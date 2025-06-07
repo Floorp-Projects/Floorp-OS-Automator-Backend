@@ -1,0 +1,21 @@
+[target.x86_64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main-centos"
+pre-build = [
+	" sed -i /etc/yum.repos.d/*.repo -e 's!^mirrorlist!#mirrorlist!' -e 's!^#baseurl=http://mirror.centos.org/!baseurl=https://vault.centos.org/!'",
+	"sed -i 's/enabled=1/enabled=0/' /etc/yum/pluginconf.d/fastestmirror.conf",
+	"yum update -y && yum install -y gcc perl make perl-IPC-Cmd"
+]
+
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main-centos"
+pre-build = [
+	" sed -i /etc/yum.repos.d/*.repo -e 's!^mirrorlist!#mirrorlist!' -e 's!^#baseurl=http://mirror.centos.org/!baseurl=https://vault.centos.org/!'",
+	"sed -i 's/enabled=1/enabled=0/' /etc/yum/pluginconf.d/fastestmirror.conf",
+	"yum update -y && yum install -y gcc perl make perl-IPC-Cmd"
+]
+
+[target.armv7-unknown-linux-gnueabihf]
+pre-build = [
+	"apt-get update && apt-get install -y crossbuild-essential-armhf",
+]
+
