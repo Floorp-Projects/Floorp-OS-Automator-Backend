@@ -11,14 +11,4 @@ pub struct Args {
 pub enum Command {
     /// Start the gRPC server
     Start,
-    /// Get weather information
-    Weather {
-        /// Latitude for the weather forecast
-        #[arg(short, long)]
-        latitude: f64,
-
-        /// Longitude for the weather forecast
-        #[arg(short = 'L', long)] // Changed short option to 'L'
-        longitude: f64,
-    },
 }
