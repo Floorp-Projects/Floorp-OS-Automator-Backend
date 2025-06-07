@@ -1,4 +1,6 @@
-use tonic::{Request, Response, Status, transport::Server};
+// gRPC Greeter service implementation
+
+use tonic::{Request, Response, Status};
 
 pub mod hello_world {
     tonic::include_proto!("helloworld");
@@ -24,20 +26,6 @@ impl Greeter for MyGreeter {
 
         Ok(Response::new(reply))
     }
-}
-
-pub async fn start_grpc_server() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
-    let greeter = MyGreeter::default();
-
-    println!("gRPC Server starting on {}", addr);
-
-    Server::builder()
-        .add_service(GreeterServer::new(greeter))
-        .serve(addr)
-        .await?;
-
-    Ok(())
 }
 
 #[cfg(test)]

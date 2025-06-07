@@ -1,11 +1,12 @@
 mod args;
-mod grpc_server;
+mod server;
+mod services;
 
 use anyhow::Result;
 use clap::Parser;
 
 use args::{Args, Command};
-use grpc_server::start_grpc_server;
+use server::start_server;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,7 +19,7 @@ async fn main() -> Result<()> {
 
             // Start server in a background task
             let server_handle = tokio::spawn(async {
-                if let Err(e) = start_grpc_server().await {
+                if let Err(e) = start_server().await {
                     eprintln!("Server error: {}", e);
                 }
             });
