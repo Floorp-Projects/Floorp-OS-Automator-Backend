@@ -1,12 +1,10 @@
 mod args;
-mod grpc_client;
 mod grpc_server;
 
 use anyhow::Result;
 use clap::Parser;
 
 use args::{Args, Command};
-use grpc_client::send_hello_request;
 use grpc_server::start_grpc_server;
 
 #[tokio::main]
@@ -27,12 +25,6 @@ async fn main() -> Result<()> {
 
             // Wait a moment for server to start
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-            // Send a test request
-            println!("Sending test hello world request...");
-            if let Err(e) = send_hello_request().await {
-                eprintln!("Client error: {}", e);
-            }
 
             // Keep server running
             println!("Server running on [::1]:50051. Press Ctrl+C to stop.");
