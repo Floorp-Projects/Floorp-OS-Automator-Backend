@@ -39,3 +39,20 @@ pub async fn start_grpc_server() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hello_world::HelloRequest;
+    use tonic::Request;
+
+    #[tokio::test]
+    async fn test_say_hello() {
+        let greeter = MyGreeter::default();
+        let request = Request::new(HelloRequest {
+            name: "TestUser".into(),
+        });
+        let response = greeter.say_hello(request).await.unwrap();
+        assert_eq!(response.get_ref().message, "Hello TestUser!");
+    }
+}
