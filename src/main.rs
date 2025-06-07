@@ -1,4 +1,6 @@
 mod args;
+mod grpc_client;
+mod grpc_server;
 mod utils;
 mod weather;
 
@@ -7,33 +9,68 @@ use chrono::{Duration, Local, NaiveDate, TimeZone};
 use clap::Parser;
 use reqwest::Client;
 
-use args::Args;
+use args::{Args, Command};
+use grpc_client::send_hello_request;
+use grpc_server::start_grpc_server;
 use utils::calculate_average;
 use weather::fetch_weather_data;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let client = Client::new();
 
-    println!(
-        "Fetching weather data for latitude: {}, longitude: {}...",
-        args.latitude, args.longitude
-    );
+    match args.command {
+        Command::Start => {
+            // Start the gRPC server and demonstrate client communication
+            println!("Starting gRPC server...");
 
-    let weather_data = fetch_weather_data(&client, args.latitude, args.longitude).await?;
+            // Start server in a background task
+            let server_handle = tokio::spawn(async {
+                if let Err(e) = start_grpc_server().await {
+                    eprintln!("Server error: {}", e);
+                }
+            });
 
-    let now = Local::now().date_naive();
-    let yesterday = now - Duration::days(1);
+            // Wait a moment for server to start
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
-    let (today_temps, yesterday_temps) = extract_temperatures(&weather_data, now, yesterday);
+            // Send a test request
+            println!("Sending test hello world request...");
+            if let Err(e) = send_hello_request().await {
+                eprintln!("Client error: {}", e);
+            }
 
-    println!("\n--- Hourly Weather Data (Every 6 Hours) ---");
-    print_hourly_weather(&weather_data, now, yesterday);
+            // Keep server running
+            println!("Server running on [::1]:50051. Press Ctrl+C to stop.");
+            server_handle.await?;
+        }
+        Command::Weather {
+            latitude,
+            longitude,
+        } => {
+            let client = Client::new();
 
-    println!("\n--- Average Temperatures ---");
-    print_average_temperature("Today's", &today_temps);
-    print_average_temperature("Yesterday's", &yesterday_temps);
+            println!(
+                "Fetching weather data for latitude: {}, longitude: {}...",
+                latitude, longitude
+            );
+
+            let weather_data = fetch_weather_data(&client, latitude, longitude).await?;
+
+            let now = Local::now().date_naive();
+            let yesterday = now - Duration::days(1);
+
+            let (today_temps, yesterday_temps) =
+                extract_temperatures(&weather_data, now, yesterday);
+
+            println!("\n--- Hourly Weather Data (Every 6 Hours) ---");
+            print_hourly_weather(&weather_data, now, yesterday);
+
+            println!("\n--- Average Temperatures ---");
+            print_average_temperature("Today's", &today_temps);
+            print_average_temperature("Yesterday's", &yesterday_temps);
+        }
+    }
 
     Ok(())
 }
