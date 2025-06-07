@@ -1,7 +1,12 @@
 [package]
-name = "rust-actions-example"
+name = "Sapphillon-Controller"
 version = "0.1.0"
 edition = "2021" # Update edition if needed, 2021 is common now
+authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/Walkmana-25/Sapphillon"
+homepage = "https://github.com/Walkmana-25/Sapphillon"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
