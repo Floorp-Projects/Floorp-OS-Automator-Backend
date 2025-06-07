@@ -16,7 +16,6 @@ clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1", features = ["full"] } # reqwest needs a tokio runtime
 chrono = "0.4"
 
-openssl = { version = "0.10.73", features = ["vendored"] }
 tonic = "0.10"
 prost = "0.12"
 
