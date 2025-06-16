@@ -4,24 +4,25 @@ mod services;
 
 use anyhow::Result;
 use clap::Parser;
-use log::{info, error};
+use log::{info, error, debug};
 
 use args::{Args, Command};
 use server::start_server;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logger with default level set to info
+    let args = Args::parse();
+    
+    // Initialize logger with the log level from command line arguments
     env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
+        .filter_level(args.loglevel.clone().into())
         .init();
     
-    let args = Args::parse();
-
     match args.command {
         Command::Start => {
             // Start the gRPC server and demonstrate client communication
             info!("Starting gRPC server...");
+            debug!("Log level set to: {:?}", args.loglevel);
 
             // Start server in a background task
             let server_handle = tokio::spawn(async {
