@@ -1,7 +1,7 @@
 // gRPC Greeter service implementation
 
-use tonic::{Request, Response, Status};
 use log::info;
+use tonic::{Request, Response, Status};
 
 pub mod hello_world {
     tonic::include_proto!("helloworld");

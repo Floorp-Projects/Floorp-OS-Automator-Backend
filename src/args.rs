@@ -7,7 +7,7 @@ pub struct Args {
     /// Set the log level
     #[arg(long, value_enum, default_value_t = LogLevel::Info)]
     pub loglevel: LogLevel,
-    
+
     #[command(subcommand)]
     pub command: Command,
 }
