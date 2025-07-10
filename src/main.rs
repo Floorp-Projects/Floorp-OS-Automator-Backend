@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
             // Start server in a background task
             let server_handle = tokio::spawn(async {
                 if let Err(e) = start_server().await {
-                    error!("Server error: {}", e);
+                    error!("Server error: {e}");
                 }
             });
 
