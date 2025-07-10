@@ -1,0 +1,31 @@
+name: Check Protocol Buffer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'proto/**'
+      - '.github/workflows/check_proto.yml'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - 'proto/**'
+      - '.github/workflows/check_proto.yml'
+      - 'Makefile'
+
+jobs:
+  check-proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install buf CLI
+        run: |
+          curl -sSL https://github.com/bufbuild/buf/releases/latest/download/buf-Linux-x86_64 -o /usr/local/bin/buf
+          chmod +x /usr/local/bin/buf
+
+      - name: Check Protocol Buffer style (lint)
+        run: buf lint proto --error-format=github-actions
+
+      - name: Check Protocol Buffer format (diff)
+        run: buf format proto -d --error-format=github-actions
