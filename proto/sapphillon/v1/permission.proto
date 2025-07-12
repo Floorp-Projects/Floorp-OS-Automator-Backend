@@ -1,6 +1,10 @@
 syntax = "proto3";
 
+//TODO Add more permission types and levels as needed
+
 package sapphillon.v1;
+
+
 
 enum PermissionType {
     PERMISSION_TYPE_NETWORK = 0;

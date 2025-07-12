@@ -19,6 +19,7 @@ message WorkflowCode {
     optional repeated sapphillon.v1.Permission required_permissions = 7;
 }
 
+// TODO Add data types to properly represent the results
 message WorkflowResult {
     string id = 1;
     string display_name = 2;
