@@ -1,0 +1,52 @@
+
+syntax = "proto3";
+
+package sapphillon.v1;
+
+ // Service for generating structured workflows.
+ service WorkflowService {
+   // Generates a workflow based on a natural language prompt.
+   // This is a custom method that takes a text prompt and returns
+   // a structured workflow definition.
+   rpc GenerateWorkflow(GenerateWorkflowRequest) returns (stream GenerateWorkflowResponse);
+
+   // Fixes an existing workflow definition based on a description of issues.
+   // This method takes a workflow definition and a description of the issues
+   // and returns a fixed workflow definition.
+   rpc FixWorkflow(FixWorkflowRequest) returns (stream FixWorkflowResponse);
+ }
+
+ // Request message for generating a workflow.
+ message GenerateWorkflowRequest {
+   // The natural language prompt describing the desired workflow.
+   // e.g., "Check the weather, and if it's raining, send me a notification."
+   string prompt = 1;
+ }
+
+ // Response message containing the generated workflow.
+ message GenerateWorkflowResponse {
+   // The structured workflow definition.
+   // The format of this definition can be JSON, YAML, or another
+   // structured format, represented as a string.
+   string workflow_definition = 1;
+ }
+
+ message FixWorkflowRequest {
+   // The workflow definition to be fixed.
+   // This should be a structured format like JSON or YAML.
+   string workflow_definition = 1;
+
+   // A description of the issues to fix.
+   // This can help guide the fixing process.
+   string description = 2;
+ }
+
+ message FixWorkflowResponse {
+   // The fixed workflow definition.
+   // This should be a structured format like JSON or YAML.
+   string fixed_workflow_definition = 1;
+
+   // A summary of the changes made to fix the workflow.
+   // This can help users understand what was changed.
+   string change_summary = 2;
+ }
