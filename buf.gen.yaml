@@ -1,0 +1,9 @@
+version: v2
+clean: true
+plugins:
+- remote: buf.build/community/neoeinstein-prost:v0.4.0
+  out: src/proto_generated
+- remote: buf.build/community/neoeinstein-tonic:v0.4.1
+  out: src/proto_generated
+inputs:
+  - directory: proto
