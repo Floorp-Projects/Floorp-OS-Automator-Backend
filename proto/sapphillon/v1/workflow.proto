@@ -5,18 +5,18 @@ import "google/protobuf/timestamp.proto";
 import "sapphillon/v1/permission.proto";
 
 enum WorkflowLanguage {
-    WORKFLOW_JAVASCRIPT = 0;
-    WORKFLOW_TYPESCRIPT = 1;
+    WORKFLOW_LANGUAGE_UNSPECIFIED = 0;
+    WORKFLOW_LANGUAGE_TYPESCRIPT = 1;
 }
 
 message WorkflowCode {
     string id = 1;
-    int code_revision = 2;
+    int32 code_revision = 2;
     string code = 3;
     WorkflowLanguage language = 4;
     google.protobuf.Timestamp created_at = 5;
     optional string result = 6;
-    optional repeated sapphillon.v1.Permission required_permissions = 7;
+    repeated sapphillon.v1.Permission required_permissions = 7;
 }
 
 // TODO Add data types to properly represent the results

@@ -7,14 +7,14 @@ package sapphillon.v1;
 
 
 enum PermissionType {
-    PERMISSION_TYPE_NETWORK = 0;
+    PERMISSION_TYPE_UNSPECIFIED = 0;
     PERMISSION_TYPE_READ = 1;
     PERMISSION_TYPE_WRITE = 2;
     PERMISSION_TYPE_EXECUTE = 3;
 }
 
 enum PermissionLevel {
-    PERMISSION_LEVEL_LOW = 0;
+    PERMISSION_LEVEL_UNSPECIFIED = 0;
     PERMISSION_LEVEL_MEDIUM = 1;
     PERMISSION_LEVEL_HIGH = 2;
     PERMISSION_LEVEL_CRITICAL = 3;
@@ -24,7 +24,7 @@ message Permission {
     string display_name = 1;
     string description = 2;
     PermissionType permission_type = 3;
-    optional repeated string resource = 4; // The resource this permission applies to, e.g., "file.txt"
+    repeated string resource = 4; // The resource this permission applies to, e.g., "file.txt"
     PermissionLevel permission_level = 5;
 
 }
