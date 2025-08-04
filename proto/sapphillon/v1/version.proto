@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package sapphillon.v1;
+
+service VersionService {
+  // Returns the current version of the application.
+  rpc GetVersion(GetVersionRequest) returns (GetVersionResponse);
+}
+
+message Version {
+  string version = 1; // The version of the application
+}
+
+message GetVersionRequest {
+  // This message can be extended in the future if needed.
+}
+message GetVersionResponse {
+  Version version = 1; // The current version of the application
+}
