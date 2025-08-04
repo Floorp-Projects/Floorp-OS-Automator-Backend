@@ -27,14 +27,13 @@ impl VersionService for MyVersionService {
 }
 
 mod test {
-    
-    
-    
-    
+
+    #[allow(unused_imports)]
+    use super::*;
 
     #[tokio::test]
     async fn test_get_version() {
-        let service = MyVersionService::default();
+        let service = MyVersionService;
         let request = Request::new(GetVersionRequest {});
         let response = service.get_version(request).await.unwrap().into_inner();
         assert!(response.version.is_some());
