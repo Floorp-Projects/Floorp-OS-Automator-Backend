@@ -1,6 +1,7 @@
 mod args;
 mod server;
 mod services;
+mod proto_generated;
 
 use anyhow::Result;
 use clap::Parser;

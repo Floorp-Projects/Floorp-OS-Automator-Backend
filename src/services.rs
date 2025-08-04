@@ -1,4 +1,4 @@
 // Service root module
 
-mod greeter;
-pub use greeter::*;
+mod version;
+pub use version::*;
