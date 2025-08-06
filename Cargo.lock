@@ -13,7 +13,7 @@ dependencies = [
  "log",
  "prost",
  "prost-types",
- "saphillon_core",
+ "sapphillon_core",
  "tokio",
  "tonic",
  "tonic-build",
@@ -1076,9 +1076,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eded382c5f5f786b989652c49544c4877d9f015cc22e145a5ea8ea66c2921cd2"
 
 [[package]]
-name = "saphillon_core"
-version = "0.1.1"
-source = "git+ssh://git@github.com/Walkmana-25/Saphillon-Core.git?tag=v0.1.1-alpha#127f16598abdd10055ccb617163d2bb9f7621904"
+name = "sapphillon_core"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.1.0-alpha#babec364240b40397a9bfb9a5dedb3228e798b2a"
 dependencies = [
  "anyhow",
  "chrono",

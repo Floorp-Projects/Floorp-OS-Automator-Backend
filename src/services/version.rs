@@ -2,8 +2,8 @@ use log::info;
 use tonic::{Request, Response, Status};
 
 // Import the generated protobuf types
-use crate::proto_generated::sapphillon::v1::version_service_server::VersionService;
-use crate::proto_generated::sapphillon::v1::{GetVersionRequest, GetVersionResponse, Version};
+use sapphillon_core::proto::sapphillon::v1::version_service_server::VersionService;
+use sapphillon_core::proto::sapphillon::v1::{GetVersionRequest, GetVersionResponse, Version};
 
 #[derive(Debug, Default)]
 pub struct MyVersionService;

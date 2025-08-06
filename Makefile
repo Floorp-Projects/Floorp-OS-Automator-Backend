@@ -1,10 +1,4 @@
-.PHONY: rust_test, rust_build, rust_check_format, rust_fix_format, buf_generate
-
-buf_generate:
-	@echo "Generate Protocol Buffer Code"
-	@echo "----------------------------------------------------------"
-	buf generate
-	@echo "----------------------------------------------------------"
+.PHONY: rust_test, rust_build, rust_check_format, rust_fix_format 
 
 rust_test:
 	@echo "Run Rust Tests"
