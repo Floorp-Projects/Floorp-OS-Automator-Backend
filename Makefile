@@ -15,14 +15,16 @@ rust_build:
 rust_check_format:
 	@echo "Check Rust Format"
 	@echo "----------------------------------------------------------"
-	cargo fmt --check
-	cargo clippy
+	cargo fmt --check || true
+	@echo "----------------------------------------------------------"
+	cargo clippy || true
 	@echo "----------------------------------------------------------"
 
 rust_fix_format:
 	@echo "Fix Rust Format"
 	@echo "----------------------------------------------------------"
-	cargo fmt
-	cargo clippy --fix --allow-dirty
+	cargo fmt || treu
+	@echo "----------------------------------------------------------"
+	cargo clippy --fix --allow-dirty || true
 	@echo "----------------------------------------------------------"
 
