@@ -68,25 +68,21 @@ jobs:
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+
       - name: Setup SSH (Windows)
         if: ${{ matrix.runner == 'windows-latest' }}
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Setup SSH knwon_hosts (Windows)
+        if: ${{ matrix.runner == 'windows-latest' }}
         run: |
-            # 元のコマンド: mkdir -p ~/.ssh
-            New-Item -Path (Join-Path $HOME ".ssh") -ItemType Directory -Force
+          # github.com のホストキーを known_hosts ファイルに追記する
+          $knownHostsPath = Join-Path $sshPath "known_hosts"
+          ssh-keyscan -H github.com | Add-Content -Path $knownHostsPath
 
-            # 元のコマンド: echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-            $env:SSH_PRIVATE_KEY | Set-Content -Path (Join-Path $HOME ".ssh\id_rsa")
-
-            # 元のコマンド: chmod 600 ~/.ssh/id_rsa
-            # icacls.exe を使ってファイルのアクセス権を変更します
-            $idRsaPath = Join-Path $HOME ".ssh\id_rsa"
-            icacls.exe $idRsaPath /inheritance:r
-            icacls.exe $idRsaPath /grant "$($env:USERNAME):F"
-
-            # 元のコマンド: ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-            ssh-keyscan -H github.com | Add-Content -Path (Join-Path $HOME ".ssh\known_hosts")
+          Write-Host "github.com has been added to the known_hosts file."
 
       - name: Install Dependencies on Windows
         if: ${{ matrix.runner == 'windows-latest' }}
