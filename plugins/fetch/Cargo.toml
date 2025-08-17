@@ -1,6 +1,12 @@
 [package]
 name = "fetch"
-version = "0.1.0"
+version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+readme.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
 edition = "2024"
 
 [dependencies]

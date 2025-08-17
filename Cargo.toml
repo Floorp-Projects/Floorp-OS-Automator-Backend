@@ -1,5 +1,6 @@
-[package]
-name = "Sapphillon-Controller"
+[workspace.package]
+
+# name = "Sapphillon"
 version = "0.2.0"
 edition = "2024" 
 authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
@@ -7,7 +8,6 @@ license-file = "LICENSE"
 readme = "README.md"
 repository = "https://github.com/Walkmana-25/Sapphillon"
 homepage = "https://github.com/Walkmana-25/Sapphillon"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [workspace]
@@ -16,7 +16,7 @@ members = [
     "plugins/*",
 ]
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1", features = ["full"] } # reqwest needs a tokio runtime
@@ -28,6 +28,30 @@ tonic = "0.12.0"
 prost = "0.13.1"
 prost-types = "0.13.1"
 sapphillon_core = { git = "ssh://git@github.com/Walkmana-25/Sapphillon-Core.git", tag = "v0.4.1-alpha" }
+tonic-build = "0.12.0"
+
+[package]
+name = "Sapphillon-Controller"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+readme.workspace = true
+repository.workspace =  true
+homepage.workspace = true
+
+[dependencies]
+
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+log.workspace = true
+env_logger.workspace = true
+tonic.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+sapphillon_core.workspace = true
 
 [build-dependencies]
-tonic-build = "0.12.0"
+tonic-build.workspace = true
