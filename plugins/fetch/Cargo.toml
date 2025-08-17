@@ -3,7 +3,7 @@ name = "fetch"
 version.workspace = true
 authors.workspace = true
 license-file.workspace = true
-readme.workspace = true
+readme = "README.md"
 repository.workspace = true
 homepage.workspace = true
 
