@@ -19,7 +19,7 @@ use std::string;
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 use deno_core::{op2, extension, error::AnyError};
-use anyhow::{Result, Error};
+use anyhow::Result;
 use deno_error::JsErrorBox;
 
 extension! {
