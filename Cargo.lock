@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "deno_error",
  "env_logger",
  "log",
  "prost",

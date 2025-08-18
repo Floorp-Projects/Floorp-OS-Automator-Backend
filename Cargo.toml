@@ -24,6 +24,7 @@ chrono = "0.4"
 log = "0.4"
 env_logger = "0.11"
 deno_core = "0.355.0"
+deno_error = "0.7.0"
 
 tonic = "0.12.0"
 prost = "0.13.1"
