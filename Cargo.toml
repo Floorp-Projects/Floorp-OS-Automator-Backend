@@ -21,6 +21,7 @@ env_logger = "0.11"
 tonic = "0.12.0"
 prost = "0.13.1"
 prost-types = "0.13.1"
+sapphillon_core = { git = "ssh://git@github.com/Walkmana-25/Sapphillon-Core.git", tag = "v0.4.1-alpha" }
 
 async-openai = "0.18.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
