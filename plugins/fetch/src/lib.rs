@@ -1,5 +1,3 @@
-use std::string;
-
 // Sapphillon
 // Copyright 2025 Yuta Takahashi
 //
@@ -18,8 +16,8 @@ use std::string;
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
-use deno_core::{op2, extension, error::AnyError};
 use anyhow::Result;
+use deno_core::{error::AnyError, op2};
 use deno_error::JsErrorBox;
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 
@@ -29,7 +27,7 @@ pub fn fetch_plugin() -> CorePluginFunction {
         "Fetch".to_string(),
         "Fetches the content of a URL using reqwest and returns it as a string.".to_string(),
         op2_fetch(),
-        Some(include_str!("00_fetch.js").to_string())
+        Some(include_str!("00_fetch.js").to_string()),
     )
 }
 
@@ -74,9 +72,8 @@ mod tests {
         let body = result.unwrap();
         assert!(body.contains("ok"));
         println!("Fetched content: {body}");
-        
     }
-    
+
     #[test]
     fn test_fetch_in_workflow() {
         let code = r#"
@@ -84,12 +81,12 @@ mod tests {
             const response = fetch(url);
             console.log(response);
         "#;
-        
+
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![fetch_plugin_package()],
-            1
+            1,
         );
         workflow.run();
         assert_eq!(workflow.result.len(), 1);
@@ -97,9 +94,6 @@ mod tests {
         let url = "https://dummyjson.com/test";
         let expected = fetch(url).unwrap() + "\n";
 
-
         assert_eq!(workflow.result[0].result, expected)
-
-
     }
 }
