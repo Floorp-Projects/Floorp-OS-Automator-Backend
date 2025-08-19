@@ -3,5 +3,3 @@ function fetch(url) {
 }
 
 globalThis.fetch = fetch;
-
-export { fetch };
