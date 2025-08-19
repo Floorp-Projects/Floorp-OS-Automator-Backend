@@ -25,20 +25,13 @@ use sapphillon_core::plugin::CorePluginFunction;
 
 pub fn fetch_plugin() -> CorePluginFunction {
     CorePluginFunction::new(
-        "app.floorp.core.fetch".to_string(),
+        "app.sapphillon.core.fetch".to_string(),
         "Fetch".to_string(),
         "Fetches the content of a URL using reqwest and returns it as a string.".to_string(),
-        fetch::init
+        op2_fetch(),
+        Some(include_str!("00_fetch.js").to_string())
     )
 }
-
-extension! (
-    fetch,
-    ops = [
-        op2_fetch,
-    ],
-    esm = ["src/00_fetch.js"],
-);
 
 #[op2]
 #[string]
