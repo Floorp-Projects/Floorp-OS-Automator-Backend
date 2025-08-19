@@ -3,28 +3,28 @@
 rust_test:
 	@echo "Run Rust Tests"
 	@echo "----------------------------------------------------------"
-	cargo test
+	cargo test --workspace --all-features
 	@echo "----------------------------------------------------------"
 
 rust_build:
 	@echo "Build Rust Project"
 	@echo "----------------------------------------------------------"
-	cargo build
+	cargo build --workspace --all-features
 	@echo "----------------------------------------------------------"
 
 rust_check_format:
 	@echo "Check Rust Format"
 	@echo "----------------------------------------------------------"
-	cargo fmt --check || true
+	cargo fmt --all --check || true
 	@echo "----------------------------------------------------------"
-	cargo clippy || true
+	cargo clippy --workspace || true
 	@echo "----------------------------------------------------------"
 
 rust_fix_format:
 	@echo "Fix Rust Format"
 	@echo "----------------------------------------------------------"
-	cargo fmt || true
+	cargo fmt --all || true
 	@echo "----------------------------------------------------------"
-	cargo clippy --fix --allow-dirty || true
+	cargo clippy --workspace --fix --allow-dirty || true
 	@echo "----------------------------------------------------------"
 

@@ -32,7 +32,7 @@ impl VersionService for MyVersionService {
         &self,
         request: Request<GetVersionRequest>,
     ) -> Result<Response<GetVersionResponse>, Status> {
-        info!("Got a version request: {:?}", request);
+        info!("Got a version request: {request:?}");
 
         let response = GetVersionResponse {
             version: Some(Version {

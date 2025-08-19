@@ -97,12 +97,12 @@ jobs:
       - name: Build Project on cross
         if: ${{ matrix.cross }}
         run: |
-            cross build --release --target ${{ matrix.target }} --verbose
+            cross build --workspace --release --target ${{ matrix.target }} --verbose
       - name: Build Project
         if: ${{ !matrix.cross }}
         run: |
           rustup target add ${{ matrix.target }}
-          cargo build --release --target ${{ matrix.target }} --verbose
+          cargo build --workspace --release --target ${{ matrix.target }} --verbose
 
       - name: Rename Artifacts
         shell: bash

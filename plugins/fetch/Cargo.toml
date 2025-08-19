@@ -1,0 +1,18 @@
+[package]
+name = "fetch"
+version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+deno_core.workspace = true
+deno_error.workspace = true
+sapphillon_core.workspace = true
+reqwest = { version = "0.12.23", default-features = false, features = ["http2", "rustls-tls", "charset", "zstd", "gzip", "blocking"] }
