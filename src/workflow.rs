@@ -7,6 +7,7 @@ use async_openai::{
     types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs},
 };
 
+#[allow(dead_code)]
 pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = llm_call(&prompt)?;
@@ -14,6 +15,7 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
     workflow_code.ok_or_else(|| "No code section found in the response".into())
 }
 
+#[allow(dead_code)]
 fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let template = format!(
         r#"
@@ -108,6 +110,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     Ok(prompt)
 }
 
+#[allow(dead_code)]
 fn extract_first_code(xml: &str) -> Option<String> {
     let open = "<code>";
     let close = "</code>";
@@ -122,6 +125,7 @@ fn extract_first_code(xml: &str) -> Option<String> {
     None
 }
 
+#[allow(dead_code)]
 pub fn llm_call(user_query: &str) -> Result<String, Box<dyn Error>> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(_llm_call_async(user_query))
@@ -154,7 +158,7 @@ pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>>
     // 最初のレスポンスの message.content を取得
     let content = response
         .choices
-        .get(0)
+        .first()
         .and_then(|c| c.message.content.clone())
         .unwrap_or_else(|| "".to_string());
 
