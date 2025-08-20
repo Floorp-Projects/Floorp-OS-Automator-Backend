@@ -20,10 +20,13 @@
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     FixWorkflowRequest, FixWorkflowResponse, GenerateWorkflowRequest, GenerateWorkflowResponse,
+    WorkflowCode, Workflow
 };
-use tonic;
+
 use tokio_stream::Stream;
 use std::pin::Pin;
+use crate::workflow::generate_workflow;
+use fetch::fetch_plugin_package;
 
 #[derive(Debug, Default)]
 pub struct MyWorkflowService {}
@@ -56,7 +59,49 @@ impl WorkflowService for MyWorkflowService {
         tonic::Status,
     > {
         // 未実装のためエラーを返す
-        let _ = request;
+        let prompt = request.into_inner().prompt;
+        
+        // Generate Workflow Code
+        let workflow_code_raw = generate_workflow(&prompt)
+            .map_err(|e| tonic::Status::internal(format!("Failed to generate workflow: {e}")))?;
+        
+        let workflow_code = WorkflowCode {
+            id: uuid::Uuid::new_v4().to_string(),
+            code_revision: 1,
+            code: workflow_code_raw,
+            language: 0,
+            created_at: None,
+            result: vec![],
+            required_permissions: vec![],
+            plugin_packages: vec![],
+            plugin_function_ids: vec![],
+        };
+        
+        let workflow = Workflow {
+            id: uuid::Uuid::new_v4().to_string(),
+            display_name: "Generated Workflow".to_string(),
+            description: "This is a generated workflow".to_string(),
+            workflow_language: 0,
+            workflow_code: vec![workflow_code],
+            created_at: None,
+            updated_at: None,
+            workflow_results: vec![],
+
+        };
+        
+        let response = GenerateWorkflowResponse {
+            workflow_definition: Some(workflow),
+            status: Some(sapphillon_core::proto::google::rpc::Status {
+                code: 0,
+                message: "Workflow generated successfully".to_string(),
+                details: vec![],
+            }),
+        };
+        
+        // return the response
+
+
+
         Err(tonic::Status::unimplemented("generate_workflow is not implemented"))
     }
 }
