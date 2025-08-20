@@ -18,19 +18,23 @@
 
 // gRPC server startup logic
 
-use crate::services::MyVersionService;
+use crate::services::{MyVersionService, MyWorkflowService};
 use log::info;
 use sapphillon_core::proto::sapphillon::v1::version_service_server::VersionServiceServer;
+use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowServiceServer;
 use tonic::transport::Server;
 
 pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let version_service = MyVersionService;
+    let version_service = MyVersionService {};
+    let workflow_service = MyWorkflowService {};
+
 
     info!("gRPC Server starting on {addr}");
 
     Server::builder()
         .add_service(VersionServiceServer::new(version_service))
+        .add_service(WorkflowServiceServer::new(workflow_service))
         .serve(addr)
         .await?;
 
