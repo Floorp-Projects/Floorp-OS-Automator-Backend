@@ -6300,8 +6300,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.5.3"
-source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.3-alpha#ed67489d26627bcd0650ef6dde6ad505a8102ba0"
+version = "0.5.4"
+source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.4-alpha#71995223c5849050ec398463fab8b883fdfdfb26"
 dependencies = [
  "anyhow",
  "chrono",
