@@ -28,11 +28,15 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
     let version_service = MyVersionService {};
     let workflow_service = MyWorkflowService {};
-
-
+    
+    let reflection_service = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(sapphillon_core::proto::sapphillon::v1::FILE_DESCRIPTOR_SET)
+        .build_v1alpha().unwrap();
+    
     info!("gRPC Server starting on {addr}");
 
     Server::builder()
+        .add_service(reflection_service)
         .add_service(VersionServiceServer::new(version_service))
         .add_service(WorkflowServiceServer::new(workflow_service))
         .serve(addr)

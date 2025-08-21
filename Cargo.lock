@@ -23,6 +23,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-build",
+ "tonic-reflection",
  "uuid",
 ]
 
@@ -6299,8 +6300,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.5.2"
-source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.2-alpha#591f622c088d78a412e0edf949b5dbb9b40762c2"
+version = "0.5.3"
+source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.3-alpha#ed67489d26627bcd0650ef6dde6ad505a8102ba0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -7222,6 +7223,19 @@ dependencies = [
  "prost-types",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "878d81f52e7fcfd80026b7fdb6a9b578b3c3653ba987f87f0dce4b64043cba27"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]
