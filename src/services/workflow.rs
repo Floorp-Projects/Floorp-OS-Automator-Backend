@@ -66,6 +66,7 @@ impl WorkflowService for MyWorkflowService {
         let workflow_code_raw = generate_workflow_async(&prompt)
             .await
             .map_err(|e| tonic::Status::internal(format!("Failed to generate workflow: {e}")))?;
+        let workflow_code_raw = workflow_code_raw + "workflow();";
         
         let workflow_code = WorkflowCode {
             id: uuid::Uuid::new_v4().to_string(),
