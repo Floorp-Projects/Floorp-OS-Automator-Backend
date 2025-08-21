@@ -26,6 +26,7 @@ dependencies = [
  "tonic-reflection",
  "tonic-web",
  "tower-http 0.5.2",
+ "unescaper",
  "uuid",
 ]
 
@@ -6302,8 +6303,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.5.4"
-source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.4-alpha#71995223c5849050ec398463fab8b883fdfdfb26"
+version = "0.5.5"
+source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.5.5-alpha#b35185ce940f31093b9d271370cc2396025a5abd"
 dependencies = [
  "anyhow",
  "chrono",
@@ -6318,6 +6319,7 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
+ "unescaper",
 ]
 
 [[package]]
@@ -7425,6 +7427,15 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
+
+[[package]]
+name = "unescaper"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c01d12e3a56a4432a8b436f293c25f4808bdf9e9f9f98f9260bba1f1bc5a1f26"
+dependencies = [
+ "thiserror 2.0.15",
+]
 
 [[package]]
 name = "unic-char-property"

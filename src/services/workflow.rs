@@ -138,7 +138,9 @@ impl WorkflowService for MyWorkflowService {
         let workflow_code = workflow.workflow_code.iter_mut()
             .find(|code| code.code_revision == latest_workflow_code_revision)
             .ok_or_else(|| tonic::Status::not_found("Latest workflow code not found"))?;
+        workflow_code.code = unescaper::unescape(&workflow_code.code).unwrap();
         
+        log::debug!("Parsed workflow code: {}", workflow_code.code);
 
         let mut workflow_core = CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package()]);
         workflow_core.run();
