@@ -33,7 +33,9 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
     workflow_code.ok_or_else(|| "No code section found in the response".into())
 }
 
-pub async fn generate_workflow_async(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn generate_workflow_async(
+    user_query: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = _llm_call_async(&prompt).await?;
     let workflow_code = extract_first_code(&workflow_raw);

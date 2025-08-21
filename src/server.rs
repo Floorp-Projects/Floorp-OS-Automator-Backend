@@ -29,36 +29,86 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
     let version_service = MyVersionService {};
     let workflow_service = MyWorkflowService {};
-    
+
     let reflection_service_v1 = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::sapphillon::v1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::rpc::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::rpc::context::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::r#type::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::expr::v1alpha1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::expr::v1beta1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::bytestream::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::longrunning::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::geo::r#type::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::protobuf::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::protobuf::compiler::FILE_DESCRIPTOR_SET)
-        .build_v1().unwrap();
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::sapphillon::v1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::rpc::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::rpc::context::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::r#type::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::expr::v1alpha1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::expr::v1beta1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::bytestream::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::longrunning::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::geo::r#type::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::protobuf::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::protobuf::compiler::FILE_DESCRIPTOR_SET,
+        )
+        .build_v1()
+        .unwrap();
 
     let reflection_service_v1_alpha = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::sapphillon::v1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::rpc::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::rpc::context::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::r#type::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::expr::v1alpha1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::api::expr::v1beta1::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::bytestream::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::longrunning::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::geo::r#type::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::protobuf::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(sapphillon_core::proto::google::protobuf::compiler::FILE_DESCRIPTOR_SET)
-        .build_v1alpha().unwrap();
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::sapphillon::v1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::rpc::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::rpc::context::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::r#type::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::expr::v1alpha1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::api::expr::v1beta1::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::bytestream::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::longrunning::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::geo::r#type::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::protobuf::FILE_DESCRIPTOR_SET,
+        )
+        .register_encoded_file_descriptor_set(
+            sapphillon_core::proto::google::protobuf::compiler::FILE_DESCRIPTOR_SET,
+        )
+        .build_v1alpha()
+        .unwrap();
 
     info!("gRPC Server starting on {addr}");
 
@@ -72,8 +122,12 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
         .layer(cors)
         .add_service(tonic_web::enable(reflection_service_v1_alpha))
         .add_service(tonic_web::enable(reflection_service_v1))
-        .add_service(tonic_web::enable(VersionServiceServer::new(version_service)))
-        .add_service(tonic_web::enable(WorkflowServiceServer::new(workflow_service)))
+        .add_service(tonic_web::enable(VersionServiceServer::new(
+            version_service,
+        )))
+        .add_service(tonic_web::enable(WorkflowServiceServer::new(
+            workflow_service,
+        )))
         .serve(addr)
         .await?;
 

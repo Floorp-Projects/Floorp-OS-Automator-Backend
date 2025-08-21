@@ -48,10 +48,7 @@ fn op2_fetch(#[string] url: String) -> std::result::Result<String, JsErrorBox> {
 }
 
 fn fetch(url: &str) -> anyhow::Result<String> {
-    let body = ureq::get(url)
-        .call()?
-        .body_mut()
-        .read_to_string()?;
+    let body = ureq::get(url).call()?.body_mut().read_to_string()?;
     Ok(body)
 }
 

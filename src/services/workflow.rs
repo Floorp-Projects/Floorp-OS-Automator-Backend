@@ -16,18 +16,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
+use fetch::fetch_plugin_package;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     FixWorkflowRequest, FixWorkflowResponse, GenerateWorkflowRequest, GenerateWorkflowResponse,
-    WorkflowCode, Workflow, RunWorkflowRequest, RunWorkflowResponse
+    RunWorkflowRequest, RunWorkflowResponse, Workflow, WorkflowCode,
 };
 use sapphillon_core::workflow::CoreWorkflowCode;
-use fetch::fetch_plugin_package;
 
-use tokio_stream::Stream;
-use std::pin::Pin;
 use crate::workflow::generate_workflow_async;
+use std::pin::Pin;
+use tokio_stream::Stream;
 
 #[derive(Debug, Default)]
 pub struct MyWorkflowService;
@@ -35,39 +34,44 @@ pub struct MyWorkflowService;
 #[tonic::async_trait]
 impl WorkflowService for MyWorkflowService {
     type FixWorkflowStream = Pin<
-        Box<dyn Stream<Item = std::result::Result<FixWorkflowResponse, tonic::Status>> + Send + 'static>,
+        Box<
+            dyn Stream<Item = std::result::Result<FixWorkflowResponse, tonic::Status>>
+                + Send
+                + 'static,
+        >,
     >;
-    type GenerateWorkflowStream =
-        Pin<Box<dyn Stream<Item = std::result::Result<GenerateWorkflowResponse, tonic::Status>> + Send + 'static>>;
+    type GenerateWorkflowStream = Pin<
+        Box<
+            dyn Stream<Item = std::result::Result<GenerateWorkflowResponse, tonic::Status>>
+                + Send
+                + 'static,
+        >,
+    >;
 
     async fn fix_workflow(
         &self,
         request: tonic::Request<FixWorkflowRequest>,
-    ) -> std::result::Result<
-        tonic::Response<Self::FixWorkflowStream>,
-        tonic::Status,
-    > {
+    ) -> std::result::Result<tonic::Response<Self::FixWorkflowStream>, tonic::Status> {
         // 未実装のためエラーを返す
         let _ = request;
-        Err(tonic::Status::unimplemented("fix_workflow is not implemented"))
+        Err(tonic::Status::unimplemented(
+            "fix_workflow is not implemented",
+        ))
     }
 
     async fn generate_workflow(
         &self,
         request: tonic::Request<GenerateWorkflowRequest>,
-    ) -> std::result::Result<
-        tonic::Response<Self::GenerateWorkflowStream>,
-        tonic::Status,
-    > {
+    ) -> std::result::Result<tonic::Response<Self::GenerateWorkflowStream>, tonic::Status> {
         // 未実装のためエラーを返す
         let prompt = request.into_inner().prompt;
-        
+
         // Generate Workflow Code
         let workflow_code_raw = generate_workflow_async(&prompt)
             .await
             .map_err(|e| tonic::Status::internal(format!("Failed to generate workflow: {e}")))?;
         let workflow_code_raw = workflow_code_raw + "workflow();";
-        
+
         let workflow_code = WorkflowCode {
             id: uuid::Uuid::new_v4().to_string(),
             code_revision: 1,
@@ -79,7 +83,7 @@ impl WorkflowService for MyWorkflowService {
             plugin_packages: vec![],
             plugin_function_ids: vec![],
         };
-        
+
         let workflow = Workflow {
             id: uuid::Uuid::new_v4().to_string(),
             display_name: "Generated Workflow".to_string(),
@@ -89,9 +93,8 @@ impl WorkflowService for MyWorkflowService {
             created_at: None,
             updated_at: None,
             workflow_results: vec![],
-
         };
-        
+
         let response = GenerateWorkflowResponse {
             workflow_definition: Some(workflow),
             status: Some(sapphillon_core::proto::google::rpc::Status {
@@ -100,7 +103,7 @@ impl WorkflowService for MyWorkflowService {
                 details: vec![],
             }),
         };
-        
+
         // return the response
         // stream the single response back to the client
         let (tx, rx) = tokio::sync::mpsc::channel(1);
@@ -112,44 +115,56 @@ impl WorkflowService for MyWorkflowService {
         });
 
         let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-        let boxed_stream: Self::GenerateWorkflowStream = Box::pin(stream) as Self::GenerateWorkflowStream;
+        let boxed_stream: Self::GenerateWorkflowStream =
+            Box::pin(stream) as Self::GenerateWorkflowStream;
 
         Ok(tonic::Response::new(boxed_stream))
     }
-    
 
     async fn run_workflow(
         &self,
         request: tonic::Request<RunWorkflowRequest>,
-    ) -> std::result::Result<
-        tonic::Response<RunWorkflowResponse>,
-        tonic::Status,
-    > {
+    ) -> std::result::Result<tonic::Response<RunWorkflowResponse>, tonic::Status> {
         let mut workflow = match request.into_inner().workflow_definition.clone() {
             Some(workflow) => workflow.clone(),
             None => {
-                return Err(tonic::Status::invalid_argument("Workflow definition is required"));
+                return Err(tonic::Status::invalid_argument(
+                    "Workflow definition is required",
+                ));
             }
         };
-        let latest_workflow_code_revision = workflow.workflow_code.iter()
+        let latest_workflow_code_revision = workflow
+            .workflow_code
+            .iter()
             .map(|code| code.code_revision)
             .max()
             .unwrap_or(0);
-        
-        let workflow_code = workflow.workflow_code.iter_mut()
+
+        let workflow_code = workflow
+            .workflow_code
+            .iter_mut()
             .find(|code| code.code_revision == latest_workflow_code_revision)
             .ok_or_else(|| tonic::Status::not_found("Latest workflow code not found"))?;
         workflow_code.code = unescaper::unescape(&workflow_code.code).unwrap();
-        
+
         log::debug!("Parsed workflow code: {}", workflow_code.code);
 
-        let mut workflow_core = CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package()]);
+        let mut workflow_core =
+            CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package()]);
         workflow_core.run();
-        
-        let latest_result_revision = workflow_core.result.iter().map(|r| r.workflow_result_revision).max().unwrap_or(0);
 
-        let workflow_core_result_latest = workflow_core.result.iter().find(|r| r.workflow_result_revision == latest_result_revision);
-        
+        let latest_result_revision = workflow_core
+            .result
+            .iter()
+            .map(|r| r.workflow_result_revision)
+            .max()
+            .unwrap_or(0);
+
+        let workflow_core_result_latest = workflow_core
+            .result
+            .iter()
+            .find(|r| r.workflow_result_revision == latest_result_revision);
+
         let res = RunWorkflowResponse {
             workflow_result: Some(workflow_core_result_latest.unwrap().clone()),
             status: Some(sapphillon_core::proto::google::rpc::Status {
@@ -158,11 +173,8 @@ impl WorkflowService for MyWorkflowService {
                 details: vec![],
             }),
         };
-        
-        
+
         // Return the response
         Ok(tonic::Response::new(res))
     }
-
 }
-    
