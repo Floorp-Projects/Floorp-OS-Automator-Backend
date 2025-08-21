@@ -87,7 +87,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ---
 
     ### 利用可能なTool
-    - `fetch_str(url: str) -> {{body: str}}`
+    - `fetch(url: str) -> {{body: str}}`
 
     ---
 
