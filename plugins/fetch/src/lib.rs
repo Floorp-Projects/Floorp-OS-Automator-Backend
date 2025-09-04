@@ -80,6 +80,8 @@ mod tests {
             code.to_string(),
             vec![fetch_plugin_package()],
             1,
+            None,
+            None
         );
         workflow.run();
         assert_eq!(workflow.result.len(), 1);
