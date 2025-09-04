@@ -167,12 +167,34 @@ impl WorkflowService for MyWorkflowService {
         &self,
         request: tonic::Request<RunWorkflowRequest>,
     ) -> std::result::Result<tonic::Response<RunWorkflowResponse>, tonic::Status> {
-        let mut workflow = match request.into_inner().workflow_definition.clone() {
-            Some(workflow) => workflow.clone(),
-            None => {
-                return Err(tonic::Status::invalid_argument(
-                    "Workflow definition is required",
-                ));
+        let req = request.into_inner();
+        if req.workflow_id.is_empty() && req.workflow_code_id.is_empty() {
+            return Err(tonic::Status::invalid_argument(
+                "Either workflow_id or workflow_code_id is required",
+            ));
+        }
+        // Construct a placeholder Workflow until a real storage lookup is implemented.
+        let mut workflow = if !req.workflow_id.is_empty() {
+            Workflow {
+                id: req.workflow_id.clone(),
+                ..Default::default()
+            }
+        } else {
+            let wc = WorkflowCode {
+                id: req.workflow_code_id.clone(),
+                code_revision: 1,
+                code: "".to_string(),
+                language: 0,
+                created_at: None,
+                result: vec![],
+                required_permissions: vec![],
+                plugin_packages: vec![],
+                plugin_function_ids: vec![],
+                allowed_permissions: vec![],
+            };
+            Workflow {
+                workflow_code: vec![wc],
+                ..Default::default()
             }
         };
         let latest_workflow_code_revision = workflow
