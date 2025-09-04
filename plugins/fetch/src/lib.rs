@@ -81,7 +81,7 @@ mod tests {
             vec![fetch_plugin_package()],
             1,
             None,
-            None
+            None,
         );
         workflow.run();
         assert_eq!(workflow.result.len(), 1);

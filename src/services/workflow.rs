@@ -19,8 +19,10 @@
 use fetch::fetch_plugin_package;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
-    FixWorkflowRequest, FixWorkflowResponse, GenerateWorkflowRequest, GenerateWorkflowResponse,
-    RunWorkflowRequest, RunWorkflowResponse, Workflow, WorkflowCode, GetWorkflowRequest, GetWorkflowResponse, ListWorkflowsRequest, ListWorkflowsResponse, DeleteWorkflowRequest, DeleteWorkflowResponse, UpdateWorkflowRequest, UpdateWorkflowResponse,
+    DeleteWorkflowRequest, DeleteWorkflowResponse, FixWorkflowRequest, FixWorkflowResponse,
+    GenerateWorkflowRequest, GenerateWorkflowResponse, GetWorkflowRequest, GetWorkflowResponse,
+    ListWorkflowsRequest, ListWorkflowsResponse, RunWorkflowRequest, RunWorkflowResponse,
+    UpdateWorkflowRequest, UpdateWorkflowResponse, Workflow, WorkflowCode,
 };
 use sapphillon_core::workflow::CoreWorkflowCode;
 
@@ -111,7 +113,6 @@ impl WorkflowService for MyWorkflowService {
             .await
             .map_err(|e| tonic::Status::internal(format!("Failed to generate workflow: {e}")))?;
         let workflow_code_raw = workflow_code_raw + "workflow();";
-
 
         let workflow_code = WorkflowCode {
             id: uuid::Uuid::new_v4().to_string(),
@@ -213,8 +214,12 @@ impl WorkflowService for MyWorkflowService {
 
         log::debug!("Parsed workflow code: {}", workflow_code.code);
 
-        let mut workflow_core =
-            CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package()], None, None);
+        let mut workflow_core = CoreWorkflowCode::new_from_proto(
+            workflow_code,
+            vec![fetch_plugin_package()],
+            None,
+            None,
+        );
         workflow_core.run();
 
         let latest_result_revision = workflow_core
