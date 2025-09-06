@@ -70,11 +70,7 @@ pub fn core_fetch_plugin_package() -> CorePluginPackage {
     )
 }
 
-#[op2]
-#[string]
-fn op2_fetch(state: &mut OpState, #[string] url: String) -> std::result::Result<String, JsErrorBox> {
-    // Permission Check
-    
+fn permission_check(state: &mut OpState, url: String) -> Result<(), JsErrorBox> {
     // Requrements Permission of this func
     let mut perm = fetch_plugin_permissions();
     perm[0].resource = vec![url.clone()];
@@ -100,6 +96,15 @@ fn op2_fetch(state: &mut OpState, #[string] url: String) -> std::result::Result<
     if let CheckPermissionResult::MissingPermission(perm) = permission_check_result {
         return Err(JsErrorBox::new("PermissionDenied. Missing Permissions:", perm.to_string()));
     }
+    Ok(())
+}
+
+#[op2]
+#[string]
+fn op2_fetch(state: &mut OpState, #[string] url: String) -> std::result::Result<String, JsErrorBox> {
+    // Permission Check
+    permission_check(state, url.clone())?;
+    
 
     match fetch(&url) {
         Ok(body) => Ok(body),
