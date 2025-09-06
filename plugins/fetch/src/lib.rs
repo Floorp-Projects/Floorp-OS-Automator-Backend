@@ -150,6 +150,7 @@ fn fetch_plugin_permissions() -> Vec<Permission> {
 mod tests {
     use super::*;
     use sapphillon_core::workflow::CoreWorkflowCode;
+    use sapphillon_core::proto::sapphillon::v1::PermissionType;
 
     #[test]
     fn test_fetch() {
@@ -214,5 +215,44 @@ mod tests {
             actual == &expected || actual.to_lowercase().contains("permission"),
             "Unexpected workflow result: {actual}"
         );
+    }
+
+    #[test]
+    fn test_fetch_plugin_permissions() {
+        let perms = fetch_plugin_permissions();
+        assert_eq!(perms.len(), 1, "Expected exactly one permission");
+        let p = &perms[0];
+        assert_eq!(p.display_name, "Network Access");
+        assert!(p.description.contains("network"));
+        assert_eq!(p.permission_type, PermissionType::NetAccess as i32);
+        assert!(p.resource.is_empty());
+    }
+
+    #[test]
+    fn test_fetch_plugin_package() {
+        let pkg = fetch_plugin_package();
+        assert_eq!(pkg.package_id, "app.sapphillon.core.fetch");
+        assert_eq!(pkg.package_name, "Fetch");
+        // package_version is set from crate version; ensure it's non-empty and matches env.
+        let expected_version = env!("CARGO_PKG_VERSION").to_string();
+        assert_eq!(pkg.package_version, expected_version);
+        // Ensure functions includes the fetch function id
+        let func_ids: Vec<String> = pkg.functions.into_iter().map(|f| f.function_id).collect();
+        assert!(
+            func_ids.contains(&fetch_plugin_function().function_id),
+            "Package functions must include fetch_plugin_function"
+        );
+    }
+
+    #[test]
+    fn test_core_fetch_plugin_and_package() {
+        // Construct core plugin and package to ensure creation succeeds.
+        let _core_fn = core_fetch_plugin();
+        // The JS bundled with the core plugin should exist in the source file.
+        let js = include_str!("00_fetch.js");
+        assert!(!js.is_empty(), "Embedded JS source must not be empty");
+
+        // Construct core package; creation should succeed without panics.
+        let _core_pkg = core_fetch_plugin_package();
     }
 }
