@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use fetch::fetch_plugin_package;
+use fetch::core_fetch_plugin_package;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     DeleteWorkflowRequest, DeleteWorkflowResponse, FixWorkflowRequest, FixWorkflowResponse,
@@ -121,7 +121,6 @@ impl WorkflowService for MyWorkflowService {
             language: 0,
             created_at: None,
             result: vec![],
-            required_permissions: vec![],
             plugin_packages: vec![],
             plugin_function_ids: vec![],
             allowed_permissions: vec![],
@@ -188,7 +187,6 @@ impl WorkflowService for MyWorkflowService {
                 language: 0,
                 created_at: None,
                 result: vec![],
-                required_permissions: vec![],
                 plugin_packages: vec![],
                 plugin_function_ids: vec![],
                 allowed_permissions: vec![],
@@ -216,7 +214,7 @@ impl WorkflowService for MyWorkflowService {
 
         let mut workflow_core = CoreWorkflowCode::new_from_proto(
             workflow_code,
-            vec![fetch_plugin_package()],
+            vec![core_fetch_plugin_package()],
             None,
             None,
         );
