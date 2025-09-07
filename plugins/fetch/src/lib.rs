@@ -76,6 +76,7 @@ pub fn core_fetch_plugin_package() -> CorePluginPackage {
 fn permission_check(state: &mut OpState, url: String) -> Result<(), JsErrorBox> {
     // Requrements Permission of this func
     let mut perm = fetch_plugin_permissions();
+    let url = url.replace("http://", "").replace("https://", "");
     perm[0].resource = vec![url.clone()];
 
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
@@ -163,6 +164,49 @@ mod tests {
     }
 
     #[test]
+    fn test_permission_error() {
+        let code = r#"
+            const url = "https://dummyjson.com/test";
+            const response = fetch(url);
+            console.log(response);
+        "#;
+
+        // Provide allowed permissions so permission_check inside the plugin passes.
+        let _url = "https://dummyjson.com/test".to_string();
+
+        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
+            plugin_function_id: fetch_plugin_function().function_id,
+            permissions: sapphillon_core::permission::Permissions {
+                permissions: vec![Permission {
+                    display_name: "Network Access".to_string(),
+                    description: "Allows the plugin to make network requests.".to_string(),
+                    permission_type: PermissionType::NetAccess as i32,
+                    permission_level: PermissionLevel::Unspecified as i32,
+                    resource: vec!["dummyjson.com/test".to_string()],
+                }],
+            },
+        };
+        let mut workflow = CoreWorkflowCode::new(
+            "test".to_string(),
+            code.to_string(),
+            vec![core_fetch_plugin_package()],
+            1,
+            None,
+            Some(perm)
+        );
+
+        workflow.run();
+        assert_eq!(workflow.result.len(), 1);
+
+
+        let actual = &workflow.result[0].result;
+        // Accept either a successful fetch result or a permission-denied message depending on test environment.
+        assert!(
+            actual.to_lowercase().contains("permission denied"),
+            "Unexpected workflow result: {actual}"
+        );
+    }
+    #[test]
     fn test_fetch_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/test";
@@ -202,7 +246,7 @@ mod tests {
         let actual = &workflow.result[0].result;
         // Accept either a successful fetch result or a permission-denied message depending on test environment.
         assert!(
-            actual == &expected || actual.to_lowercase().contains("permission"),
+            actual == &expected,
             "Unexpected workflow result: {actual}"
         );
     }
