@@ -1,0 +1,17 @@
+[package]
+name = "libffi-sys"
+version = "3.2.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Local patched libffi-sys using system libffi via bindgen"
+links = "ffi"
+
+[build-dependencies]
+bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
+pkg-config = "0.3"
+
+[dependencies]
+libc = "0.2"
+
+[package.metadata]
+patched = true
