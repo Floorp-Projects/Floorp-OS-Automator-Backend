@@ -44,13 +44,15 @@ pub async fn generate_workflow_async(
 
 #[allow(dead_code)]
 fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let template = format!(
+    let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let prompt = format!(
         r#"
     ## System
 
     あなたは「Workflow Planner and Generator」です。
     あなたの役割は、与えられたタスクを達成するための **実行可能で明確なワークフロー** を設計し、
-    その手順を **実際に動作するPythonファイル `workflow.js`** として出力することです。
+    その手順を **実際に動作するJavascript code `workflow.js`** として出力することです。
+    現在時刻: {today_date}
 
     ### 目的
     - ユーザーの質問や依頼を達成するための、再現性・信頼性の高い処理手順を定義する。
@@ -58,7 +60,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     - ワークフローは、与えられたToolだけを使って完結すること。
 
     ### 出力ルール
-    - 出力は必ず `<code>` タグで囲まれた **Json Codeのみ**とする。
+    - 出力は必ず ```javascript``` タグで囲まれた **Javascript Codeのみ**とする。
     - `workflow()` 関数は **定義のみ** を行い、その中に全てのロジックを記述する（関数の外に処理を記述しない）。
     - 実際の関数呼び出しや実行結果の表示は行わない。
     - 各ステップにおいて **コメントで意図や処理内容を説明** すること。
@@ -67,79 +69,82 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
 
     ### ワークフロー設計ガイドライン
     1. **目的の正確な理解**  
-    ユーザーの要求や質問を正確に理解し、達成するべきゴールを明確化する。
+    ユーザーの要求や質問を正確に理解し、達成するべきゴールを明確化する。成功条件・制約・出力形式を明示する。
     2. **情報不足の補完**  
-    - 必要情報が不足している場合は `search()` や `web()` を用いて補完する。  
-    - 不確実な情報は `llm()` を使い抽出・要約・推論する。
+    - 既知の知識で不足する場合は、許可された情報源や資料を適切に参照する。  
+    - 不確実な情報は根拠を明示し、仮説と確度を区別する。
     3. **処理順序の最適化**  
-    - 不要な検索や推論は避け、最小限の手順で目的を達成する。  
-    - ただし精度を確保するため、信頼性確認ステップを含める。
-    4. **Tool使用の優先度**  
-    - 直接的な情報取得が可能な場合： `search()` → `web()`  
-    - 推論や抽出が必要な場合： `llm()`
-    - 上記の標準ツール以外も状況によって与えられている場合があるので適切に目的やゴールを理解して使用すること
-    - 許可されていない外部関数は絶対に使用しない。
+    - 直接的で信頼性の高い取得手段を優先し、不要な探索や過度な推論を避ける。  
+    - 正確性を確保するため、検証・クロスチェックのステップを含める。
+    4. **手段選択の原則**  
+    - 事実の取得が必要な場合：一次情報や公式資料などの直接ソースを優先する。  
+    - 解釈・要約・推論が必要な場合：構造化・根拠提示を行い、結論の妥当性を示す。  
+    - 利用可能な機能は、目的・制約・権限に照らして最小限かつ適切に選ぶ。  
+    - 許可されていない機能・外部リソースは使用しない。
     5. **エラー時の対処**  
-    - 検索結果が空・Webページが取得不可・抽出失敗などのケースに対応する。
-    6. **汎用性**  
-    - 歴史、科学、技術、エンタメ、ビジネス、日常的な質問など、あらゆるジャンルに対応できるよう設計する。
-
+    - 情報未取得・アクセス不可・抽出失敗などに対し、代替手段、再試行、スコープ調整を検討する。
+    6. **難しい問題に対する対処**
+    - 難しい問題、複雑問題に対しては、問題を分解し、各要素を個別に検討するアプローチを取る。
+    - 難しい問題を単純化して考えるのではなく、問題の本質の本質を捉えて、長くても正確に解決する方法を優先する。
     ---
 
     ### 利用可能なTool
-    - `fetch(url: str) -> {{body: str}}`
-
+    - `fetch(url: str) -> str`
+    - `console.log(str) -> stdout`
     ---
 
     ### 出力例
-    <code>
+    ```javascript
     function workflow() {{
-        /**
-         * タスクの概要:
-         * 1. ユーザー要求の核心を特定
-         * 2. 必要な情報を検索または推論で補完
-         * 3. 信頼性の高い情報源から必要なデータを抽出
-         * 4. 目的に沿った形で加工して返す
-        */
+        const url = "https://api.example.com/data";
+
         try {{
-            // 1. 必要な検索クエリを組み立てて検索を実行します。
-            const searchResults = search("");
-            if (!searchResults?.results?.length) {{
-                throw new Error("検索結果が取得できませんでした。");
-            }}
+            // fetch は文字列を返す（ツール仕様）のでそのまま受け取る
+            const body = fetch(url);
 
-            // 2. 最適な情報源を選択し、Webページの内容を取得します。
-            const topUrl = searchResults.results[0].url;
-            const page = web(topUrl);
-            const markdown = page?.markdown;
+            // 受け取った文字列を JSON.parse でパースする（失敗検出）
+            let data;
+            try {{
+            data = JSON.parse(body);
+            }} catch (e) {{
+            console.log(JSON.stringify({{
+                ok: false,
+                reason: "JSON parse error",
+                error: String(e)
+            }}));
+            return;
+        }}
 
-            if (!markdown) {{
-                throw new Error("Webページの内容が取得できませんでした。");
-            }}  
-
-            // 3. LLMを使用して情報を抽出
-            const extractPrompt = `以下の情報から必要な項目を抽出してください:\n${{markdown}}`;
-            const extracted = llm(extractPrompt);
-
-            return extracted.text;
+            // 成功時はパースしたオブジェクトを出力する
+            console.log(JSON.stringify({{
+            ok: true,
+            data: data
+        }}));
+    }} catch (e) {{
+            // fetch が例外を投げた場合（ネットワークエラー等）
+            console.log(JSON.stringify({{
+                ok: false,
+                reason: "fetch failed",
+                error: String(e)
+            }}));
         }}
     }}
-    </code>
-
+    ```
     ## User
     User Query(Task):
     - {user_query}
     - 使用言語: ja-JP
-    "#
+    "#,
+        today_date = today_date,
+        user_query = user_query
     );
-    let prompt = template.replace("{user_query}", user_query);
     Ok(prompt)
 }
 
 #[allow(dead_code)]
 fn extract_first_code(xml: &str) -> Option<String> {
-    let open = "<code>";
-    let close = "</code>";
+    let open = "```javascript\n";
+    let close = "\n```";
 
     if let Some(s) = xml.find(open) {
         let s_idx = s + open.len();
@@ -159,16 +164,15 @@ pub fn llm_call(user_query: &str) -> Result<String, Box<dyn Error>> {
 
 pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>> {
     // OpenRouter のエンドポイント
-    let api_base = "https://openrouter.ai/api/v1".to_string();
-    let api_key = env::var("OPENROUTER_API_KEY")?;
+    let api_base = &env::var("OPENAI_API_BASE")?;
+    let api_key = &env::var("OPENAI_API_KEY")?;
+    let model = &env::var("OPENAI_MODEL")?;
 
     let client = Client::with_config(
         OpenAIConfig::new()
             .with_api_key(api_key)
             .with_api_base(api_base),
     );
-
-    let model: &str = "openai/gpt-oss-20b:free";
 
     // ユーザー入力をメッセージに反映
     let request = CreateChatCompletionRequestArgs::default()
@@ -191,7 +195,15 @@ pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>>
     Ok(content)
 }
 
-// .envがない状態ではテストを通過しないため、コメントアウト
+#[test]
+fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
+    let result = extract_first_code("```javascript\nHello World\n```");
+    assert_eq!(result, Some("Hello World".to_string()));
+    println!("Extracted code: {:?}", result);
+    Ok(())
+}
+
+//.envがない状態ではテストを通過しないため、コメントアウト
 // #[test]
 // fn test_llm_call() -> Result<(), Box<dyn Error>> {
 //     // async fn ではなく sync ラッパーを使う
@@ -204,14 +216,6 @@ pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>>
 // fn test_generate_prompt() -> Result<(), Box<dyn Error>> {
 //     let prompt = generate_prompt("今日の天気はなんですか?")?;
 //     println!("{}", prompt);
-//     Ok(())
-// }
-
-// #[test]
-// fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
-//     let result = extract_first_code("<code>Hello World</code>");
-//     assert_eq!(result, Some("Hello World".to_string()));
-//     println!("Extracted code: {:?}", result);
 //     Ok(())
 // }
 
