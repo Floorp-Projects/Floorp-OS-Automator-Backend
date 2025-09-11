@@ -1,0 +1,15 @@
+[package]
+name = "openapi"
+version = "1.0.0"
+authors = ["OpenAPI Generator team and contributors"]
+description = "Floorp OS Local HTTP Server provides a minimal subset of os-apis to other local applications via HTTP/JSON. - Loopback-only server (127.0.0.1) - Optional bearer token authentication (disabled by default) - Exposes browser information, web scraping, and tab management capabilities "
+license = "Mozilla Public License 2.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "^1.0", features = ["derive"] }
+serde_with = { version = "^3.8", default-features = false, features = ["base64", "std", "macros"] }
+serde_json = "^1.0"
+serde_repr = "^0.1"
+url = "^2.5"
+reqwest = { version = "^0.12", default-features = false, features = ["json", "multipart"] }

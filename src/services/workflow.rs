@@ -17,6 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use fetch::fetch_plugin_package;
+use floorp::floorp_plugin_package;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     FixWorkflowRequest, FixWorkflowResponse, GenerateWorkflowRequest, GenerateWorkflowResponse,
@@ -150,7 +151,7 @@ impl WorkflowService for MyWorkflowService {
         log::debug!("Parsed workflow code: {}", workflow_code.code);
 
         let mut workflow_core =
-            CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package()]);
+            CoreWorkflowCode::new_from_proto(workflow_code, vec![fetch_plugin_package(), floorp_plugin_package()]);
         workflow_core.run();
 
         let latest_result_revision = workflow_core

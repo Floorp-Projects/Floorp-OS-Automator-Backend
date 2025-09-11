@@ -1,0 +1,3 @@
+[submodule "plugins/floorp/api-spec"]
+	path = plugins/floorp/api-spec
+	url = /Users/user/dev-source/floorp-dev/floorp-os-api-spec
