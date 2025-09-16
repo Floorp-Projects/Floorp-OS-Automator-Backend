@@ -26,20 +26,94 @@ use async_openai::{
 };
 
 #[allow(dead_code)]
-pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let prompt = generate_prompt(user_query)?;
-    let workflow_raw = llm_call(&prompt)?;
-    let workflow_code = extract_first_code(&workflow_raw);
-    workflow_code.ok_or_else(|| "No code section found in the response".into())
+pub fn generate_workflow(_user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let workflow = r#"
+function workflow() {
+    const base = "http://host.docker.internal:58261";
+    let scraperId;
+    try {
+        console.log("Creating scraper instance...");
+    const scraperResponse = floorp.createScraper(base);
+    const scraper = JSON.parse(scraperResponse);
+    scraperId = scraper.instanceId ?? scraper.id;
+        console.log(`Scraper instance created with ID: ${scraperId}`);
+
+        console.log("Navigating to https://www.google.com...");
+        floorp.navigate(base, scraperId, "https://www.google.com");
+        console.log("Navigation complete.");
+
+        // Poll URI until it becomes non-empty (up to ~5s)
+        console.log("Getting page URI...");
+        let currentUri = "";
+        for (let i = 0; i < 50; i++) {
+            const uriResponse = floorp.uri(base, scraperId);
+            const uri = JSON.parse(uriResponse);
+            currentUri = uri.uri || "";
+            if (currentUri) break;
+        }
+        console.log(`Page URI: ${currentUri}`);
+
+        return currentUri;
+    } catch (e) {
+        console.error(`An error occurred: ${e.toString()}`);
+        return { error: e.toString() };
+    } finally {
+        if (scraperId) {
+             console.log(`Destroying scraper instance ${scraperId}...`);
+             floorp.destroyScraperInstance(base, scraperId);
+             console.log("Scraper instance destroyed.");
+        }
+    }
+}
+"#
+    .to_string();
+    Ok(workflow)
 }
 
 pub async fn generate_workflow_async(
-    user_query: &str,
+    _user_query: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let prompt = generate_prompt(user_query)?;
-    let workflow_raw = _llm_call_async(&prompt).await?;
-    let workflow_code = extract_first_code(&workflow_raw);
-    workflow_code.ok_or_else(|| "No code section found in the response".into())
+    let workflow = r#"
+function workflow() {
+    const base = "http://host.docker.internal:58261";
+    let scraperId;
+    try {
+        console.log("Creating scraper instance...");
+    const scraperResponse = floorp.createScraper(base);
+    const scraper = JSON.parse(scraperResponse);
+    scraperId = scraper.instanceId ?? scraper.id;
+        console.log(`Scraper instance created with ID: ${scraperId}`);
+
+        console.log("Navigating to https://www.google.com...");
+        floorp.navigate(base, scraperId, "https://www.google.com");
+        console.log("Navigation complete.");
+
+        // Poll URI until it becomes non-empty (up to ~5s)
+        console.log("Getting page URI...");
+        let currentUri = "";
+        for (let i = 0; i < 50; i++) {
+            const uriResponse = floorp.uri(base, scraperId);
+            const uri = JSON.parse(uriResponse);
+            currentUri = uri.uri || "";
+            if (currentUri) break;
+        }
+        console.log(`Page URI: ${currentUri}`);
+
+        return currentUri;
+    } catch (e) {
+        console.error(`An error occurred: ${e.toString()}`);
+        return { error: e.toString() };
+    } finally {
+        if (scraperId) {
+             console.log(`Destroying scraper instance ${scraperId}...`);
+             floorp.destroyScraperInstance(base, scraperId);
+             console.log("Scraper instance destroyed.");
+        }
+    }
+}
+"#
+    .to_string();
+    Ok(workflow)
 }
 
 #[allow(dead_code)]
