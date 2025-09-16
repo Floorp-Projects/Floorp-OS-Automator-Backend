@@ -1,107 +1,103 @@
 // JavaScript glue exposing Floorp OS API operations to workflows
-function floorpHealth(base) {
-  return Deno.core.ops.op_floorp_health(base);
+function floorpHealth() {
+  return Deno.core.ops.op_floorp_health();
 }
-function floorpCreateScraper(base) {
-  return Deno.core.ops.op_floorp_create_scraper_instance(base);
+function floorpCreateScraper() {
+  return Deno.core.ops.op_floorp_create_scraper_instance();
 }
-function floorpNavigate(base, id, url) {
-  return Deno.core.ops.op_floorp_navigate_scraper(base, id, url);
+function floorpNavigate(id, url) {
+  return Deno.core.ops.op_floorp_navigate_scraper(id, url);
 }
-function floorpScraperHtml(base, id) {
-  return Deno.core.ops.op_floorp_scraper_html(base, id);
+function floorpScraperHtml(id) {
+  return Deno.core.ops.op_floorp_scraper_html(id);
 }
-function floorpScraperUri(base, id) {
-  return Deno.core.ops.op_floorp_scraper_uri(base, id);
+function floorpScraperUri(id) {
+  return Deno.core.ops.op_floorp_scraper_uri(id);
 }
-function floorpWaitForElement(base, id, selector, timeoutMs) {
+function floorpWaitForElement(id, selector, timeoutMs) {
   return Deno.core.ops.op_floorp_wait_for_element(
-    base,
     id,
     selector,
     timeoutMs?.toString()
   );
 }
-function floorpClick(base, id, selector) {
-  return Deno.core.ops.op_floorp_click_element(base, id, selector);
+function floorpClick(id, selector) {
+  return Deno.core.ops.op_floorp_click_element(id, selector);
 }
-function floorpElementText(base, id, selector) {
-  return Deno.core.ops.op_floorp_element_text(base, id, selector);
+function floorpElementText(id, selector) {
+  return Deno.core.ops.op_floorp_element_text(id, selector);
 }
-function floorpElementValue(base, id, selector) {
-  return Deno.core.ops.op_floorp_element_value(base, id, selector);
+function floorpElementValue(id, selector) {
+  return Deno.core.ops.op_floorp_element_value(id, selector);
 }
-function floorpFillForm(base, id, selector, value) {
-  return Deno.core.ops.op_floorp_fill_form(base, id, selector, value);
+function floorpFillForm(id, selector, value) {
+  return Deno.core.ops.op_floorp_fill_form(id, selector, value);
 }
-function floorpSubmitForm(base, id, selector) {
-  return Deno.core.ops.op_floorp_submit_form(base, id, selector);
+function floorpSubmitForm(id, selector) {
+  return Deno.core.ops.op_floorp_submit_form(id, selector);
 }
-function floorpScreenshot(base, id) {
-  return Deno.core.ops.op_floorp_screenshot(base, id);
+function floorpScreenshot(id) {
+  return Deno.core.ops.op_floorp_screenshot(id);
 }
-function floorpElementScreenshot(base, id, selector) {
-  return Deno.core.ops.op_floorp_element_screenshot(base, id, selector);
+function floorpElementScreenshot(id, selector) {
+  return Deno.core.ops.op_floorp_element_screenshot(id, selector);
 }
-function floorpFullPageScreenshot(base, id) {
-  return Deno.core.ops.op_floorp_fullpage_screenshot(base, id);
+function floorpFullPageScreenshot(id) {
+  return Deno.core.ops.op_floorp_fullpage_screenshot(id);
 }
-function floorpRegionScreenshot(base, id, x, y, w, h) {
+function floorpRegionScreenshot(id, x, y, w, h) {
   return Deno.core.ops.op_floorp_region_screenshot(
-    base,
     id,
     x?.toString(),
     y?.toString(),
     w?.toString(),
-    h?.toString()
+h?.toString()
   );
 }
-function floorpCreateTab(base, url, inBackground) {
+function floorpCreateTab(url, inBackground) {
   return Deno.core.ops.op_floorp_create_tab_instance(
-    base,
     url,
     inBackground?.toString()
   );
 }
-function floorpNavigateTab(base, id, url) {
-  return Deno.core.ops.op_floorp_navigate_tab(base, id, url);
+function floorpNavigateTab(id, url) {
+  return Deno.core.ops.op_floorp_navigate_tab(id, url);
 }
-function floorpTabUri(base, id) {
-  return Deno.core.ops.op_floorp_tab_uri(base, id);
+function floorpTabUri(id) {
+  return Deno.core.ops.op_floorp_tab_uri(id);
 }
-function floorpListBrowserTabs(base) {
-  return Deno.core.ops.op_floorp_list_browser_tabs(base);
+function floorpListBrowserTabs() {
+  return Deno.core.ops.op_floorp_list_browser_tabs();
 }
-function floorpBrowserTabs(base) {
-  return Deno.core.ops.op_floorp_browser_tabs(base);
+function floorpBrowserTabs() {
+  return Deno.core.ops.op_floorp_browser_tabs();
 }
-function floorpBrowserHistory(base, limit) {
-  return Deno.core.ops.op_floorp_browser_history(base, limit?.toString());
+function floorpBrowserHistory(limit) {
+  return Deno.core.ops.op_floorp_browser_history(limit?.toString());
 }
-function floorpBrowserDownloads(base, limit) {
-  return Deno.core.ops.op_floorp_browser_downloads(base, limit?.toString());
+function floorpBrowserDownloads(limit) {
+  return Deno.core.ops.op_floorp_browser_downloads(limit?.toString());
 }
-function floorpBrowserContext(base, historyLimit, downloadLimit) {
+function floorpBrowserContext(historyLimit, downloadLimit) {
   return Deno.core.ops.op_floorp_browser_context(
-    base,
     historyLimit?.toString(),
     downloadLimit?.toString()
   );
 }
-function floorpAttachToTab(base, instanceId) {
-  return Deno.core.ops.op_floorp_attach_to_tab(base, instanceId);
+function floorpAttachToTab(instanceId) {
+  return Deno.core.ops.op_floorp_attach_to_tab(instanceId);
 }
-function floorpDestroyTabInstance(base, id) {
-  return Deno.core.ops.op_floorp_destroy_tab_instance(base, id);
+function floorpDestroyTabInstance(id) {
+  return Deno.core.ops.op_floorp_destroy_tab_instance(id);
 }
-function floorpDestroyScraperInstance(base, id) {
-  return Deno.core.ops.op_floorp_destroy_scraper_instance(base, id);
+function floorpDestroyScraperInstance(id) {
+  return Deno.core.ops.op_floorp_destroy_scraper_instance(id);
 }
-function floorpCheckTabInstanceExists(base, id) {
-  return Deno.core.ops.op_floorp_check_tab_instance_exists(base, id);
+function floorpCheckTabInstanceExists(id) {
+  return Deno.core.ops.op_floorp_check_tab_instance_exists(id);
 }
-function floorpCheckScraperInstanceExists(base, id) {
-  return Deno.core.ops.op_floorp_check_scraper_instance_exists(base, id);
+function floorpCheckScraperInstanceExists(id) {
+  return Deno.core.ops.op_floorp_check_scraper_instance_exists(id);
 }
 
 globalThis.floorp = {

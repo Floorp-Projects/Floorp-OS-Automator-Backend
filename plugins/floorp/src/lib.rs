@@ -5,9 +5,9 @@ use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 
 const DEFAULT_BASE: &str = "http://localhost:58261";
 
-fn cfg(base: Option<String>, token: Option<String>) -> openapi::apis::configuration::Configuration {
+fn cfg(token: Option<String>) -> openapi::apis::configuration::Configuration {
 	let mut c = openapi::apis::configuration::Configuration::new();
-	c.base_path = base.unwrap_or_else(|| DEFAULT_BASE.to_string());
+	c.base_path = DEFAULT_BASE.to_string();
 	if let Some(t) = token { c.bearer_access_token = Some(t); }
 	c
 }
@@ -84,18 +84,18 @@ macro_rules! make_plugin {
 // --- op 実装 ---
 #[op2]
 #[string]
-fn op_floorp_health(#[string] base: Option<String>) -> Result<String, JsErrorBox> {
+fn op_floorp_health() -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_health(&c)
 	})
 }
 
 #[op2]
 #[string]
-fn op_floorp_create_scraper_instance(#[string] base: Option<String>) -> Result<String, JsErrorBox> {
+fn op_floorp_create_scraper_instance() -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::create_scraper_instance(&c)
 			.map(|r| serde_json::json!({
 				"instanceId": r.instance_id,
@@ -107,7 +107,6 @@ fn op_floorp_create_scraper_instance(#[string] base: Option<String>) -> Result<S
 #[op2]
 #[string]
 fn op_floorp_create_tab_instance(
-	#[string] base: Option<String>,
 	#[string] url: String,
 	#[string] in_background: Option<String>,
 ) -> Result<String, JsErrorBox> {
@@ -116,7 +115,7 @@ fn op_floorp_create_tab_instance(
 		body.in_background = b.parse::<bool>().ok();
 	}
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::create_tab_instance(&c, body)
 			.map(|r| serde_json::json!({
 				"instanceId": r.instance_id,
@@ -128,13 +127,12 @@ fn op_floorp_create_tab_instance(
 #[op2]
 #[string]
 fn op_floorp_navigate_scraper(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] url: String,
 ) -> Result<String, JsErrorBox> {
 	let body = openapi::models::NavigateRequest { url };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::navigate_scraper_instance(&c, &id, body)
 	})
 }
@@ -142,13 +140,12 @@ fn op_floorp_navigate_scraper(
 #[op2]
 #[string]
 fn op_floorp_navigate_tab(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] url: String,
 ) -> Result<String, JsErrorBox> {
 	let body = openapi::models::NavigateRequest { url };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::navigate_tab_instance(&c, &id, body)
 	})
 }
@@ -156,11 +153,10 @@ fn op_floorp_navigate_tab(
 #[op2]
 #[string]
 fn op_floorp_scraper_html(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_scraper_instance_html(&c, &id)
 			.map(|r| {
 				let html = r.html.and_then(|h| h).unwrap_or_default();
@@ -172,11 +168,10 @@ fn op_floorp_scraper_html(
 #[op2]
 #[string]
 fn op_floorp_scraper_uri(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_scraper_instance_uri(&c, &id)
 			.map(|r| {
 				let uri = r.uri.and_then(|u| u).unwrap_or_default();
@@ -188,11 +183,10 @@ fn op_floorp_scraper_uri(
 #[op2]
 #[string]
 fn op_floorp_tab_uri(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_tab_instance_uri(&c, &id)
 	})
 }
@@ -200,7 +194,6 @@ fn op_floorp_tab_uri(
 #[op2]
 #[string]
 fn op_floorp_wait_for_element(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 	#[string] timeout_ms: Option<String>,
@@ -208,7 +201,7 @@ fn op_floorp_wait_for_element(
 	let timeout = timeout_ms.and_then(|s| s.parse::<i32>().ok());
 	let body = openapi::models::WaitForElementRequest { selector: selector.clone(), timeout };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::wait_for_scraper_element(&c, &id, body)
 	})
 }
@@ -216,13 +209,12 @@ fn op_floorp_wait_for_element(
 #[op2]
 #[string]
 fn op_floorp_click_element(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 ) -> Result<String, JsErrorBox> {
 	let body = openapi::models::SelectorRequest { selector };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::click_scraper_element(&c, &id, body)
 	})
 }
@@ -230,12 +222,11 @@ fn op_floorp_click_element(
 #[op2]
 #[string]
 fn op_floorp_element_text(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_scraper_element_text(&c, &id, &selector)
 			.map(|r| {
 				let text = r.text.and_then(|t| t).unwrap_or_default();
@@ -247,12 +238,11 @@ fn op_floorp_element_text(
 #[op2]
 #[string]
 fn op_floorp_element_value(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_scraper_element_value(&c, &id, &selector)
 			.map(|r| {
 				let value = r.value.and_then(|v| v).unwrap_or_default();
@@ -264,7 +254,6 @@ fn op_floorp_element_value(
 #[op2]
 #[string]
 fn op_floorp_fill_form(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 	#[string] value: String,
@@ -273,7 +262,7 @@ fn op_floorp_fill_form(
 	map.insert(selector, value);
 	let body = openapi::models::FillFormRequest { form_data: map };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::fill_scraper_form(&c, &id, body)
 	})
 }
@@ -281,13 +270,12 @@ fn op_floorp_fill_form(
 #[op2]
 #[string]
 fn op_floorp_submit_form(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 ) -> Result<String, JsErrorBox> {
 	let body = openapi::models::SelectorRequest { selector };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::submit_scraper_form(&c, &id, body)
 	})
 }
@@ -295,11 +283,10 @@ fn op_floorp_submit_form(
 #[op2]
 #[string]
 fn op_floorp_screenshot(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::take_scraper_screenshot(&c, &id)
 			.map(|r| {
 				let image = r.image.and_then(|i| i).unwrap_or_default();
@@ -311,12 +298,11 @@ fn op_floorp_screenshot(
 #[op2]
 #[string]
 fn op_floorp_element_screenshot(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] selector: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::take_scraper_element_screenshot(&c, &id, &selector)
 			.map(|r| {
 				let image = r.image.and_then(|i| i).unwrap_or_default();
@@ -328,11 +314,10 @@ fn op_floorp_element_screenshot(
 #[op2]
 #[string]
 fn op_floorp_fullpage_screenshot(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::take_scraper_full_page_screenshot(&c, &id)
 			.map(|r| {
 				let image = r.image.and_then(|i| i).unwrap_or_default();
@@ -344,7 +329,6 @@ fn op_floorp_fullpage_screenshot(
 #[op2]
 #[string]
 fn op_floorp_region_screenshot(
-	#[string] base: Option<String>,
 	#[string] id: String,
 	#[string] x: Option<String>,
 	#[string] y: Option<String>,
@@ -358,7 +342,7 @@ fn op_floorp_region_screenshot(
 	rect.height = h.and_then(|v| v.parse::<i32>().ok());
 	let body = openapi::models::RegionScreenshotRequest { rect: Some(Box::new(rect)) };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::take_scraper_region_screenshot(&c, &id, body)
 			.map(|r| {
 				let image = r.image.and_then(|i| i).unwrap_or_default();
@@ -370,18 +354,18 @@ fn op_floorp_region_screenshot(
 // ---- Browser / Tab listing & context ----
 #[op2]
 #[string]
-fn op_floorp_list_browser_tabs(#[string] base: Option<String>) -> Result<String, JsErrorBox> {
+fn op_floorp_list_browser_tabs() -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::list_browser_tabs(&c)
 	})
 }
 
 #[op2]
 #[string]
-fn op_floorp_browser_tabs(#[string] base: Option<String>) -> Result<String, JsErrorBox> {
+fn op_floorp_browser_tabs() -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_browser_tabs(&c)
 	})
 }
@@ -389,12 +373,11 @@ fn op_floorp_browser_tabs(#[string] base: Option<String>) -> Result<String, JsEr
 #[op2]
 #[string]
 fn op_floorp_browser_history(
-	#[string] base: Option<String>,
 	#[string] limit: Option<String>,
 ) -> Result<String, JsErrorBox> {
 	let lim = limit.and_then(|v| v.parse::<i32>().ok());
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_browser_history(&c, lim)
 	})
 }
@@ -402,12 +385,11 @@ fn op_floorp_browser_history(
 #[op2]
 #[string]
 fn op_floorp_browser_downloads(
-	#[string] base: Option<String>,
 	#[string] limit: Option<String>,
 ) -> Result<String, JsErrorBox> {
 	let lim = limit.and_then(|v| v.parse::<i32>().ok());
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_browser_downloads(&c, lim)
 	})
 }
@@ -415,14 +397,13 @@ fn op_floorp_browser_downloads(
 #[op2]
 #[string]
 fn op_floorp_browser_context(
-	#[string] base: Option<String>,
 	#[string] history_limit: Option<String>,
 	#[string] download_limit: Option<String>,
 ) -> Result<String, JsErrorBox> {
 	let h = history_limit.and_then(|v| v.parse::<i32>().ok());
 	let d = download_limit.and_then(|v| v.parse::<i32>().ok());
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::get_browser_context(&c, h, d)
 	})
 }
@@ -431,12 +412,11 @@ fn op_floorp_browser_context(
 #[op2]
 #[string]
 fn op_floorp_attach_to_tab(
-	#[string] base: Option<String>,
 	#[string] browser_id: String,
 ) -> Result<String, JsErrorBox> {
 	let body = openapi::models::AttachRequest { browser_id };
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::attach_to_tab(&c, body)
 	})
 }
@@ -444,11 +424,10 @@ fn op_floorp_attach_to_tab(
 #[op2]
 #[string]
 fn op_floorp_destroy_tab_instance(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::destroy_tab_instance(&c, &id)
 	})
 }
@@ -456,11 +435,10 @@ fn op_floorp_destroy_tab_instance(
 #[op2]
 #[string]
 fn op_floorp_destroy_scraper_instance(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::destroy_scraper_instance(&c, &id)
 	})
 }
@@ -468,11 +446,10 @@ fn op_floorp_destroy_scraper_instance(
 #[op2]
 #[string]
 fn op_floorp_check_tab_instance_exists(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::check_tab_instance_exists(&c, &id)
 	})
 }
@@ -480,11 +457,10 @@ fn op_floorp_check_tab_instance_exists(
 #[op2]
 #[string]
 fn op_floorp_check_scraper_instance_exists(
-	#[string] base: Option<String>,
 	#[string] id: String,
 ) -> Result<String, JsErrorBox> {
 	run_blocking_json(move || {
-		let c = cfg(base, None);
+		let c = cfg(None);
 		openapi::apis::default_api::check_scraper_instance_exists(&c, &id)
 	})
 }
