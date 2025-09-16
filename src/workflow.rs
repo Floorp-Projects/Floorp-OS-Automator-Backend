@@ -18,6 +18,8 @@
 
 use std::env;
 use std::error::Error;
+use std::thread;
+use std::time::Duration;
 
 use async_openai::{
     Client,
@@ -29,24 +31,23 @@ use async_openai::{
 pub fn generate_workflow(_user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let workflow = r#"
 function workflow() {
-    const base = "http://localhost:58261";
     let scraperId;
     try {
         console.log("Creating scraper instance...");
-    const scraperResponse = floorp.createScraper(base);
+    const scraperResponse = floorp.createScraper();
     const scraper = JSON.parse(scraperResponse);
     scraperId = scraper.instanceId ?? scraper.id;
         console.log(`Scraper instance created with ID: ${scraperId}`);
 
         console.log("Navigating to https://www.google.com...");
-        floorp.navigate(base, scraperId, "https://www.google.com");
+        floorp.navigate(scraperId, "https://www.google.com");
         console.log("Navigation complete.");
 
         // Poll URI until it becomes non-empty (up to ~5s)
         console.log("Getting page URI...");
         let currentUri = "";
         for (let i = 0; i < 50; i++) {
-            const uriResponse = floorp.uri(base, scraperId);
+            const uriResponse = floorp.uri(scraperId);
             const uri = JSON.parse(uriResponse);
             currentUri = uri.uri || "";
             if (currentUri) break;
@@ -55,15 +56,17 @@ function workflow() {
 
         // Get HTML
         console.log("Getting page HTML...");
-        const htmlResponse = floorp.html(base, scraperId);
+        const htmlResponse = floorp.html(scraperId);
         const htmlContent = JSON.parse(htmlResponse);
         console.log("HTML content received.");
+        console.log(`HTML: ${htmlContent.html}`);
 
         // Take screenshot
         console.log("Taking screenshot...");
-        const screenshotResponse = floorp.screenshot(base, scraperId);
+        const screenshotResponse = floorp.screenshot(scraperId);
         const screenshotContent = JSON.parse(screenshotResponse);
         console.log("Screenshot taken.");
+        console.log(`Screenshot (base64): ${screenshotContent.image}`);
 
         return {
             uri: currentUri,
@@ -76,13 +79,14 @@ function workflow() {
     } finally {
         if (scraperId) {
              console.log(`Destroying scraper instance ${scraperId}...`);
-             floorp.destroyScraperInstance(base, scraperId);
+             floorp.destroyScraperInstance(scraperId);
              console.log("Scraper instance destroyed.");
         }
     }
 }
 "#
     .to_string();
+    thread::sleep(Duration::from_secs(12));
     Ok(workflow)
 }
 
@@ -146,6 +150,7 @@ function workflow() {
 }
 "#
     .to_string();
+    tokio::time::sleep(Duration::from_secs(12)).await;
     Ok(workflow)
 }
 
