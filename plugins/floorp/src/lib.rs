@@ -3,7 +3,7 @@ use deno_core::serde;
 use deno_error::JsErrorBox;
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 
-const DEFAULT_BASE: &str = "http://host.docker.internal:58261";
+const DEFAULT_BASE: &str = "http://localhost:58261";
 
 fn cfg(base: Option<String>, token: Option<String>) -> openapi::apis::configuration::Configuration {
 	let mut c = openapi::apis::configuration::Configuration::new();

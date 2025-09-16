@@ -29,7 +29,7 @@ use async_openai::{
 pub fn generate_workflow(_user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let workflow = r#"
 function workflow() {
-    const base = "http://host.docker.internal:58261";
+    const base = "http://localhost:58261";
     let scraperId;
     try {
         console.log("Creating scraper instance...");
@@ -53,7 +53,23 @@ function workflow() {
         }
         console.log(`Page URI: ${currentUri}`);
 
-        return currentUri;
+        // Get HTML
+        console.log("Getting page HTML...");
+        const htmlResponse = floorp.html(base, scraperId);
+        const htmlContent = JSON.parse(htmlResponse);
+        console.log("HTML content received.");
+
+        // Take screenshot
+        console.log("Taking screenshot...");
+        const screenshotResponse = floorp.screenshot(base, scraperId);
+        const screenshotContent = JSON.parse(screenshotResponse);
+        console.log("Screenshot taken.");
+
+        return {
+            uri: currentUri,
+            html: htmlContent.html.substring(0, 200), // Return first 200 chars of HTML
+            screenshot: screenshotContent.image.substring(0, 100) + "..." // Truncate for display
+        };
     } catch (e) {
         console.error(`An error occurred: ${e.toString()}`);
         return { error: e.toString() };
@@ -75,7 +91,7 @@ pub async fn generate_workflow_async(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let workflow = r#"
 function workflow() {
-    const base = "http://host.docker.internal:58261";
+    const base = "http://localhost:58261";
     let scraperId;
     try {
         console.log("Creating scraper instance...");
@@ -99,7 +115,25 @@ function workflow() {
         }
         console.log(`Page URI: ${currentUri}`);
 
-        return currentUri;
+        // Get HTML
+        console.log("Getting page HTML...");
+        const htmlResponse = floorp.html(base, scraperId);
+        const htmlContent = JSON.parse(htmlResponse);
+        console.log("HTML content received.");
+        console.log(`HTML: ${htmlContent.html}`);
+
+        // Take screenshot
+        console.log("Taking screenshot...");
+        const screenshotResponse = floorp.screenshot(base, scraperId);
+        const screenshotContent = JSON.parse(screenshotResponse);
+        console.log("Screenshot taken.");
+        console.log(`Screenshot (base64): ${screenshotContent.image}`);
+
+        return {
+            uri: currentUri,
+            html: htmlContent.html.substring(0, 200), // Return first 200 chars of HTML
+            screenshot: screenshotContent.image.substring(0, 100) + "..." // Truncate for display
+        };
     } catch (e) {
         console.error(`An error occurred: ${e.toString()}`);
         return { error: e.toString() };
