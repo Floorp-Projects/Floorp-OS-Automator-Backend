@@ -51,7 +51,7 @@ function floorpRegionScreenshot(id, x, y, w, h) {
     x?.toString(),
     y?.toString(),
     w?.toString(),
-h?.toString()
+    h?.toString()
   );
 }
 function floorpCreateTab(url, inBackground) {
