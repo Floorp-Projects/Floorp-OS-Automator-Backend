@@ -1,8 +1,6 @@
 // Sapphillon
 // Copyright 2025 Yuta Takahashi
-//
-// This file is part of Sapphillon
-//
+
 // Sapphillon is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
@@ -34,9 +32,9 @@ function workflow() {
     let scraperId;
     try {
         console.log("Creating scraper instance...");
-    const scraperResponse = floorp.createScraper();
-    const scraper = JSON.parse(scraperResponse);
-    scraperId = scraper.instanceId ?? scraper.id;
+        const scraperResponse = floorp.createScraper();
+        const scraper = JSON.parse(scraperResponse);
+        scraperId = scraper.instanceId ?? scraper.id;
         console.log(`Scraper instance created with ID: ${scraperId}`);
 
         console.log("Navigating to https://www.google.com...");
@@ -54,33 +52,17 @@ function workflow() {
         }
         console.log(`Page URI: ${currentUri}`);
 
-        // Get HTML
-        console.log("Getting page HTML...");
-        const htmlResponse = floorp.html(scraperId);
-        const htmlContent = JSON.parse(htmlResponse);
-        console.log("HTML content received.");
-        console.log(`HTML: ${htmlContent.html}`);
-
-        // Take screenshot
-        console.log("Taking screenshot...");
-        const screenshotResponse = floorp.screenshot(scraperId);
-        const screenshotContent = JSON.parse(screenshotResponse);
-        console.log("Screenshot taken.");
-        console.log(`Screenshot (base64): ${screenshotContent.image}`);
-
         return {
             uri: currentUri,
-            html: htmlContent.html.substring(0, 200), // Return first 200 chars of HTML
-            screenshot: screenshotContent.image.substring(0, 100) + "..." // Truncate for display
         };
     } catch (e) {
         console.error(`An error occurred: ${e.toString()}`);
         return { error: e.toString() };
     } finally {
         if (scraperId) {
-             console.log(`Destroying scraper instance ${scraperId}...`);
-             floorp.destroyScraperInstance(scraperId);
-             console.log("Scraper instance destroyed.");
+             console.log(`Destroying tab instance ${scraperId}...`);
+             floorp.destroyTabInstance(scraperId);
+             console.log("Tab instance destroyed.");
         }
     }
 }
@@ -98,53 +80,37 @@ function workflow() {
     let scraperId;
     try {
         console.log("Creating scraper instance...");
-    const scraperResponse = floorp.createScraper();
-    const scraper = JSON.parse(scraperResponse);
-    scraperId = scraper.instanceId ?? scraper.id;
-        console.log(`Scraper instance created with ID: ${scraperId}`);
+        const scraperResponse = floorp.createTab("about:blank", false);
+        const scraper = JSON.parse(scraperResponse);
+        scraperId = scraper.instanceId ?? scraper.id;
+        console.log(`Tab instance created with ID: ${scraperId}`);
 
         console.log("Navigating to https://www.google.com...");
-        floorp.navigate(scraperId, "https://www.google.com");
+        floorp.navigateTab(scraperId, "https://www.google.com");
         console.log("Navigation complete.");
 
         // Poll URI until it becomes non-empty (up to ~5s)
         console.log("Getting page URI...");
         let currentUri = "";
         for (let i = 0; i < 50; i++) {
-            const uriResponse = floorp.uri(scraperId);
+            const uriResponse = floorp.tabUri(scraperId);　　　
             const uri = JSON.parse(uriResponse);
             currentUri = uri.uri || "";
             if (currentUri) break;
         }
         console.log(`Page URI: ${currentUri}`);
 
-        // Get HTML
-        console.log("Getting page HTML...");
-        const htmlResponse = floorp.html(scraperId);
-        const htmlContent = JSON.parse(htmlResponse);
-        console.log("HTML content received.");
-        console.log(`HTML: ${htmlContent.html}`);
-
-        // Take screenshot
-        console.log("Taking screenshot...");
-        const screenshotResponse = floorp.screenshot(scraperId);
-        const screenshotContent = JSON.parse(screenshotResponse);
-        console.log("Screenshot taken.");
-        console.log(`Screenshot (base64): ${screenshotContent.image}`);
-
         return {
             uri: currentUri,
-            html: htmlContent.html.substring(0, 200), // Return first 200 chars of HTML
-            screenshot: screenshotContent.image.substring(0, 100) + "..." // Truncate for display
         };
     } catch (e) {
         console.error(`An error occurred: ${e.toString()}`);
         return { error: e.toString() };
     } finally {
         if (scraperId) {
-             console.log(`Destroying scraper instance ${scraperId}...`);
-             floorp.destroyScraperInstance(scraperId);
-             console.log("Scraper instance destroyed.");
+             console.log(`Destroying tab instance ${scraperId}...`);
+             floorp.destroyTabInstance(scraperId);
+             console.log("Tab instance destroyed.");
         }
     }
 }

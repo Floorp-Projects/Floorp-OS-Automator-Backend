@@ -66,6 +66,55 @@ function floorpNavigateTab(id, url) {
 function floorpTabUri(id) {
   return Deno.core.ops.op_floorp_tab_uri(id);
 }
+function floorpTabHtml(id) {
+  return Deno.core.ops.op_floorp_tab_html(id);
+}
+function floorpTabScreenshot(id) {
+  return Deno.core.ops.op_floorp_tab_screenshot(id);
+}
+function floorpTabElement(id, selector) {
+  return Deno.core.ops.op_floorp_tab_element(id, selector);
+}
+function floorpTabElementText(id, selector) {
+  return Deno.core.ops.op_floorp_tab_element_text(id, selector);
+}
+function floorpTabClick(id, selector) {
+  return Deno.core.ops.op_floorp_tab_click_element(id, selector);
+}
+function floorpTabWaitForElement(id, selector, timeoutMs) {
+  return Deno.core.ops.op_floorp_tab_wait_for_element(
+    id,
+    selector,
+    timeoutMs?.toString()
+  );
+}
+function floorpTabExecuteScript(id, script) {
+  return Deno.core.ops.op_floorp_tab_execute_script(id, script);
+}
+function floorpTabElementScreenshot(id, selector) {
+  return Deno.core.ops.op_floorp_tab_element_screenshot(id, selector);
+}
+function floorpTabFullPageScreenshot(id) {
+  return Deno.core.ops.op_floorp_tab_fullpage_screenshot(id);
+}
+function floorpTabRegionScreenshot(id, x, y, w, h) {
+  return Deno.core.ops.op_floorp_tab_region_screenshot(
+    id,
+    x?.toString(),
+    y?.toString(),
+    w?.toString(),
+    h?.toString()
+  );
+}
+function floorpTabFillForm(id, selector, value) {
+  return Deno.core.ops.op_floorp_tab_fill_form(id, selector, value);
+}
+function floorpTabElementValue(id, selector) {
+  return Deno.core.ops.op_floorp_tab_element_value(id, selector);
+}
+function floorpTabSubmitForm(id, selector) {
+  return Deno.core.ops.op_floorp_tab_submit_form(id, selector);
+}
 function floorpListBrowserTabs() {
   return Deno.core.ops.op_floorp_list_browser_tabs();
 }
@@ -119,6 +168,19 @@ globalThis.floorp = {
   createTab: floorpCreateTab,
   navigateTab: floorpNavigateTab,
   tabUri: floorpTabUri,
+  tabHtml: floorpTabHtml,
+  tabScreenshot: floorpTabScreenshot,
+  tabElement: floorpTabElement,
+  tabElementText: floorpTabElementText,
+  tabClick: floorpTabClick,
+  tabWaitForElement: floorpTabWaitForElement,
+  tabExecuteScript: floorpTabExecuteScript,
+  tabElementScreenshot: floorpTabElementScreenshot,
+  tabFullPageScreenshot: floorpTabFullPageScreenshot,
+  tabRegionScreenshot: floorpTabRegionScreenshot,
+  tabFillForm: floorpTabFillForm,
+  tabElementValue: floorpTabElementValue,
+  tabSubmitForm: floorpTabSubmitForm,
   listBrowserTabs: floorpListBrowserTabs,
   browserTabs: floorpBrowserTabs,
   browserHistory: floorpBrowserHistory,

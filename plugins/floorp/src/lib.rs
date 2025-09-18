@@ -40,6 +40,20 @@ pub fn floorp_plugin_package() -> CorePluginPackage {
 			floorp_destroy_scraper_instance_plugin(),
 			floorp_navigate_scraper_plugin(),
 			floorp_scraper_html_plugin(),
+			// tab-specific plugins
+			floorp_tab_html_plugin(),
+			floorp_tab_screenshot_plugin(),
+			floorp_tab_element_plugin(),
+			floorp_tab_element_text_plugin(),
+			floorp_tab_click_element_plugin(),
+			floorp_tab_wait_for_element_plugin(),
+			floorp_tab_execute_script_plugin(),
+			floorp_tab_element_screenshot_plugin(),
+			floorp_tab_fullpage_screenshot_plugin(),
+			floorp_tab_region_screenshot_plugin(),
+			floorp_tab_fill_form_plugin(),
+			floorp_tab_element_value_plugin(),
+			floorp_tab_submit_form_plugin(),
 			floorp_scraper_uri_plugin(),
 			floorp_wait_for_element_plugin(),
 			floorp_click_element_plugin(),
@@ -351,6 +365,207 @@ fn op_floorp_region_screenshot(
 	})
 }
 
+// --- Tab ops implementations ---
+#[op2]
+#[string]
+fn op_floorp_tab_html(
+	#[string] id: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::get_tab_instance_html(&c, &id)
+			.map(|r| {
+				let html = r.html.and_then(|h| h).unwrap_or_default();
+				serde_json::json!({ "html": html })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_screenshot(
+	#[string] id: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::take_tab_screenshot(&c, &id)
+			.map(|r| {
+				let image = r.image.and_then(|i| i).unwrap_or_default();
+				serde_json::json!({ "image": image })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_element(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::get_tab_element(&c, &id, &selector)
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_element_text(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::get_tab_element_text(&c, &id, &selector)
+			.map(|r| {
+				let text = r.text.and_then(|t| t).unwrap_or_default();
+				serde_json::json!({ "text": text })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_click_element(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	let body = openapi::models::SelectorRequest { selector };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::click_tab_element(&c, &id, body)
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_wait_for_element(
+	#[string] id: String,
+	#[string] selector: String,
+	#[string] timeout_ms: Option<String>,
+) -> Result<String, JsErrorBox> {
+	let timeout = timeout_ms.and_then(|s| s.parse::<i32>().ok());
+	let body = openapi::models::WaitForElementRequest { selector: selector.clone(), timeout };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::wait_for_tab_element(&c, &id, body)
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_execute_script(
+	#[string] id: String,
+	#[string] script: String,
+) -> Result<String, JsErrorBox> {
+	let body = openapi::models::ExecuteScriptRequest { script };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::execute_tab_script(&c, &id, body)
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_element_screenshot(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::take_tab_element_screenshot(&c, &id, &selector)
+			.map(|r| {
+				let image = r.image.and_then(|i| i).unwrap_or_default();
+				serde_json::json!({ "image": image })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_fullpage_screenshot(
+	#[string] id: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::take_tab_full_page_screenshot(&c, &id)
+			.map(|r| {
+				let image = r.image.and_then(|i| i).unwrap_or_default();
+				serde_json::json!({ "image": image })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_region_screenshot(
+	#[string] id: String,
+	#[string] x: Option<String>,
+	#[string] y: Option<String>,
+	#[string] w: Option<String>,
+	#[string] h: Option<String>,
+) -> Result<String, JsErrorBox> {
+	let mut rect = openapi::models::Rect::new();
+	rect.x = x.and_then(|v| v.parse::<i32>().ok());
+	rect.y = y.and_then(|v| v.parse::<i32>().ok());
+	rect.width = w.and_then(|v| v.parse::<i32>().ok());
+	rect.height = h.and_then(|v| v.parse::<i32>().ok());
+	let body = openapi::models::RegionScreenshotRequest { rect: Some(Box::new(rect)) };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::take_tab_region_screenshot(&c, &id, body)
+			.map(|r| {
+				let image = r.image.and_then(|i| i).unwrap_or_default();
+				serde_json::json!({ "image": image })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_fill_form(
+	#[string] id: String,
+	#[string] selector: String,
+	#[string] value: String,
+) -> Result<String, JsErrorBox> {
+	let mut map = std::collections::HashMap::new();
+	map.insert(selector, value);
+	let body = openapi::models::FillFormRequest { form_data: map };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::fill_tab_form(&c, &id, body)
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_element_value(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::get_tab_element_value(&c, &id, &selector)
+			.map(|r| {
+				let value = r.value.and_then(|v| v).unwrap_or_default();
+				serde_json::json!({ "value": value })
+			})
+	})
+}
+
+#[op2]
+#[string]
+fn op_floorp_tab_submit_form(
+	#[string] id: String,
+	#[string] selector: String,
+) -> Result<String, JsErrorBox> {
+	let body = openapi::models::SelectorRequest { selector };
+	run_blocking_json(move || {
+		let c = cfg(None);
+		openapi::apis::default_api::submit_tab_form(&c, &id, body)
+	})
+}
+
 // ---- Browser / Tab listing & context ----
 #[op2]
 #[string]
@@ -481,6 +696,19 @@ make_plugin!(floorp_create_tab_instance_plugin, op_floorp_create_tab_instance, "
 make_plugin!(floorp_navigate_scraper_plugin, op_floorp_navigate_scraper, "navigateScraper", "Navigate Scraper", "Navigate a scraper instance to a URL.");
 make_plugin!(floorp_navigate_tab_plugin, op_floorp_navigate_tab, "navigateTab", "Navigate Tab", "Navigate a tab instance to a URL.");
 make_plugin!(floorp_scraper_html_plugin, op_floorp_scraper_html, "scraperHtml", "Scraper HTML", "Get current page HTML of scraper instance.");
+make_plugin!(floorp_tab_html_plugin, op_floorp_tab_html, "tabHtml", "Tab HTML", "Get current page HTML of tab instance.");
+make_plugin!(floorp_tab_screenshot_plugin, op_floorp_tab_screenshot, "tabScreenshot", "Tab Screenshot", "Take a screenshot of the tab page (PNG base64)." );
+make_plugin!(floorp_tab_element_plugin, op_floorp_tab_element, "tabElement", "Tab Element", "Get element information from tab by selector.");
+make_plugin!(floorp_tab_element_text_plugin, op_floorp_tab_element_text, "tabElementText", "Tab Element Text", "Get text content of element in tab by selector.");
+make_plugin!(floorp_tab_click_element_plugin, op_floorp_tab_click_element, "tabClickElement", "Tab Click Element", "Click an element in tab by selector.");
+make_plugin!(floorp_tab_wait_for_element_plugin, op_floorp_tab_wait_for_element, "tabWaitForElement", "Tab Wait For Element", "Wait for an element in tab by selector.");
+make_plugin!(floorp_tab_execute_script_plugin, op_floorp_tab_execute_script, "tabExecuteScript", "Tab Execute Script", "Execute JS in tab.");
+make_plugin!(floorp_tab_element_screenshot_plugin, op_floorp_tab_element_screenshot, "tabElementScreenshot", "Tab Element Screenshot", "Take a screenshot of an element in tab (PNG base64).");
+make_plugin!(floorp_tab_fullpage_screenshot_plugin, op_floorp_tab_fullpage_screenshot, "tabFullPageScreenshot", "Tab Full Page Screenshot", "Take a full page screenshot of tab (PNG base64).");
+make_plugin!(floorp_tab_region_screenshot_plugin, op_floorp_tab_region_screenshot, "tabRegionScreenshot", "Tab Region Screenshot", "Take a region screenshot of tab (PNG base64).");
+make_plugin!(floorp_tab_fill_form_plugin, op_floorp_tab_fill_form, "tabFillForm", "Tab Fill Form", "Fill a form in tab.");
+make_plugin!(floorp_tab_element_value_plugin, op_floorp_tab_element_value, "tabElementValue", "Tab Element Value", "Get element value in tab by selector.");
+make_plugin!(floorp_tab_submit_form_plugin, op_floorp_tab_submit_form, "tabSubmitForm", "Tab Submit Form", "Submit a form element in tab.");
 make_plugin!(floorp_scraper_uri_plugin, op_floorp_scraper_uri, "scraperUri", "Scraper URI", "Get current URI of scraper instance.");
 make_plugin!(floorp_tab_uri_plugin, op_floorp_tab_uri, "tabUri", "Tab URI", "Get current URI of tab instance.");
 make_plugin!(floorp_wait_for_element_plugin, op_floorp_wait_for_element, "waitForElement", "Wait For Element", "Wait for an element by selector.");
