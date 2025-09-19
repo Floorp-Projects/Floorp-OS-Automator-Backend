@@ -31,6 +31,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           # github.com のホストキーを known_hosts ファイルに追記する
+          $sshPath = "$env:USERPROFILE\.ssh"
           $knownHostsPath = Join-Path $sshPath "known_hosts"
           ssh-keyscan -H github.com | Add-Content -Path $knownHostsPath
 
