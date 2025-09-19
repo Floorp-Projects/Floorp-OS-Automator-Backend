@@ -63,18 +63,8 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           
-      - name: Setup SSH knwon_hosts (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # github.com のホストキーを known_hosts ファイルに追記する
-          $sshPath = "$env:USERPROFILE\.ssh"
-          $knownHostsPath = Join-Path $sshPath "known_hosts"
-          ssh-keyscan -H github.com | Add-Content -Path $knownHostsPath
-
-          Write-Host "github.com has been added to the known_hosts file."
-
-      - name: Setup SSH KNOWN_HOSTS (mac OS, Linux)
-        if: runner.os != 'Windows'
+      - name: Setup SSH KNOWN_HOSTS
+        shell: bash
         run: |
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
