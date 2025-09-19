@@ -168,33 +168,25 @@ impl WorkflowService for MyWorkflowService {
         request: tonic::Request<RunWorkflowRequest>,
     ) -> std::result::Result<tonic::Response<RunWorkflowResponse>, tonic::Status> {
         let req = request.into_inner();
-        if req.workflow_id.is_empty() && req.workflow_code_id.is_empty() {
-            return Err(tonic::Status::invalid_argument(
-                "Either workflow_id or workflow_code_id is required",
-            ));
-        }
+
+        // The proto defines RunWorkflowRequest with a `oneof source` which is either
+        // ById(WorkflowSourceById) or WorkflowDefinition(Workflow). Validate and
+        // extract the chosen source here.
+        let source = req.source.ok_or_else(|| {
+            tonic::Status::invalid_argument(
+                "RunWorkflowRequest.source is required (ById or WorkflowDefinition)",
+            )
+        })?;
+
         // Construct a placeholder Workflow until a real storage lookup is implemented.
-        let mut workflow = if !req.workflow_id.is_empty() {
-            Workflow {
-                id: req.workflow_id.clone(),
-                ..Default::default()
+        let mut workflow: Workflow = match source {
+            sapphillon_core::proto::sapphillon::v1::run_workflow_request::Source::ById(byid) => {
+                log::debug!("Received request, Workflow Code Id: {}, Workflow Id: {}", byid.workflow_code_id, byid.workflow_id);
+                Err(tonic::Status::unimplemented(
+                    "RunWorkflowRequest ById is not implemented",
+                ))?
             }
-        } else {
-            let wc = WorkflowCode {
-                id: req.workflow_code_id.clone(),
-                code_revision: 1,
-                code: "".to_string(),
-                language: 0,
-                created_at: None,
-                result: vec![],
-                plugin_packages: vec![],
-                plugin_function_ids: vec![],
-                allowed_permissions: vec![],
-            };
-            Workflow {
-                workflow_code: vec![wc],
-                ..Default::default()
-            }
+            sapphillon_core::proto::sapphillon::v1::run_workflow_request::Source::WorkflowDefinition(wf) => wf,
         };
         let latest_workflow_code_revision = workflow
             .workflow_code
@@ -212,11 +204,40 @@ impl WorkflowService for MyWorkflowService {
 
         log::debug!("Parsed workflow code: {}", workflow_code.code);
 
+        // Convert protobuf AllowedPermission entries into the core PluginFunctionPermissions
+        // Use the first allowed_permissions entry if present, otherwise, if plugin_function_ids
+        // contains at least one id, create a default permissive entry for that function id
+        // with empty Resources (meaning no specific resources granted).
+        let allowed_permissions_proto = &workflow_code.allowed_permissions;
+        let allowed_permissions: Option<sapphillon_core::permission::PluginFunctionPermissions> =
+            if !allowed_permissions_proto.is_empty() {
+                let ap = &allowed_permissions_proto[0];
+                Some(sapphillon_core::permission::PluginFunctionPermissions {
+                    plugin_function_id: ap.plugin_function_id.clone(),
+                    permissions: sapphillon_core::permission::Permissions::new(
+                        ap.permissions.clone(),
+                    ),
+                })
+            } else if !workflow_code.plugin_function_ids.is_empty() {
+                // fallback: use the first plugin_function_id with empty permissions
+                Some(sapphillon_core::permission::PluginFunctionPermissions {
+                    plugin_function_id: workflow_code.plugin_function_ids[0].clone(),
+                    permissions: sapphillon_core::permission::Permissions::new(vec![]),
+                })
+            } else {
+                None
+            };
+
+        // For required permissions, the proto currently doesn't have a separate field on the
+        // WorkflowCode message; treat required as same as allowed for now if present.
+        let required_permissions: Option<sapphillon_core::permission::PluginFunctionPermissions> =
+            allowed_permissions.clone();
+
         let mut workflow_core = CoreWorkflowCode::new_from_proto(
             workflow_code,
             vec![core_fetch_plugin_package()],
-            None,
-            None,
+            required_permissions,
+            allowed_permissions,
         );
         workflow_core.run();
 

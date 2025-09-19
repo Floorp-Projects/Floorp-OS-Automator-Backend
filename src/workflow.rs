@@ -134,9 +134,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     User Query(Task):
     - {user_query}
     - 使用言語: ja-JP
-    "#,
-        today_date = today_date,
-        user_query = user_query
+    "#
     );
     Ok(prompt)
 }
@@ -199,7 +197,7 @@ pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>>
 fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
     let result = extract_first_code("```javascript\nHello World\n```");
     assert_eq!(result, Some("Hello World".to_string()));
-    println!("Extracted code: {:?}", result);
+    println!("Extracted code: {result:?}");
     Ok(())
 }
 
