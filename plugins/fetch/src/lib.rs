@@ -88,7 +88,10 @@ fn _permission_check_backend(
 
         permissions_vec
             .into_iter()
-            .find(|p| p.plugin_function_id == fetch_plugin_function().function_id || p.plugin_function_id == "*")
+            .find(|p| {
+                p.plugin_function_id == fetch_plugin_function().function_id
+                    || p.plugin_function_id == "*"
+            })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
                 permissions: vec![],
