@@ -839,6 +839,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "filesystem"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "sapphillon_core",
+ "tempfile",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
