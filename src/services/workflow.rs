@@ -204,11 +204,36 @@ impl WorkflowService for MyWorkflowService {
 
         log::debug!("Parsed workflow code: {}", workflow_code.code);
 
+        // Convert protobuf AllowedPermission entries into the core PluginFunctionPermissions
+        // Use the first allowed_permissions entry if present, otherwise, if plugin_function_ids
+        // contains at least one id, create a default permissive entry for that function id
+        // with empty Resources (meaning no specific resources granted).
+        let allowed_permissions_proto = &workflow_code.allowed_permissions;
+        let allowed_permissions: Option<sapphillon_core::permission::PluginFunctionPermissions> = if !allowed_permissions_proto.is_empty() {
+            let ap = &allowed_permissions_proto[0];
+            Some(sapphillon_core::permission::PluginFunctionPermissions {
+                plugin_function_id: ap.plugin_function_id.clone(),
+                permissions: sapphillon_core::permission::Permissions::new(ap.permissions.clone()),
+            })
+        } else if !workflow_code.plugin_function_ids.is_empty() {
+            // fallback: use the first plugin_function_id with empty permissions
+            Some(sapphillon_core::permission::PluginFunctionPermissions {
+                plugin_function_id: workflow_code.plugin_function_ids[0].clone(),
+                permissions: sapphillon_core::permission::Permissions::new(vec![]),
+            })
+        } else {
+            None
+        };
+
+        // For required permissions, the proto currently doesn't have a separate field on the
+        // WorkflowCode message; treat required as same as allowed for now if present.
+        let required_permissions: Option<sapphillon_core::permission::PluginFunctionPermissions> = allowed_permissions.clone();
+
         let mut workflow_core = CoreWorkflowCode::new_from_proto(
             workflow_code,
             vec![core_fetch_plugin_package()],
-            None,
-            None,
+            required_permissions,
+            allowed_permissions,
         );
         workflow_core.run();
 
