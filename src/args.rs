@@ -51,6 +51,19 @@ impl From<LogLevel> for LevelFilter {
     }
 }
 
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LogLevel::Trace => "trace",
+            LogLevel::Debug => "debug",
+            LogLevel::Info => "info",
+            LogLevel::Warn => "warn",
+            LogLevel::Error => "error",
+        };
+        write!(f, "{s}")
+    }
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Start the gRPC server

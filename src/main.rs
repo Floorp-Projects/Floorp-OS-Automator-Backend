@@ -32,8 +32,10 @@ use server::start_server;
 async fn main() -> Result<()> {
     let args = Args::parse();
     // Initialize logger with the log level from command line arguments
-    env_logger::Builder::from_default_env()
-        .filter_level(args.loglevel.clone().into())
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::new(
+            args.loglevel.to_string(),
+        ))
         .init();
 
     match args.command {
