@@ -260,6 +260,9 @@ mod tests {
     use sapphillon_core::workflow::CoreWorkflowCode;
     use std::io::Write;
 
+    // Tests below use std::env::temp_dir() to construct temporary file paths so
+    // they work both on Unix-like systems and Windows (avoids hard-coded paths
+    // like /tmp/... and handles backslashes in JS string literals).
     #[test]
     fn test_read_file_text() {
         // create a temp file
@@ -285,15 +288,17 @@ mod tests {
 
     #[test]
     fn test_permission_in_workflow() {
-        let code = r#"
-            const path = "/tmp/__sapphillon_test__";
-            const content = readFile(path);
-            console.log(content);
-        "#;
+        // Create a platform-appropriate temp path and write the file
+        let mut tmp_path_buf = std::env::temp_dir();
+        tmp_path_buf.push("__sapphillon_test__");
+        let tmp_path = tmp_path_buf.to_str().unwrap().to_string();
+        std::fs::write(&tmp_path_buf, "workflow-test").unwrap();
 
-        // Create the file that workflow will try to read
-        let tmp_path = "/tmp/__sapphillon_test__".to_string();
-        std::fs::write(&tmp_path, "workflow-test").unwrap();
+        // Build JS code with the properly-escaped path string so backslashes on Windows
+        // don't create invalid escape sequences in the JS literal.
+        let code = format!(
+            "const path = {tmp_path:?}; const content = readFile(path); console.log(content);"
+        );
 
         let perm: PluginFunctionPermissions = PluginFunctionPermissions {
             plugin_function_id: filesystem_read_plugin_function().function_id,
@@ -329,15 +334,16 @@ mod tests {
 
     #[test]
     fn test_permission_write_in_workflow() {
-        let code = r#"
-            const path = "/tmp/__sapphillon_test_write__";
-            fs.write(path, "workflow-write");
-            console.log("done");
-        "#;
-
         // Ensure file does not exist then grant permission
-        let tmp_path = "/tmp/__sapphillon_test_write__".to_string();
-        let _ = std::fs::remove_file(&tmp_path);
+        let mut tmp_path_buf = std::env::temp_dir();
+        tmp_path_buf.push("__sapphillon_test_write__");
+        let tmp_path = tmp_path_buf.to_str().unwrap().to_string();
+        let _ = std::fs::remove_file(&tmp_path_buf);
+
+        // Build JS code with escaped path literal
+        let code = format!(
+            "const path = {tmp_path:?}; fs.write(path, \"workflow-write\"); console.log(\"done\");"
+        );
 
         let perm: PluginFunctionPermissions = PluginFunctionPermissions {
             plugin_function_id: filesystem_write_plugin_function().function_id,
