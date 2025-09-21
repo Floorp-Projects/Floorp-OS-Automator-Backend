@@ -6,7 +6,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  workflow_call:
+  workflow_call:    
+    secrets:
+      SSH_PRIVATE_KEY:
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
