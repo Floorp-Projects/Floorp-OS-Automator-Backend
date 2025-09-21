@@ -21,7 +21,7 @@ jobs:
     needs: [Test]
     runs-on: ${{ matrix.runner }}
     env:
-      PROJECT_NAME: rust-actions-example
+      PROJECT_NAME: Sapphillon-Controller
     strategy:
       fail-fast: false
       matrix:

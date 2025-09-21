@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "Sapphillon-Controller"
-version = "0.5.0"
+version = "0.5.5"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -831,7 +831,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fetch"
-version = "0.5.0"
+version = "0.5.5"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -843,7 +843,7 @@ dependencies = [
 
 [[package]]
 name = "filesystem"
-version = "0.5.0"
+version = "0.5.5"
 dependencies = [
  "anyhow",
  "deno_core",
