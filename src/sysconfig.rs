@@ -1,4 +1,6 @@
 use crate::sysconfig;
+use sapphillon_core::plugin::CorePluginPackage;
+use sapphillon_core::proto::sapphillon::v1::PluginPackage;
 
 // Sapphillon
 // Copyright 2025 Yuta Takahashi
@@ -27,10 +29,12 @@ pub const SYSCONFIG: SysConfig = SysConfig {
 
 #[derive(Debug, Clone)]
 pub struct SysConfig {
-    app_name: &'static str,
-    version: &'static str,
-    authors: &'static str,
-    copyright_year: u16,
+    pub app_name: &'static str,
+    pub version: &'static str,
+    pub authors: &'static str,
+    pub copyright_year: u16,
+    
+
 }
 
 impl SysConfig {
