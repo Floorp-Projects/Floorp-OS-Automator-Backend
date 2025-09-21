@@ -17,6 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use fetch::core_fetch_plugin_package;
+use filesystem::core_filesystem_plugin_package;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     DeleteWorkflowRequest, DeleteWorkflowResponse, FixWorkflowRequest, FixWorkflowResponse,
@@ -235,7 +236,10 @@ impl WorkflowService for MyWorkflowService {
 
         let mut workflow_core = CoreWorkflowCode::new_from_proto(
             workflow_code,
-            vec![core_fetch_plugin_package()],
+            vec![
+                core_fetch_plugin_package(),
+                core_filesystem_plugin_package(),
+            ],
             required_permissions,
             allowed_permissions,
         );

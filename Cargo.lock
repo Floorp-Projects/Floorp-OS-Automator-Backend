@@ -12,6 +12,7 @@ dependencies = [
  "clap",
  "env_logger",
  "fetch",
+ "filesystem",
  "log",
  "prost",
  "prost-types",
@@ -838,6 +839,18 @@ dependencies = [
  "log",
  "sapphillon_core",
  "ureq",
+]
+
+[[package]]
+name = "filesystem"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "sapphillon_core",
+ "tempfile",
 ]
 
 [[package]]
@@ -2388,8 +2401,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "sapphillon_core"
-version = "0.8.2"
-source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.8.2-alpha#924d24b000b552f74c8c5464a603aedb733dafe9"
+version = "0.8.3"
+source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.8.3-alpha#471d3f6435ab9ec68c0e7c99e25d8fe8abff4929"
 dependencies = [
  "anyhow",
  "async-trait",
