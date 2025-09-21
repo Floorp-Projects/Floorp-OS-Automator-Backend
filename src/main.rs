@@ -21,6 +21,10 @@ mod server;
 mod services;
 mod workflow;
 
+/// System Configuration
+#[allow(unused)]
+mod sysconfig;
+
 use anyhow::Result;
 use clap::Parser;
 use log::{debug, error, info};
@@ -37,6 +41,12 @@ async fn main() -> Result<()> {
             args.loglevel.to_string(),
         ))
         .init();
+
+    // Display application information
+    let app_info = sysconfig::sysconfig().app_info();
+    for line in app_info.lines() {
+        log::info!("{line}");
+    }
 
     match args.command {
         Command::Start => {
