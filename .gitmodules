@@ -1,0 +1,3 @@
+[submodule "plugins/floorp"]
+	path = plugins/floorp
+	url = https://github.com/Floorp-Projects/Floorp-Sapphillon-Plugins
