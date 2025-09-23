@@ -3,6 +3,7 @@ use sapphillon_core::proto::sapphillon::v1::PluginPackage;
 
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
+use floorp::{core_floorp_plugin_package, floorp_plugin_package};
 
 // Sapphillon
 // Copyright 2025 Yuta Takahashi
@@ -32,8 +33,9 @@ pub fn sysconfig() -> SysConfig {
         core_plugin_package: vec![
             core_fetch_plugin_package(),
             core_filesystem_plugin_package(),
+            core_floorp_plugin_package(),
         ],
-        plugin_package: vec![fetch_plugin_package(), filesystem_plugin_package()],
+        plugin_package: vec![fetch_plugin_package(), filesystem_plugin_package(), floorp_plugin_package()],
     }
 }
 
