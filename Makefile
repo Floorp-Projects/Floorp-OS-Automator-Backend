@@ -41,7 +41,7 @@ migrate_generate:
 	@if [ -z "$(NAME)" ]; then \
 		echo "Usage: make migrate_generate NAME=your_migration_name"; exit 1; \
 	fi
-	cargo run -p migration -- migrate generate $(NAME)
+	sea-orm-cli migrate generate $(NAME)
 	@echo "----------------------------------------------------------"
 
 migrate:
