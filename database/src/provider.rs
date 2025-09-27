@@ -16,5 +16,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use sapphillon_core::proto::sapphillon::ai::v1::Provider as ProtoProvider;
-use entity::entity::provider::Model as EntityProvider;
+use entity::entity::provider;
+use sea_orm::{DatabaseConnection, DbErr, EntityTrait};
+
+pub async fn create_provider(
+    db: &DatabaseConnection,
+    provider: provider::Model,
+) -> Result<(), DbErr> {
+
+    let active_model: provider::ActiveModel = provider.into();
+    provider::Entity::insert(active_model).exec(db).await?;
+    Ok(())
+}
