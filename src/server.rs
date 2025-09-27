@@ -118,6 +118,7 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
         .allow_headers(tower_http::cors::Any);
 
     Server::builder()
+        .trace_fn(|_| tracing::info_span!("grpc_server")) // Add tracing span
         .accept_http1(true)
         .layer(cors)
         .add_service(tonic_web::enable(reflection_service_v1_alpha))

@@ -21,6 +21,10 @@ mod server;
 mod services;
 mod workflow;
 
+/// System Configuration
+#[allow(unused)]
+mod sysconfig;
+
 use anyhow::Result;
 use clap::Parser;
 use log::{debug, error, info};
@@ -28,12 +32,14 @@ use log::{debug, error, info};
 use args::{Args, Command};
 use server::start_server;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let args = Args::parse();
     // Initialize logger with the log level from command line arguments
-    env_logger::Builder::from_default_env()
-        .filter_level(args.loglevel.clone().into())
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::new(
+            args.loglevel.to_string(),
+        ))
         .init();
     
 
@@ -44,6 +50,12 @@ async fn main() -> Result<()> {
         .with_thread_names(true)
         .with_test_writer()
         .init();
+
+    // Display application information
+    let app_info = sysconfig::sysconfig().app_info();
+    for line in app_info.lines() {
+        log::info!("{line}");
+    }
 
     match args.command {
         Command::Start => {

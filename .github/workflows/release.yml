@@ -14,12 +14,14 @@ env:
 jobs:
   Test:
     uses: ./.github/workflows/testing.yml
+    secrets:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
   build:
     needs: [Test]
     runs-on: ${{ matrix.runner }}
     env:
-      PROJECT_NAME: rust-actions-example
+      PROJECT_NAME: Sapphillon-Controller
     strategy:
       fail-fast: false
       matrix:
@@ -32,26 +34,26 @@ jobs:
             extension: ".exe"
             runner: windows-latest
             cross: false
-          - target: x86_64-apple-darwin
-            extension: ""
-            runner: macos-latest
-            cross: false
+          # - target: x86_64-apple-darwin
+          #   extension: ""
+          #   runner: macos-latest
+          #   cross: false
           - target: aarch64-unknown-linux-gnu
             extension: ""
             runner: ubuntu-latest
             cross: true
-          - target: aarch64-pc-windows-msvc
-            extension: ".exe"
-            runner: windows-latest
-            cross: false
+          # - target: aarch64-pc-windows-msvc
+          #   extension: ".exe"
+          #   runner: windows-latest
+          #   cross: false
           - target: aarch64-apple-darwin
             extension: ""
             runner: macos-latest
             cross: false
-          - target: armv7-unknown-linux-gnueabihf
-            extension: ""
-            runner: ubuntu-latest
-            cross: true
+          # - target: armv7-unknown-linux-gnueabihf
+          #   extension: ""
+          #   runner: ubuntu-latest
+          #   cross: true
 
     steps:
       - name: Checkout
@@ -63,22 +65,13 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           
-      - name: Setup SSH knwon_hosts (Windows)
-        if: ${{ matrix.runner == 'windows-latest' }}
-        run: |
-          # github.com のホストキーを known_hosts ファイルに追記する
-          $knownHostsPath = Join-Path $sshPath "known_hosts"
-          ssh-keyscan -H github.com | Add-Content -Path $knownHostsPath
-
-          Write-Host "github.com has been added to the known_hosts file."
-
-      - name: Setup SSH KNOWN_HOSTS (mac OS, Linux)
-        if: ${{ matrix.runner != 'windows-latest' }}
+      - name: Setup SSH KNOWN_HOSTS
+        shell: bash
         run: |
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
       - name: Install Dependencies on Windows
-        if: ${{ matrix.runner == 'windows-latest' }}
+        if: runner.os == 'Windows'
         run: |
             choco install make --yes
             choco install nasm --yes
@@ -86,7 +79,7 @@ jobs:
             echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Dependencies on MacOS
-        if: ${{ matrix.runner == 'macos-latest' }}
+        if: runner.os == 'macOS'
         run: |
             brew install make
 

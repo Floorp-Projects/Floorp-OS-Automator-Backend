@@ -1,7 +1,7 @@
 [workspace.package]
 
 # name = "Sapphillon"
-version = "0.4.0"
+version = "0.5.6"
 edition = "2024" 
 authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
 license-file = "LICENSE"
@@ -31,7 +31,7 @@ deno_error = "0.7.0"
 tonic = "0.12.0"
 prost = "0.13.1"
 prost-types = "0.13.1"
-sapphillon_core = { git = "ssh://git@github.com/Walkmana-25/Sapphillon-Core.git", tag = "v0.8.0-alpha" }
+sapphillon_core = { git = "ssh://git@github.com/Walkmana-25/Sapphillon-Core.git", tag = "v0.8.3-alpha" }
 tonic-build = "0.12.0"
 
 [package]
@@ -64,15 +64,16 @@ serde_json = "1.0"
 tokio-stream = "0.1.17"
 
 fetch = {path = "./plugins/fetch"}
+filesystem = {path = "./plugins/filesystem"}
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.12.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
 tonic-web = "0.12.0"
 unescaper = "0.1.6"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 sea-orm = { version = "1.1.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "mock", "with-chrono", "debug-print"] }
-tracing-subscriber = "0.3.20"
-tracing = "0.1.41"
 entity = {path = "./entity"}
 migration = {path = "./migration"}
 

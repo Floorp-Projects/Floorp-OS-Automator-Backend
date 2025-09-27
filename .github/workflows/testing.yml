@@ -6,7 +6,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  workflow_call:
+  workflow_call:    
+    secrets:
+      SSH_PRIVATE_KEY:
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -26,34 +29,25 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
-      - name: Setup SSH knwon_hosts (Windows)
-        if: ${{ matrix.runner == 'windows-latest' }}
-        run: |
-          # github.com のホストキーを known_hosts ファイルに追記する
-          $knownHostsPath = Join-Path $sshPath "known_hosts"
-          ssh-keyscan -H github.com | Add-Content -Path $knownHostsPath
 
-          Write-Host "github.com has been added to the known_hosts file."
-
-      - name: Setup SSH KNOWN_HOSTS (mac OS, Linux)
-        if: ${{ matrix.runner != 'windows-latest' }}
+      - name: Setup SSH KNOWN_HOSTS
+        shell: bash
         run: |
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
       - name: Install Dependecies on Ubuntu
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y protobuf-compiler
 
       - name: Install Dependencies on MacOS
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: runner.os == 'macOS'
         run: |
           brew install protobuf
 
       - name: Install Dependencies on Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: runner.os == 'Windows'
         run: |
           choco install make --yes
           choco install nasm --yes
@@ -73,12 +67,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Setup SSH KNOWN_HOSTS
+        shell: bash
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
