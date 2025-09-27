@@ -1,4 +1,4 @@
-.PHONY: rust_test, rust_build, rust_check_format, rust_fix_format, gen_empty_db, migrate_generate
+.PHONY: rust_test, rust_build, rust_check_format, rust_fix_format, gen_empty_db, migrate_generate, entity_generate
 
 rust_test:
 	@echo "Run Rust Tests"
@@ -50,6 +50,14 @@ migrate:
 	mkdir -p ./db
 	touch ./db/sqlite.db
 	sea-orm-cli migrate up -u "sqlite://db/sqlite.db"
+	@echo "----------------------------------------------------------"
+
+entity_generate:
+	@echo "Generate SeaORM entities from database"
+	@echo "----------------------------------------------------------"
+	mkdir -p ./db
+	touch ./db/sqlite.db
+	sea-orm-cli generate entity -u "sqlite://db/sqlite.db" -o ./entity/src/entity
 	@echo "----------------------------------------------------------"
 
 
