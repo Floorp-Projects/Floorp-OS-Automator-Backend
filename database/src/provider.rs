@@ -16,7 +16,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod type_convert;
-
-#[allow(unused_imports)]
-use type_convert::*;
+use sapphillon_core::proto::sapphillon::ai::v1::Provider as ProtoProvider;
+use entity::entity::provider::Model as EntityProvider;
