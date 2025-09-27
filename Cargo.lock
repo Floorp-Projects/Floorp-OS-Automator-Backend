@@ -954,8 +954,10 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 name = "database"
 version = "0.5.6"
 dependencies = [
+ "anyhow",
  "entity",
  "sapphillon_core",
+ "sea-orm",
 ]
 
 [[package]]
@@ -1182,6 +1184,8 @@ dependencies = [
 name = "entity"
 version = "0.5.6"
 dependencies = [
+ "anyhow",
+ "sapphillon_core",
  "sea-orm",
 ]
 

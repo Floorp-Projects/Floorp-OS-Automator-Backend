@@ -11,5 +11,5 @@ homepage.workspace = true
 [dependencies]
 sapphillon_core.workspace = true
 entity.workspace = true
-see-orm.workspace = true
+sea-orm.workspace = true
 anyhow.workspace = true

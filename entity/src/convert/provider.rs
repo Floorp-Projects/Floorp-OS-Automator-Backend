@@ -16,8 +16,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod entity;
-pub mod convert;
+use sapphillon_core::proto::sapphillon::ai::v1::Provider as ProtoProvider;
+use crate::entity::provider::Model as EntityProvider;
 
-#[allow(unused)]
-pub use convert::*;
+impl From<ProtoProvider> for EntityProvider {
+    fn from(proto: ProtoProvider) -> Self {
+        EntityProvider {
+            name: proto.name,
+            display_name: proto.display_name,
+            api_key: proto.api_key,
+            api_endpoint: proto.api_endpoint,
+        }
+    }
+}
+
+impl From<EntityProvider> for ProtoProvider {
+    fn from(entity: EntityProvider) -> Self {
+        ProtoProvider {
+            name: entity.name,
+            display_name: entity.display_name,
+            api_key: entity.api_key,
+            api_endpoint: entity.api_endpoint,
+        }
+    }
+}
