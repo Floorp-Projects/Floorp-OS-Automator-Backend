@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use entity::entity::provider;
-use sea_orm::{DatabaseConnection, DbErr, ActiveModelTrait};
+use sea_orm::{DatabaseConnection, DbErr, ActiveModelTrait, EntityTrait};
 
 
 pub async fn create_provider(
@@ -31,6 +31,14 @@ pub async fn create_provider(
     // if the row doesn't exist yet.
     active_model.insert(db).await?;
     Ok(())
+}
+
+pub async fn get_provider(
+    db: &DatabaseConnection,
+    name: &str,
+) -> Result<Option<provider::Model>, DbErr> {
+    let provider = provider::Entity::find_by_id(name.to_string()).one(db).await?;
+    Ok(provider)
 }
 
 #[cfg(test)]
@@ -107,6 +115,42 @@ mod tests {
 
         assert!(found_a.is_some(), "prov_a should be found");
         assert!(found_b.is_some(), "prov_b should be found");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_provider_found() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert a provider and retrieve it via get_provider
+        let model = provider::Model {
+            name: "test_provider_get".to_string(),
+            display_name: "Get Provider".to_string(),
+            api_key: "get_key".to_string(),
+            api_endpoint: "https://get.example.test".to_string(),
+        };
+
+        create_provider(&db, model).await?;
+
+        let found = get_provider(&db, "test_provider_get").await?;
+        assert!(found.is_some(), "get_provider should return Some for existing provider");
+        let found = found.unwrap();
+        assert_eq!(found.name, "test_provider_get");
+        assert_eq!(found.display_name, "Get Provider");
+        assert_eq!(found.api_key, "get_key");
+        assert_eq!(found.api_endpoint, "https://get.example.test");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_provider_not_found() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Ensure requesting a non-existent provider returns None
+        let found = get_provider(&db, "nonexistent").await?;
+        assert!(found.is_none(), "get_provider should return None for missing provider");
 
         Ok(())
     }
