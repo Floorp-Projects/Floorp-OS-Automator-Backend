@@ -41,7 +41,6 @@ async fn main() -> Result<()> {
             args.loglevel.to_string(),
         ))
         .init();
-    
 
     // orm log
     tracing_subscriber::fmt()

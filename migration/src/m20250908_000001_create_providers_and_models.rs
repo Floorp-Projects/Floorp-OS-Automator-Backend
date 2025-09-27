@@ -37,11 +37,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(string(Model::DisplayName))
                     .col(ColumnDef::new(Model::Description).string().null())
-                    .col(
-                        ColumnDef::new(Model::ProviderName)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Model::ProviderName).string().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_model_provider")
