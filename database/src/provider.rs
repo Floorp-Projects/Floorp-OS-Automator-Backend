@@ -17,7 +17,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use entity::entity::provider;
-use sea_orm::{DatabaseConnection, DbErr, EntityTrait};
+use sea_orm::{DatabaseConnection, DbErr, ActiveModelTrait};
+
 
 pub async fn create_provider(
     db: &DatabaseConnection,
@@ -25,6 +26,88 @@ pub async fn create_provider(
 ) -> Result<(), DbErr> {
 
     let active_model: provider::ActiveModel = provider.into();
-    provider::Entity::insert(active_model).exec(db).await?;
+    // Use insert to ensure a new record is created. save() can try to perform an update
+    // when the primary key is already set on the ActiveModel, which causes RecordNotFound
+    // if the row doesn't exist yet.
+    active_model.insert(db).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
+
+    async fn setup_db() -> Result<DatabaseConnection, DbErr> {
+        // Use an in-memory SQLite database for testing
+        let db = Database::connect("sqlite::memory:").await?;
+
+        // Create the `provider` table matching the entity definition
+        let sql = r#"
+            CREATE TABLE provider (
+                name TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                api_key TEXT NOT NULL,
+                api_endpoint TEXT NOT NULL
+            )
+        "#;
+        db.execute(Statement::from_string(DbBackend::Sqlite, sql.to_string())).await?;
+
+        Ok(db)
+    }
+
+    #[tokio::test]
+    async fn test_create_provider() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Prepare a provider model and call the function under test
+        let model = provider::Model {
+            name: "test_provider".to_string(),
+            display_name: "Test Provider".to_string(),
+            api_key: "secret_key".to_string(),
+            api_endpoint: "https://example.test".to_string(),
+        };
+
+        create_provider(&db, model).await?;
+
+        // Verify the provider was inserted
+        let found = provider::Entity::find_by_id("test_provider".to_string()).one(&db).await?;
+        assert!(found.is_some(), "Inserted provider should be found");
+        let found = found.unwrap();
+        assert_eq!(found.name, "test_provider");
+        assert_eq!(found.display_name, "Test Provider");
+        assert_eq!(found.api_key, "secret_key");
+        assert_eq!(found.api_endpoint, "https://example.test");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_multiple_providers() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        let a = provider::Model {
+            name: "prov_a".to_string(),
+            display_name: "Provider A".to_string(),
+            api_key: "key_a".to_string(),
+            api_endpoint: "https://a.test".to_string(),
+        };
+        let b = provider::Model {
+            name: "prov_b".to_string(),
+            display_name: "Provider B".to_string(),
+            api_key: "key_b".to_string(),
+            api_endpoint: "https://b.test".to_string(),
+        };
+
+        create_provider(&db, a).await?;
+        create_provider(&db, b).await?;
+
+        let found_a = provider::Entity::find_by_id("prov_a".to_string()).one(&db).await?;
+        let found_b = provider::Entity::find_by_id("prov_b".to_string()).one(&db).await?;
+
+        assert!(found_a.is_some(), "prov_a should be found");
+        assert!(found_b.is_some(), "prov_b should be found");
+
+        Ok(())
+    }
 }
