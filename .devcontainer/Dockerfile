@@ -38,6 +38,7 @@ RUN go install github.com/ktr0731/evans@latest \
     && go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest \
     && go install github.com/fullstorydev/grpcui/cmd/grpcui@latest
     
-    
 USER vscode
+ENV CARGO_HOME="/home/vscode/.cargo"
+RUN mkdir /home/vscode/.cargo
 RUN cargo install tokei sea-orm-cli
