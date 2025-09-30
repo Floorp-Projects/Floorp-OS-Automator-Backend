@@ -99,6 +99,18 @@ pub async fn list_providers(
     Ok((providers, next_page_token))
 }
 
+pub async fn delete_provider(
+    db: &DatabaseConnection,
+    name: &str,
+) -> Result<(), DbErr> {
+    let provider = provider::Entity::find_by_id(name.to_string()).one(db).await?;
+    if let Some(provider) = provider {
+        let active_model: provider::ActiveModel = provider.into();
+        active_model.delete(db).await?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,6 +320,37 @@ mod tests {
         assert_eq!(second_page.len(), 2, "second page should contain 2 items");
         // Since there were 4 total and page size 2, final token should be empty
         assert!(final_token.is_empty(), "final token should be empty when no more pages");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_provider() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert a provider to delete
+        let model = provider::Model {
+            name: "del_test".to_string(),
+            display_name: "Delete Test".to_string(),
+            api_key: "del_key".to_string(),
+            api_endpoint: "https://del.test".to_string(),
+        };
+
+        create_provider(&db, model).await?;
+
+        // Ensure it exists
+        let found = provider::Entity::find_by_id("del_test".to_string()).one(&db).await?;
+        assert!(found.is_some(), "provider should exist before deletion");
+
+        // Delete the provider
+        delete_provider(&db, "del_test").await?;
+
+        // Ensure it's gone
+        let found = provider::Entity::find_by_id("del_test".to_string()).one(&db).await?;
+        assert!(found.is_none(), "provider should be removed after deletion");
+
+        // Deleting again should not error
+        delete_provider(&db, "del_test").await?;
 
         Ok(())
     }
