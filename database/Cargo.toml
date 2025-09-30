@@ -14,3 +14,4 @@ entity.workspace = true
 sea-orm.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
+base64.workspace = true

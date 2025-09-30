@@ -17,7 +17,9 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use entity::entity::provider;
-use sea_orm::{DatabaseConnection, DbErr, ActiveModelTrait, EntityTrait};
+use sea_orm::{DatabaseConnection, DbErr, ActiveModelTrait, EntityTrait, QuerySelect};
+use base64::engine::general_purpose;
+use base64::Engine as _;
 
 
 pub async fn create_provider(
@@ -39,6 +41,62 @@ pub async fn get_provider(
 ) -> Result<Option<provider::Model>, DbErr> {
     let provider = provider::Entity::find_by_id(name.to_string()).one(db).await?;
     Ok(provider)
+}
+
+pub async fn list_providers(
+    db: &DatabaseConnection,
+    next_page_token: Option<String>,
+    page_size: Option<u32>
+) -> Result<(Vec<provider::Model>, String), DbErr> { // Return a tuple of (list, next_page_token)
+    // Decode next_page_token as base64 u64 offset. If missing or invalid, start at 0.
+    let offset: u64 = match next_page_token {
+        Some(token) => {
+            match general_purpose::STANDARD.decode(token) {
+                Ok(bytes) => {
+                    if bytes.len() == 8 {
+                        let mut arr = [0u8; 8];
+                        arr.copy_from_slice(&bytes);
+                        u64::from_be_bytes(arr)
+                    } else {
+                        0u64
+                    }
+                }
+                Err(_) => 0u64,
+            }
+        }
+        None => 0u64,
+    };
+
+    // Determine limit, default to 100 if not provided or zero
+    let limit = match page_size {
+        Some(0) | None => 100u64,
+        Some(sz) => sz as u64,
+    };
+
+    // Query with offset/limit. Fetch one extra row to detect whether a next page exists.
+    let query_limit = limit.saturating_add(1);
+    let mut providers = provider::Entity::find()
+        .offset(Some(offset))
+        .limit(Some(query_limit))
+        .all(db)
+        .await?;
+
+    let has_next = (providers.len() as u64) > limit;
+
+    // Trim to requested page size
+    if has_next {
+        providers.truncate(limit as usize);
+    }
+
+    let next_page_token = if has_next {
+        let next_offset = offset.saturating_add(limit);
+        let bytes = next_offset.to_be_bytes();
+        general_purpose::STANDARD.encode(bytes)
+    } else {
+        String::new()
+    };
+
+    Ok((providers, next_page_token))
 }
 
 #[cfg(test)]
@@ -151,6 +209,105 @@ mod tests {
         // Ensure requesting a non-existent provider returns None
         let found = get_provider(&db, "nonexistent").await?;
         assert!(found.is_none(), "get_provider should return None for missing provider");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_providers_pagination() -> Result<(), DbErr> {
+        use std::collections::HashSet;
+
+        let db = setup_db().await?;
+
+        // Insert 5 providers
+        for i in 1..=5 {
+            let model = provider::Model {
+                name: format!("prov_{i}"),
+                display_name: format!("Provider {i}"),
+                api_key: format!("key_{i}"),
+                api_endpoint: format!("https://{i}.test"),
+            };
+            create_provider(&db, model).await?;
+        }
+
+        // Page size 2 should produce 3 pages: 2, 2, 1
+        let mut token: Option<String> = None;
+        let mut all_names = HashSet::new();
+
+        loop {
+            let (items, next) = list_providers(&db, token.clone(), Some(2)).await?;
+            for it in items.iter() {
+                all_names.insert(it.name.clone());
+            }
+
+            if next.is_empty() {
+                break;
+            }
+            token = Some(next);
+        }
+
+        assert_eq!(all_names.len(), 5, "Should have collected all 5 providers");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_providers_invalid_token() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert 3 providers
+        for i in 1..=3 {
+            let model = provider::Model {
+                name: format!("bad_{i}"),
+                display_name: format!("Bad {i}"),
+                api_key: format!("bkey_{i}"),
+                api_endpoint: format!("https://bad{i}.test"),
+            };
+            create_provider(&db, model).await?;
+        }
+
+        // Provide an invalid token; function should treat it as offset 0 and return first page
+        let (items, next) = list_providers(&db, Some("not-a-valid-token".to_string()), Some(2)).await?;
+        assert!(!items.is_empty(), "Should return some items when token is invalid");
+        // Because there are 3 items and page_size=2, there should be a next token
+        assert!(!next.is_empty(), "Should return a next_page_token when more pages exist");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_page_token_roundtrip() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert 4 providers
+        for i in 1..=4 {
+            let model = provider::Model {
+                name: format!("pt_{i}"),
+                display_name: format!("PT {i}"),
+                api_key: format!("ptkey_{i}"),
+                api_endpoint: format!("https://pt{i}.test"),
+            };
+            create_provider(&db, model).await?;
+        }
+
+        // First page: size 2
+        let (first_page, next_token) = list_providers(&db, None, Some(2)).await?;
+        assert_eq!(first_page.len(), 2, "first page should contain 2 items");
+        assert!(!next_token.is_empty(), "should have a next token");
+
+        // Decode token and check it equals offset 2
+        let decoded = general_purpose::STANDARD.decode(next_token.clone()).expect("decode token");
+        assert_eq!(decoded.len(), 8, "token should decode to 8 bytes");
+        let mut arr = [0u8; 8];
+        arr.copy_from_slice(&decoded);
+        let offset = u64::from_be_bytes(arr);
+        assert_eq!(offset, 2u64, "next offset encoded in token should be 2");
+
+        // Use token to fetch second page
+        let (second_page, final_token) = list_providers(&db, Some(next_token), Some(2)).await?;
+        assert_eq!(second_page.len(), 2, "second page should contain 2 items");
+        // Since there were 4 total and page size 2, final token should be empty
+        assert!(final_token.is_empty(), "final token should be empty when no more pages");
 
         Ok(())
     }

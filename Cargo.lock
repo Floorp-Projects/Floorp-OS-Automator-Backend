@@ -955,6 +955,7 @@ name = "database"
 version = "0.5.6"
 dependencies = [
  "anyhow",
+ "base64 0.21.7",
  "entity",
  "sapphillon_core",
  "sea-orm",
