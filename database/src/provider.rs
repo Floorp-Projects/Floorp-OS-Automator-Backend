@@ -47,11 +47,20 @@ pub async fn update_provider(
     db: &DatabaseConnection,
     provider: provider::Model,
 ) -> Result<(), DbErr> {
-    // Ensure the provider exists before updating
-    let _ = get_provider(db, &provider.name).await?;
+    // Fetch existing record so we can mark fields as changed explicitly.
+    // Converting the incoming model directly into an ActiveModel may leave
+    // some fields as `NotSet` / `Unchanged` depending on conversions,
+    // so we start from the existing row and set the fields we want to update.
+    let existing = get_provider(db, &provider.name).await?;
 
-    let active_model: provider::ActiveModel = provider.into();
-    active_model.update(db).await?;
+    if let Some(existing) = existing {
+        let mut active_model: provider::ActiveModel = existing.into();
+        use sea_orm::ActiveValue::Set;
+        active_model.display_name = Set(provider.display_name);
+        active_model.api_key = Set(provider.api_key);
+        active_model.api_endpoint = Set(provider.api_endpoint);
+        active_model.update(db).await?;
+    }
     Ok(())
 }
 
@@ -392,6 +401,43 @@ mod tests {
 
         // Deleting again should not error
         delete_provider(&db, "del_test").await?;
+
+        Ok(())
+    }
+    #[tokio::test]
+    async fn test_update_provider() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert initial provider
+        let initial = provider::Model {
+            name: "up_test".to_string(),
+            display_name: "Before Update".to_string(),
+            api_key: "before_key".to_string(),
+            api_endpoint: "https://before.test".to_string(),
+        };
+        create_provider(&db, initial).await?;
+
+        // Prepare updated model with the same primary key (name)
+        let updated = provider::Model {
+            name: "up_test".to_string(),
+            display_name: "After Update".to_string(),
+            api_key: "after_key".to_string(),
+            api_endpoint: "https://after.test".to_string(),
+        };
+
+        // Call the function under test
+        update_provider(&db, updated).await?;
+
+        // Verify the changes were persisted
+        let found = provider::Entity::find_by_id("up_test".to_string())
+            .one(&db)
+            .await?;
+        assert!(found.is_some(), "provider should exist after update");
+        let found = found.unwrap();
+        assert_eq!(found.name, "up_test");
+        assert_eq!(found.display_name, "After Update");
+        assert_eq!(found.api_key, "after_key");
+        assert_eq!(found.api_endpoint, "https://after.test");
 
         Ok(())
     }
