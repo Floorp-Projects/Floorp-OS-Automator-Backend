@@ -39,6 +39,17 @@ impl GlobalState {
             })),
         }
     }
+    pub fn is_db_initialized(&self) -> bool {
+        // Use the non-blocking try_read so we don't block the current thread
+        // (blocking_read would panic if called from a Tokio runtime thread).
+        match self.data.try_read() {
+            Ok(data) => data.db_initialized,
+            Err(_) => {
+                // If we can't acquire the lock, assume not initialized
+                false
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for GlobalState {
