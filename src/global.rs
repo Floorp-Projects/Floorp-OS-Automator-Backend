@@ -41,6 +41,33 @@ impl GlobalState {
             }),
         }
     }
+    pub async fn async_set_db_url(&self, url: String) {
+        let mut data = self.data.write().await;
+        data.db_url = url;
+    }
+
+    pub fn set_db_url(self: std::sync::Arc<Self>, url: String) {
+        tokio::spawn(async move {
+            let mut data = self.data.write().await;
+            data.db_url = url;
+        });
+    }
+
+    pub async fn async_get_db_url(&self) -> String {
+        let data = self.data.read().await;
+        data.db_url.clone()
+    }
+
+    pub fn get_db_url_blocking(self: std::sync::Arc<Self>) -> String {
+        // Use block_in_place to synchronously block on the async read
+        tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let data = self.data.read().await;
+                data.db_url.clone()
+            })
+        })
+    }
 
     pub async fn async_set_db_initialized(&self, initialized: bool) {
         let mut data = self.data.write().await;
