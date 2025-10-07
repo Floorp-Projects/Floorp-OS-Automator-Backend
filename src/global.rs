@@ -39,6 +39,18 @@ impl GlobalState {
             })),
         }
     }
+    
+    pub async fn async_set_db_initialized(&self, initialized: bool) {
+        let mut data = self.data.write().await;
+        data.db_initialized = initialized;
+    }
+
+    pub fn set_db_initialized(self: std::sync::Arc<Self>, initialized: bool) {
+        tokio::spawn(async move {
+            self.async_set_db_initialized(initialized).await;
+        });
+    }
+
     pub fn is_db_initialized(&self) -> bool {
         // Use the non-blocking try_read so we don't block the current thread
         // (blocking_read would panic if called from a Tokio runtime thread).
