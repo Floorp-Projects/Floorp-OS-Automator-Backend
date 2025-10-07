@@ -16,6 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use sea_orm::{Database, DatabaseConnection};
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
@@ -41,6 +42,21 @@ impl GlobalState {
             }),
         }
     }
+
+    pub async fn get_db_connection(&self) -> anyhow::Result<DatabaseConnection> {
+        let data = self.data.read().await;
+        if data.db_url.is_empty() {
+            anyhow::bail!("Database URL is not set");
+        }
+        let conn = Database::connect(&data.db_url).await?;
+        Ok(conn)
+    }
+
+    pub async fn wait_init_and_get_connection(&self) -> anyhow::Result<DatabaseConnection> {
+        self.wait_db_initialized().await?;
+        self.get_db_connection().await
+    }
+
     pub async fn async_set_db_url(&self, url: String) {
         let mut data = self.data.write().await;
         data.db_url = url;
@@ -404,5 +420,53 @@ mod tests {
         .expect("timeout waiting for spawn to set db_url");
 
         assert!(res, "set_db_url spawn did not set the db_url in time");
+    }
+
+    #[tokio::test]
+    async fn get_db_connection_returns_connection_when_url_set() {
+        // Ensure that when a valid DB URL is present, get_db_connection returns a connection
+        let gs = GlobalState::new();
+
+        // set an in-memory sqlite URL
+        {
+            let mut w = gs.data.try_write().expect("should acquire write lock");
+            w.db_url = "sqlite::memory:".to_string();
+        }
+
+        let conn = gs.get_db_connection().await;
+        assert!(
+            conn.is_ok(),
+            "get_db_connection should return Ok when db_url is set"
+        );
+    }
+
+    #[tokio::test]
+    async fn wait_init_and_get_connection_waits_and_returns_connection() {
+        use std::sync::Arc;
+
+        // Start with an uninitialized state; a background task will set the URL and initialized flag.
+        let gs = Arc::new(GlobalState::new());
+
+        let gs_clone = Arc::clone(&gs);
+        tokio::spawn(async move {
+            // give the waiter a moment to start waiting
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            let mut w = gs_clone.data.write().await;
+            w.db_url = "sqlite::memory:".to_string();
+            w.db_initialized = true;
+        });
+
+        // wait_init_and_get_connection should wait until the flag is set and then return a connection
+        let res =
+            tokio::time::timeout(Duration::from_secs(3), gs.wait_init_and_get_connection()).await;
+        assert!(
+            res.is_ok(),
+            "wait_init_and_get_connection should complete within timeout"
+        );
+        let conn = res.unwrap();
+        assert!(
+            conn.is_ok(),
+            "wait_init_and_get_connection should return a valid connection"
+        );
     }
 }
