@@ -64,8 +64,8 @@ impl GlobalState {
     }
 
     pub async fn wait_db_initialized(&self) -> anyhow::Result<()> {
+        let mut count = 1;
         loop {
-            let mut count = 1;
             {
                 let data = self.data.read().await;
                 if data.db_initialized {
@@ -243,6 +243,43 @@ mod tests {
 
         let s = format!("{gs}");
         assert!(s.contains("postgres://localhost/mydb"), "display should show updated db_url, got: {s}");
+    }
+
+    #[tokio::test]
+    async fn async_set_db_initialized_sets_flag_immediately() {
+        let gs = GlobalState::new();
+
+        // call the async setter and await it
+        gs.async_set_db_initialized(true).await;
+
+        // try_read should succeed and report true
+        assert!(gs.is_db_initialized(), "async_set_db_initialized should set the flag to true");
+    }
+
+    #[tokio::test]
+    async fn set_db_initialized_spawns_and_sets_flag() {
+        use std::sync::Arc;
+        let gs = Arc::new(GlobalState::new());
+
+        // Call the non-async setter which spawns a background task
+        let gs_clone = Arc::clone(&gs);
+        gs_clone.set_db_initialized(true);
+
+        // Wait up to 1 second for the spawned task to complete and set the flag
+        let res = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            // poll until flag becomes true
+            for _ in 0..20 {
+                if gs.is_db_initialized() {
+                    return true;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+            false
+        })
+        .await
+        .expect("timeout waiting for spawn to set flag");
+
+        assert!(res, "set_db_initialized spawn did not set the flag in time");
     }
 }
 
