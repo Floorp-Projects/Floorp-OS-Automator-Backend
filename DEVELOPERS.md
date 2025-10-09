@@ -1,4 +1,4 @@
-# Developping Sapphillon
+# Developing Sapphillon
 
 ## Makefile targets
 
