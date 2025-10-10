@@ -70,11 +70,8 @@ impl MigrationTrait for Migration {
                     )
                     .col(string(PluginFunction::FunctionName))
                     .col(ColumnDef::new(PluginFunction::Description).string().null())
-                    .col(
-                        ColumnDef::new(PluginFunction::PermissionsJson)
-                            .text()
-                            .null(),
-                    )
+                    // Separate ID with colons (SQLite does not support for array)
+                    .col(ColumnDef::new(PluginFunction::PermissionId).text().null())
                     .col(ColumnDef::new(PluginFunction::Arguments).text().null())
                     .col(ColumnDef::new(PluginFunction::Returns).text().null())
                     .primary_key(
@@ -107,11 +104,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Permission::DisplayName).string().null())
                     .col(ColumnDef::new(Permission::Description).string().null())
-                    .col(
-                        ColumnDef::new(Permission::Type)
-                            .integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Permission::Type).integer().not_null())
                     .col(ColumnDef::new(Permission::ResourceJson).text().null())
                     .col(ColumnDef::new(Permission::Level).integer().null())
                     .to_owned(),
