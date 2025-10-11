@@ -19,3 +19,4 @@
 pub mod model;
 pub mod provider;
 pub mod permission;
+pub mod workflow;
