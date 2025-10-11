@@ -22,7 +22,8 @@ use base64::engine::general_purpose;
 use entity::entity::workflow;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
-pub async fn create_workflow(
+#[allow(dead_code)]
+pub(crate) async fn create_workflow(
     db: &DatabaseConnection,
     wf: workflow::Model,
 ) -> Result<(), DbErr> {
@@ -32,7 +33,8 @@ pub async fn create_workflow(
     Ok(())
 }
 
-pub async fn get_workflow(
+#[allow(dead_code)]
+pub(crate) async fn get_workflow(
     db: &DatabaseConnection,
     id: &str,
 ) -> Result<Option<workflow::Model>, DbErr> {
@@ -40,7 +42,8 @@ pub async fn get_workflow(
     Ok(w)
 }
 
-pub async fn update_workflow(db: &DatabaseConnection, wf: workflow::Model) -> Result<(), DbErr> {
+#[allow(dead_code)]
+pub(crate) async fn update_workflow(db: &DatabaseConnection, wf: workflow::Model) -> Result<(), DbErr> {
     let existing = get_workflow(db, &wf.id).await?;
     if let Some(existing) = existing {
         let mut active_model: workflow::ActiveModel = existing.into();
@@ -53,7 +56,8 @@ pub async fn update_workflow(db: &DatabaseConnection, wf: workflow::Model) -> Re
     Ok(())
 }
 
-pub async fn list_workflows(
+#[allow(dead_code)]
+pub(crate) async fn list_workflows(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
     page_size: Option<u32>,
@@ -103,7 +107,8 @@ pub async fn list_workflows(
     Ok((items, next_token))
 }
 
-pub async fn delete_workflow(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
+#[allow(dead_code)]
+pub(crate) async fn delete_workflow(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
     let found = workflow::Entity::find_by_id(id.to_string()).one(db).await?;
     if let Some(found) = found {
         let active_model: workflow::ActiveModel = found.into();

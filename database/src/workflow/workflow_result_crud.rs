@@ -21,7 +21,8 @@ use base64::engine::general_purpose;
 use entity::entity::workflow_result;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
-pub async fn create_workflow_result(
+#[allow(dead_code)]
+pub(crate) async fn create_workflow_result(
     db: &DatabaseConnection,
     r: workflow_result::Model,
 ) -> Result<(), DbErr> {
@@ -30,7 +31,8 @@ pub async fn create_workflow_result(
     Ok(())
 }
 
-pub async fn get_workflow_result(
+#[allow(dead_code)]
+pub(crate) async fn get_workflow_result(
     db: &DatabaseConnection,
     id: &str,
 ) -> Result<Option<workflow_result::Model>, DbErr> {
@@ -38,7 +40,8 @@ pub async fn get_workflow_result(
     Ok(r)
 }
 
-pub async fn update_workflow_result(
+#[allow(dead_code)]
+pub(crate) async fn update_workflow_result(
     db: &DatabaseConnection,
     r: workflow_result::Model,
 ) -> Result<(), DbErr> {
@@ -60,7 +63,8 @@ pub async fn update_workflow_result(
     Ok(())
 }
 
-pub async fn list_workflow_results(
+#[allow(dead_code)]
+pub(crate) async fn list_workflow_results(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
     page_size: Option<u32>,
@@ -109,7 +113,8 @@ pub async fn list_workflow_results(
     Ok((items, next_token))
 }
 
-pub async fn delete_workflow_result(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
+#[allow(dead_code)]
+pub(crate) async fn delete_workflow_result(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
     let found = workflow_result::Entity::find_by_id(id.to_string()).one(db).await?;
     if let Some(found) = found {
         let active_model: workflow_result::ActiveModel = found.into();
