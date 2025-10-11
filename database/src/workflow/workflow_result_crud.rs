@@ -1,0 +1,306 @@
+// Sapphillon
+// Copyright 2025 Yuta Takahashi
+//
+// This file is part of Sapphillon
+//
+// Sapphillon is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+use base64::Engine as _;
+use base64::engine::general_purpose;
+use entity::entity::workflow_result;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
+
+pub async fn create_workflow_result(
+    db: &DatabaseConnection,
+    r: workflow_result::Model,
+) -> Result<(), DbErr> {
+    let active_model: workflow_result::ActiveModel = r.into();
+    active_model.insert(db).await?;
+    Ok(())
+}
+
+pub async fn get_workflow_result(
+    db: &DatabaseConnection,
+    id: &str,
+) -> Result<Option<workflow_result::Model>, DbErr> {
+    let r = workflow_result::Entity::find_by_id(id.to_string()).one(db).await?;
+    Ok(r)
+}
+
+pub async fn update_workflow_result(
+    db: &DatabaseConnection,
+    r: workflow_result::Model,
+) -> Result<(), DbErr> {
+    let existing = get_workflow_result(db, &r.id).await?;
+    if let Some(existing) = existing {
+        let mut active_model: workflow_result::ActiveModel = existing.into();
+        use sea_orm::ActiveValue::Set;
+        active_model.workflow_id = Set(r.workflow_id);
+        active_model.workflow_code_id = Set(r.workflow_code_id);
+        active_model.display_name = Set(r.display_name);
+        active_model.description = Set(r.description);
+        active_model.result = Set(r.result);
+        active_model.ran_at = Set(r.ran_at);
+        active_model.result_type = Set(r.result_type);
+        active_model.exit_code = Set(r.exit_code);
+        active_model.workflow_result_revision = Set(r.workflow_result_revision);
+        active_model.update(db).await?;
+    }
+    Ok(())
+}
+
+pub async fn list_workflow_results(
+    db: &DatabaseConnection,
+    next_page_token: Option<String>,
+    page_size: Option<u32>,
+) -> Result<(Vec<workflow_result::Model>, String), DbErr> {
+    let offset: u64 = match next_page_token {
+        Some(token) => match general_purpose::STANDARD.decode(token) {
+            Ok(bytes) => {
+                if bytes.len() == 8 {
+                    let mut arr = [0u8; 8];
+                    arr.copy_from_slice(&bytes);
+                    u64::from_be_bytes(arr)
+                } else {
+                    0u64
+                }
+            }
+            Err(_) => 0u64,
+        },
+        None => 0u64,
+    };
+
+    let limit = match page_size {
+        Some(0) | None => 100u64,
+        Some(sz) => sz as u64,
+    };
+
+    let query_limit = limit.saturating_add(1);
+    let mut items = workflow_result::Entity::find()
+        .offset(Some(offset))
+        .limit(Some(query_limit))
+        .all(db)
+        .await?;
+
+    let has_next = (items.len() as u64) > limit;
+    if has_next {
+        items.truncate(limit as usize);
+    }
+
+    let next_token = if has_next {
+        let next_offset = offset.saturating_add(limit);
+        let bytes = next_offset.to_be_bytes();
+        general_purpose::STANDARD.encode(bytes)
+    } else {
+        String::new()
+    };
+
+    Ok((items, next_token))
+}
+
+pub async fn delete_workflow_result(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
+    let found = workflow_result::Entity::find_by_id(id.to_string()).one(db).await?;
+    if let Some(found) = found {
+        let active_model: workflow_result::ActiveModel = found.into();
+        active_model.delete(db).await?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
+    use entity::entity::{workflow as entity_wf, workflow_code as entity_wc};
+
+    async fn setup_db() -> Result<DatabaseConnection, DbErr> {
+        let db = Database::connect("sqlite::memory:").await?;
+
+        // workflow table (referenced)
+        let sql_wf = r#"
+            CREATE TABLE workflow (
+                id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                description TEXT,
+                workflow_language INTEGER NOT NULL,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        "#;
+        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wf.to_string()))
+            .await?;
+
+        // workflow_code table (referenced)
+            let sql_wc = r#"
+                CREATE TABLE workflow_code (
+                    id TEXT PRIMARY KEY,
+                    workflow_id TEXT NOT NULL,
+                    code_revision INTEGER NOT NULL,
+                    code TEXT NOT NULL,
+                    language INTEGER NOT NULL,
+                    created_at TEXT
+                )
+            "#;
+        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wc.to_string()))
+            .await?;
+
+        // workflow_result table
+        let sql_rr = r#"
+            CREATE TABLE workflow_result (
+                id TEXT PRIMARY KEY,
+                workflow_id TEXT NOT NULL,
+                workflow_code_id TEXT NOT NULL,
+                display_name TEXT,
+                description TEXT,
+                result TEXT,
+                ran_at TEXT,
+                result_type INTEGER NOT NULL,
+                exit_code INTEGER,
+                workflow_result_revision INTEGER NOT NULL
+            )
+        "#;
+        db.execute(Statement::from_string(DbBackend::Sqlite, sql_rr.to_string()))
+            .await?;
+
+        Ok(db)
+    }
+
+    #[tokio::test]
+    async fn test_create_get_update_delete_workflow_result() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow and workflow_code
+        let wf = entity_wf::Model {
+            id: "wf1".to_string(),
+            display_name: "WF".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let wc = entity_wc::Model {
+            id: "wc1".to_string(),
+            workflow_id: "wf1".to_string(),
+            code_revision: 1,
+            code: "code".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        let r = workflow_result::Model {
+            id: "r1".to_string(),
+            workflow_id: "wf1".to_string(),
+            workflow_code_id: "wc1".to_string(),
+            display_name: Some("Res".to_string()),
+            description: Some("d".to_string()),
+            result: Some("ok".to_string()),
+            ran_at: None,
+            result_type: 1,
+            exit_code: Some(0),
+            workflow_result_revision: 1,
+        };
+
+        create_workflow_result(&db, r.clone()).await?;
+
+        let found = get_workflow_result(&db, "r1").await?;
+        assert!(found.is_some());
+        let found = found.unwrap();
+        assert_eq!(found.id, "r1");
+        assert_eq!(found.workflow_id, "wf1");
+        assert_eq!(found.workflow_code_id, "wc1");
+
+        // Update
+        let mut updated = found.clone();
+        updated.display_name = Some("ResX".to_string());
+        updated.description = None;
+        update_workflow_result(&db, updated).await?;
+
+        let found = get_workflow_result(&db, "r1").await?;
+        assert!(found.is_some());
+        let found = found.unwrap();
+        assert_eq!(found.display_name.as_deref(), Some("ResX"));
+        assert!(found.description.is_none());
+
+        // Delete
+        delete_workflow_result(&db, "r1").await?;
+        let found = get_workflow_result(&db, "r1").await?;
+        assert!(found.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_workflow_results_pagination() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow and workflow_code
+        let wf = entity_wf::Model {
+            id: "wf2".to_string(),
+            display_name: "WF2".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+
+        let wc = entity_wc::Model {
+            id: "wc2".to_string(),
+            workflow_id: "wf2".to_string(),
+            code_revision: 1,
+            code: "c".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        for i in 1..=5 {
+            let r = workflow_result::Model {
+                id: format!("rr{i}"),
+                workflow_id: "wf2".to_string(),
+                workflow_code_id: "wc2".to_string(),
+                display_name: None,
+                description: None,
+                result: None,
+                ran_at: None,
+                result_type: 0,
+                exit_code: None,
+                workflow_result_revision: 1,
+            };
+            create_workflow_result(&db, r).await?;
+        }
+
+        let mut token: Option<String> = None;
+        let mut collected = std::collections::HashSet::new();
+        loop {
+            let (items, next) = list_workflow_results(&db, token.clone(), Some(2)).await?;
+            for it in items.iter() {
+                collected.insert(it.id.clone());
+            }
+            if next.is_empty() {
+                break;
+            }
+            token = Some(next);
+        }
+
+        assert_eq!(collected.len(), 5);
+        Ok(())
+    }
+}
