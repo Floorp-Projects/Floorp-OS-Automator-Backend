@@ -3,17 +3,12 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "plugin_function_permission")]
+#[sea_orm(table_name = "workflow_code_plugin_function")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
+    pub workflow_code_id: String,
     pub plugin_function_id: String,
-    pub display_name: Option<String>,
-    pub description: Option<String>,
-    pub r#type: i32,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub resource_json: Option<String>,
-    pub level: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -26,11 +21,25 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PluginFunction,
+    #[sea_orm(
+        belongs_to = "super::workflow_code::Entity",
+        from = "Column::WorkflowCodeId",
+        to = "super::workflow_code::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    WorkflowCode,
 }
 
 impl Related<super::plugin_function::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PluginFunction.def()
+    }
+}
+
+impl Related<super::workflow_code::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkflowCode.def()
     }
 }
 

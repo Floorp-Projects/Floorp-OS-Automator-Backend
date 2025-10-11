@@ -3,7 +3,7 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "plugin_function_permission")]
+#[sea_orm(table_name = "permission")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
@@ -26,11 +26,19 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PluginFunction,
+    #[sea_orm(has_many = "super::workflow_code_allowed_permission::Entity")]
+    WorkflowCodeAllowedPermission,
 }
 
 impl Related<super::plugin_function::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PluginFunction.def()
+    }
+}
+
+impl Related<super::workflow_code_allowed_permission::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkflowCodeAllowedPermission.def()
     }
 }
 

@@ -22,6 +22,8 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::plugin_function::Entity")]
     PluginFunction,
+    #[sea_orm(has_many = "super::workflow_code_plugin_package::Entity")]
+    WorkflowCodePluginPackage,
 }
 
 impl Related<super::plugin_function::Entity> for Entity {
@@ -30,12 +32,9 @@ impl Related<super::plugin_function::Entity> for Entity {
     }
 }
 
-impl Related<super::plugin_function_permission::Entity> for Entity {
+impl Related<super::workflow_code_plugin_package::Entity> for Entity {
     fn to() -> RelationDef {
-        super::plugin_function::Relation::PluginFunctionPermission.def()
-    }
-    fn via() -> Option<RelationDef> {
-        Some(super::plugin_function::Relation::PluginPackage.def().rev())
+        Relation::WorkflowCodePluginPackage.def()
     }
 }
 
