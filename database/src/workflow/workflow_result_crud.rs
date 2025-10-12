@@ -182,7 +182,50 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_get_update_delete_workflow_result() -> Result<(), DbErr> {
+    async fn test_create_workflow_result() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow and workflow_code
+        let wf = entity_wf::Model {
+            id: "wf1".to_string(),
+            display_name: "WF".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let wc = entity_wc::Model {
+            id: "wc1".to_string(),
+            workflow_id: "wf1".to_string(),
+            code_revision: 1,
+            code: "code".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        let r = workflow_result::Model {
+            id: "r1".to_string(),
+            workflow_id: "wf1".to_string(),
+            workflow_code_id: "wc1".to_string(),
+            display_name: Some("Res".to_string()),
+            description: Some("d".to_string()),
+            result: Some("ok".to_string()),
+            ran_at: None,
+            result_type: 1,
+            exit_code: Some(0),
+            workflow_result_revision: 1,
+        };
+
+        create_workflow_result(&db, r).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_and_update_workflow_result() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
         // Insert referenced workflow and workflow_code
@@ -224,22 +267,65 @@ mod tests {
 
         let found = get_workflow_result(&db, "r1").await?;
         assert!(found.is_some());
-        let found = found.unwrap();
+        let mut found = found.unwrap();
         assert_eq!(found.id, "r1");
         assert_eq!(found.workflow_id, "wf1");
         assert_eq!(found.workflow_code_id, "wc1");
 
         // Update
-        let mut updated = found.clone();
-        updated.display_name = Some("ResX".to_string());
-        updated.description = None;
-        update_workflow_result(&db, updated).await?;
+        found.display_name = Some("ResX".to_string());
+        found.description = None;
+        update_workflow_result(&db, found).await?;
 
         let found = get_workflow_result(&db, "r1").await?;
         assert!(found.is_some());
         let found = found.unwrap();
         assert_eq!(found.display_name.as_deref(), Some("ResX"));
         assert!(found.description.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_workflow_result() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow and workflow_code
+        let wf = entity_wf::Model {
+            id: "wf1".to_string(),
+            display_name: "WF".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let wc = entity_wc::Model {
+            id: "wc1".to_string(),
+            workflow_id: "wf1".to_string(),
+            code_revision: 1,
+            code: "code".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        let r = workflow_result::Model {
+            id: "r1".to_string(),
+            workflow_id: "wf1".to_string(),
+            workflow_code_id: "wc1".to_string(),
+            display_name: Some("Res".to_string()),
+            description: Some("d".to_string()),
+            result: Some("ok".to_string()),
+            ran_at: None,
+            result_type: 1,
+            exit_code: Some(0),
+            workflow_result_revision: 1,
+        };
+
+        create_workflow_result(&db, r).await?;
 
         // Delete
         delete_workflow_result(&db, "r1").await?;

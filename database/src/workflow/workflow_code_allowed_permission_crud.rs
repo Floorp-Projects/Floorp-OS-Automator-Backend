@@ -188,7 +188,46 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_get_update_delete_workflow_code_allowed_permission() -> Result<(), DbErr> {
+    async fn test_create_allowed_permission() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert permission and workflow_code
+        let perm = entity_permission::Model {
+            id: 10,
+            plugin_function_id: "pf1".to_string(),
+            display_name: Some("P".to_string()),
+            description: None,
+            r#type: 1,
+            resource_json: None,
+            level: None,
+        };
+        let active_perm: entity_permission::ActiveModel = perm.into();
+        active_perm.insert(&db).await?;
+
+        let wc = entity_wc::Model {
+            id: "wcx".to_string(),
+            workflow_id: "wfx".to_string(),
+            code_revision: 1,
+            code: "c".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        let a = workflow_code_allowed_permission::Model {
+            id: 100,
+            workflow_code_id: "wcx".to_string(),
+            permission_id: 10,
+        };
+
+        create_workflow_code_allowed_permission(&db, a).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_and_update_allowed_permission() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
         // Insert permission and workflow_code
@@ -241,6 +280,45 @@ mod tests {
         assert_eq!(res.0.len(), 1);
         assert_eq!(res.0[0].0.workflow_code_id, "wcx");
         assert!(res.0[0].1.is_some());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_allowed_permission() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert permission and workflow_code
+        let perm = entity_permission::Model {
+            id: 10,
+            plugin_function_id: "pf1".to_string(),
+            display_name: Some("P".to_string()),
+            description: None,
+            r#type: 1,
+            resource_json: None,
+            level: None,
+        };
+        let active_perm: entity_permission::ActiveModel = perm.into();
+        active_perm.insert(&db).await?;
+
+        let wc = entity_wc::Model {
+            id: "wcx".to_string(),
+            workflow_id: "wfx".to_string(),
+            code_revision: 1,
+            code: "c".to_string(),
+            language: 0,
+            created_at: None,
+        };
+        let active_wc: entity_wc::ActiveModel = wc.into();
+        active_wc.insert(&db).await?;
+
+        let a = workflow_code_allowed_permission::Model {
+            id: 100,
+            workflow_code_id: "wcx".to_string(),
+            permission_id: 10,
+        };
+
+        create_workflow_code_allowed_permission(&db, a).await?;
 
         // Delete
         delete_workflow_code_allowed_permission(&db, 100).await?;

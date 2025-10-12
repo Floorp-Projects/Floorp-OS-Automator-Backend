@@ -143,7 +143,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_and_get_workflow() -> Result<(), DbErr> {
+    async fn test_create_workflow() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        let w = entity_wf::Model {
+            id: "w1".to_string(),
+            display_name: "Workflow One".to_string(),
+            description: Some("desc".to_string()),
+            workflow_language: 1,
+            created_at: None,
+            updated_at: None,
+        };
+
+        // create should succeed
+        create_workflow(&db, w).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
         let w = entity_wf::Model {
@@ -167,7 +185,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_list_workflows_pagination() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -202,7 +219,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_and_delete_workflow() -> Result<(), DbErr> {
+    async fn test_update_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
         let initial = entity_wf::Model {
@@ -232,6 +249,23 @@ mod tests {
         assert_eq!(found.display_name, "After");
         assert!(found.description.is_none());
         assert_eq!(found.workflow_language, 3);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_workflow() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        let initial = entity_wf::Model {
+            id: "u1".to_string(),
+            display_name: "Before".to_string(),
+            description: Some("d".to_string()),
+            workflow_language: 2,
+            created_at: None,
+            updated_at: None,
+        };
+        create_workflow(&db, initial).await?;
 
         delete_workflow(&db, "u1").await?;
         let found = get_workflow(&db, "u1").await?;

@@ -159,7 +159,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_get_update_delete_workflow_code() -> Result<(), DbErr> {
+    async fn test_create_workflow_code() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow
+        let wf = entity_wf::Model {
+            id: "wf1".to_string(),
+            display_name: "WF".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+
+        let wc = workflow_code::Model {
+            id: "wc1".to_string(),
+            workflow_id: "wf1".to_string(),
+            code_revision: 1,
+            code: "print('hi')".to_string(),
+            language: 0,
+            created_at: None,
+        };
+
+        create_workflow_code(&db, wc).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_workflow_code_and_update() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
         // Insert referenced workflow
@@ -187,16 +216,15 @@ mod tests {
 
         let found = get_workflow_code(&db, "wc1").await?;
         assert!(found.is_some());
-        let found = found.unwrap();
+        let mut found = found.unwrap();
         assert_eq!(found.id, "wc1");
         assert_eq!(found.workflow_id, "wf1");
         assert_eq!(found.code_revision, 1);
 
         // Update
-        let mut updated = found.clone();
-        updated.code = "print('bye')".to_string();
-        updated.code_revision = 2;
-        update_workflow_code(&db, updated).await?;
+        found.code = "print('bye')".to_string();
+        found.code_revision = 2;
+        update_workflow_code(&db, found).await?;
 
         let found = get_workflow_code(&db, "wc1").await?;
         assert!(found.is_some());
@@ -204,7 +232,36 @@ mod tests {
         assert_eq!(found.code, "print('bye')");
         assert_eq!(found.code_revision, 2);
 
-        // Delete
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_delete_workflow_code() -> Result<(), DbErr> {
+        let db = setup_db().await?;
+
+        // Insert referenced workflow
+        let wf = entity_wf::Model {
+            id: "wf1".to_string(),
+            display_name: "WF".to_string(),
+            description: None,
+            workflow_language: 0,
+            created_at: None,
+            updated_at: None,
+        };
+        let active_wf: entity_wf::ActiveModel = wf.into();
+        active_wf.insert(&db).await?;
+
+        let wc = workflow_code::Model {
+            id: "wc1".to_string(),
+            workflow_id: "wf1".to_string(),
+            code_revision: 1,
+            code: "print('hi')".to_string(),
+            language: 0,
+            created_at: None,
+        };
+
+        create_workflow_code(&db, wc).await?;
+
         delete_workflow_code(&db, "wc1").await?;
         let found = get_workflow_code(&db, "wc1").await?;
         assert!(found.is_none());
