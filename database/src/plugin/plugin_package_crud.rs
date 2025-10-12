@@ -20,7 +20,10 @@ use base64::Engine as _;
 use base64::engine::general_purpose;
 use entity::entity::plugin_function;
 use entity::entity::plugin_package;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter,
+    QuerySelect,
+};
 
 #[allow(dead_code)]
 pub(crate) async fn create_plugin_package(
@@ -80,7 +83,13 @@ pub(crate) async fn list_plugin_packages(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
     page_size: Option<u32>,
-) -> Result<(Vec<(plugin_package::Model, Vec<plugin_function::Model>)>, String), DbErr> {
+) -> Result<
+    (
+        Vec<(plugin_package::Model, Vec<plugin_function::Model>)>,
+        String,
+    ),
+    DbErr,
+> {
     let offset: u64 = match next_page_token {
         Some(token) => match general_purpose::STANDARD.decode(token) {
             Ok(bytes) => {
@@ -104,8 +113,12 @@ pub(crate) async fn list_plugin_packages(
 
     let query_limit = limit.saturating_add(1);
 
-    let mut finder = plugin_package::Entity::find();
-    let mut items = finder.offset(Some(offset)).limit(Some(query_limit)).all(db).await?;
+    let finder = plugin_package::Entity::find();
+    let mut items = finder
+        .offset(Some(offset))
+        .limit(Some(query_limit))
+        .all(db)
+        .await?;
 
     let has_next = (items.len() as u64) > limit;
     if has_next {
@@ -130,7 +143,10 @@ pub(crate) async fn list_plugin_packages(
 }
 
 #[allow(dead_code)]
-pub(crate) async fn delete_plugin_package(db: &DatabaseConnection, package_id: &str) -> Result<(), DbErr> {
+pub(crate) async fn delete_plugin_package(
+    db: &DatabaseConnection,
+    package_id: &str,
+) -> Result<(), DbErr> {
     let found = plugin_package::Entity::find()
         .filter(plugin_package::Column::PackageId.eq(package_id.to_string()))
         .one(db)
@@ -142,11 +158,12 @@ pub(crate) async fn delete_plugin_package(db: &DatabaseConnection, package_id: &
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
+    use sea_orm::{
+        ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
+    };
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
@@ -166,8 +183,11 @@ mod tests {
                 updated_at TEXT
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_pkg.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_pkg.to_string(),
+        ))
+        .await?;
 
         // plugin_function table
         let sql_pf = r#"
@@ -181,8 +201,11 @@ mod tests {
                 PRIMARY KEY (function_id, package_id)
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_pf.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_pf.to_string(),
+        ))
+        .await?;
 
         Ok(db)
     }
@@ -205,7 +228,12 @@ mod tests {
         Ok(())
     }
 
-    async fn insert_test_function(db: &DatabaseConnection, id: &str, pkg_id: &str, name: &str) -> Result<(), DbErr> {
+    async fn insert_test_function(
+        db: &DatabaseConnection,
+        id: &str,
+        pkg_id: &str,
+        name: &str,
+    ) -> Result<(), DbErr> {
         let pf = plugin_function::Model {
             function_id: id.to_string(),
             package_id: pkg_id.to_string(),

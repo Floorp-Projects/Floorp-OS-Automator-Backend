@@ -18,9 +18,12 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose;
-use entity::entity::workflow_code_allowed_permission;
 use entity::entity::permission as entity_permission;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter, QuerySelect};
+use entity::entity::workflow_code_allowed_permission;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter,
+    QuerySelect,
+};
 
 #[allow(dead_code)]
 pub(crate) async fn create_workflow_code_allowed_permission(
@@ -36,9 +39,17 @@ pub(crate) async fn create_workflow_code_allowed_permission(
 pub(crate) async fn get_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     id: i32,
-) -> Result<Option<(workflow_code_allowed_permission::Model, Option<entity_permission::Model>)>, DbErr> {
+) -> Result<
+    Option<(
+        workflow_code_allowed_permission::Model,
+        Option<entity_permission::Model>,
+    )>,
+    DbErr,
+> {
     // Find the allowed permission by id and also load the related permission if exists
-    let row = workflow_code_allowed_permission::Entity::find_by_id(id).one(db).await?;
+    let row = workflow_code_allowed_permission::Entity::find_by_id(id)
+        .one(db)
+        .await?;
     if let Some(r) = row {
         // Try to load related permission
         let perm = r.find_related(entity_permission::Entity).one(db).await?;
@@ -53,7 +64,9 @@ pub(crate) async fn update_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     a: workflow_code_allowed_permission::Model,
 ) -> Result<(), DbErr> {
-    let existing = workflow_code_allowed_permission::Entity::find_by_id(a.id).one(db).await?;
+    let existing = workflow_code_allowed_permission::Entity::find_by_id(a.id)
+        .one(db)
+        .await?;
     if let Some(existing) = existing {
         let mut active_model: workflow_code_allowed_permission::ActiveModel = existing.into();
         use sea_orm::ActiveValue::Set;
@@ -70,7 +83,16 @@ pub(crate) async fn list_workflow_code_allowed_permissions(
     workflow_code_id: Option<String>,
     next_page_token: Option<String>,
     page_size: Option<u32>,
-) -> Result<(Vec<(workflow_code_allowed_permission::Model, Option<entity_permission::Model>)>, String), DbErr> {
+) -> Result<
+    (
+        Vec<(
+            workflow_code_allowed_permission::Model,
+            Option<entity_permission::Model>,
+        )>,
+        String,
+    ),
+    DbErr,
+> {
     let offset: u64 = match next_page_token {
         Some(token) => match general_purpose::STANDARD.decode(token) {
             Ok(bytes) => {
@@ -96,7 +118,8 @@ pub(crate) async fn list_workflow_code_allowed_permissions(
 
     let mut finder = workflow_code_allowed_permission::Entity::find();
     if let Some(ref wcid) = workflow_code_id {
-        finder = finder.filter(workflow_code_allowed_permission::Column::WorkflowCodeId.eq(wcid.clone()));
+        finder = finder
+            .filter(workflow_code_allowed_permission::Column::WorkflowCodeId.eq(wcid.clone()));
     }
 
     let mut items = finder
@@ -129,8 +152,13 @@ pub(crate) async fn list_workflow_code_allowed_permissions(
 }
 
 #[allow(dead_code)]
-pub(crate) async fn delete_workflow_code_allowed_permission(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
-    let found = workflow_code_allowed_permission::Entity::find_by_id(id).one(db).await?;
+pub(crate) async fn delete_workflow_code_allowed_permission(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<(), DbErr> {
+    let found = workflow_code_allowed_permission::Entity::find_by_id(id)
+        .one(db)
+        .await?;
     if let Some(found) = found {
         let active_model: workflow_code_allowed_permission::ActiveModel = found.into();
         active_model.delete(db).await?;
@@ -141,7 +169,7 @@ pub(crate) async fn delete_workflow_code_allowed_permission(db: &DatabaseConnect
 #[cfg(test)]
 mod tests {
     use super::*;
-    use entity::entity::{workflow_code as entity_wc, permission as entity_permission};
+    use entity::entity::{permission as entity_permission, workflow_code as entity_wc};
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
@@ -159,7 +187,11 @@ mod tests {
                 level INTEGER
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_perm.to_string())).await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_perm.to_string(),
+        ))
+        .await?;
 
         // workflow_code table
         let sql_wc = r#"
@@ -172,7 +204,11 @@ mod tests {
                 created_at TEXT
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wc.to_string())).await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_wc.to_string(),
+        ))
+        .await?;
 
         // workflow_code_allowed_permission table
         let sql_a = r#"
@@ -182,7 +218,8 @@ mod tests {
                 permission_id INTEGER NOT NULL
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_a.to_string())).await?;
+        db.execute(Statement::from_string(DbBackend::Sqlite, sql_a.to_string()))
+            .await?;
 
         Ok(db)
     }
@@ -276,7 +313,9 @@ mod tests {
         updated.permission_id = 10;
         update_workflow_code_allowed_permission(&db, updated).await?;
 
-        let res = list_workflow_code_allowed_permissions(&db, Some("wcx".to_string()), None, Some(10)).await?;
+        let res =
+            list_workflow_code_allowed_permissions(&db, Some("wcx".to_string()), None, Some(10))
+                .await?;
         assert_eq!(res.0.len(), 1);
         assert_eq!(res.0[0].0.workflow_code_id, "wcx");
         assert!(res.0[0].1.is_some());

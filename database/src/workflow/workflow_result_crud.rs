@@ -36,7 +36,9 @@ pub(crate) async fn get_workflow_result(
     db: &DatabaseConnection,
     id: &str,
 ) -> Result<Option<workflow_result::Model>, DbErr> {
-    let r = workflow_result::Entity::find_by_id(id.to_string()).one(db).await?;
+    let r = workflow_result::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await?;
     Ok(r)
 }
 
@@ -115,7 +117,9 @@ pub(crate) async fn list_workflow_results(
 
 #[allow(dead_code)]
 pub(crate) async fn delete_workflow_result(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
-    let found = workflow_result::Entity::find_by_id(id.to_string()).one(db).await?;
+    let found = workflow_result::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await?;
     if let Some(found) = found {
         let active_model: workflow_result::ActiveModel = found.into();
         active_model.delete(db).await?;
@@ -126,8 +130,10 @@ pub(crate) async fn delete_workflow_result(db: &DatabaseConnection, id: &str) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
     use entity::entity::{workflow as entity_wf, workflow_code as entity_wc};
+    use sea_orm::{
+        ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
+    };
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
@@ -143,11 +149,14 @@ mod tests {
                 updated_at TEXT
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wf.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_wf.to_string(),
+        ))
+        .await?;
 
         // workflow_code table (referenced)
-            let sql_wc = r#"
+        let sql_wc = r#"
                 CREATE TABLE workflow_code (
                     id TEXT PRIMARY KEY,
                     workflow_id TEXT NOT NULL,
@@ -157,8 +166,11 @@ mod tests {
                     created_at TEXT
                 )
             "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wc.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_wc.to_string(),
+        ))
+        .await?;
 
         // workflow_result table
         let sql_rr = r#"
@@ -175,8 +187,11 @@ mod tests {
                 workflow_result_revision INTEGER NOT NULL
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_rr.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_rr.to_string(),
+        ))
+        .await?;
 
         Ok(db)
     }

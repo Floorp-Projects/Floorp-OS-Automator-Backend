@@ -596,7 +596,7 @@ enum PluginFunctionPermission {
     Table,
     Id,
     PluginFunctionId,
-    PermissionId
+    PermissionId,
 }
 
 // Permission Related Table

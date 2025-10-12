@@ -27,7 +27,10 @@ pub async fn create_permission(db: &DatabaseConnection, p: permission::Model) ->
     Ok(())
 }
 
-pub async fn get_permission(db: &DatabaseConnection, id: i32) -> Result<Option<permission::Model>, DbErr> {
+pub async fn get_permission(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<Option<permission::Model>, DbErr> {
     let p = permission::Entity::find_by_id(id).one(db).await?;
     Ok(p)
 }
@@ -127,8 +130,11 @@ mod tests {
                 PRIMARY KEY (function_id, package_id)
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_pf.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_pf.to_string(),
+        ))
+        .await?;
 
         // Create permission table
         let sql_perm = r#"
@@ -142,8 +148,11 @@ mod tests {
                 level INTEGER
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_perm.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_perm.to_string(),
+        ))
+        .await?;
 
         Ok(db)
     }

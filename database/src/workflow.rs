@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+pub mod workflow_code_allowed_permission_crud;
+pub mod workflow_code_crud;
 pub mod workflow_crud;
 pub mod workflow_result_crud;
-pub mod workflow_code_crud;
-pub mod workflow_code_allowed_permission_crud;

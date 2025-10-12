@@ -36,7 +36,9 @@ pub(crate) async fn get_workflow_code(
     db: &DatabaseConnection,
     id: &str,
 ) -> Result<Option<workflow_code::Model>, DbErr> {
-    let r = workflow_code::Entity::find_by_id(id.to_string()).one(db).await?;
+    let r = workflow_code::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await?;
     Ok(r)
 }
 
@@ -110,7 +112,9 @@ pub(crate) async fn list_workflow_codes(
 
 #[allow(dead_code)]
 pub(crate) async fn delete_workflow_code(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
-    let found = workflow_code::Entity::find_by_id(id.to_string()).one(db).await?;
+    let found = workflow_code::Entity::find_by_id(id.to_string())
+        .one(db)
+        .await?;
     if let Some(found) = found {
         let active_model: workflow_code::ActiveModel = found.into();
         active_model.delete(db).await?;
@@ -121,8 +125,10 @@ pub(crate) async fn delete_workflow_code(db: &DatabaseConnection, id: &str) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
     use entity::entity::workflow as entity_wf;
+    use sea_orm::{
+        ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
+    };
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
@@ -138,8 +144,11 @@ mod tests {
                 updated_at TEXT
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wf.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_wf.to_string(),
+        ))
+        .await?;
 
         // workflow_code table
         let sql_wc = r#"
@@ -152,8 +161,11 @@ mod tests {
                 created_at TEXT
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_wc.to_string()))
-            .await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_wc.to_string(),
+        ))
+        .await?;
 
         Ok(db)
     }

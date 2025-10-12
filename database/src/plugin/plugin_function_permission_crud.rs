@@ -19,7 +19,9 @@
 use entity::entity::permission;
 use entity::entity::plugin_function;
 use entity::entity::plugin_function_permission;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, QueryFilter,
+};
 
 #[allow(dead_code)]
 pub(crate) async fn create_plugin_function_permission(
@@ -35,7 +37,14 @@ pub(crate) async fn create_plugin_function_permission(
 pub(crate) async fn get_plugin_function_permission(
     db: &DatabaseConnection,
     id: i32,
-) -> Result<Option<(plugin_function_permission::Model, Option<permission::Model>, Option<plugin_function::Model>)>, DbErr> {
+) -> Result<
+    Option<(
+        plugin_function_permission::Model,
+        Option<permission::Model>,
+        Option<plugin_function::Model>,
+    )>,
+    DbErr,
+> {
     let row = plugin_function_permission::Entity::find()
         .filter(plugin_function_permission::Column::Id.eq(id))
         .one(db)
@@ -72,10 +81,18 @@ pub(crate) async fn update_plugin_function_permission(
 pub(crate) async fn list_plugin_function_permissions(
     db: &DatabaseConnection,
     plugin_function_id: Option<String>,
-) -> Result<Vec<(plugin_function_permission::Model, Option<permission::Model>, Option<plugin_function::Model>)>, DbErr> {
+) -> Result<
+    Vec<(
+        plugin_function_permission::Model,
+        Option<permission::Model>,
+        Option<plugin_function::Model>,
+    )>,
+    DbErr,
+> {
     let mut finder = plugin_function_permission::Entity::find();
     if let Some(ref pfid) = plugin_function_id {
-        finder = finder.filter(plugin_function_permission::Column::PluginFunctionId.eq(pfid.clone()));
+        finder =
+            finder.filter(plugin_function_permission::Column::PluginFunctionId.eq(pfid.clone()));
     }
     let items = finder.all(db).await?;
     let mut out = Vec::with_capacity(items.len());
@@ -88,7 +105,10 @@ pub(crate) async fn list_plugin_function_permissions(
 }
 
 #[allow(dead_code)]
-pub(crate) async fn delete_plugin_function_permission(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
+pub(crate) async fn delete_plugin_function_permission(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<(), DbErr> {
     let found = plugin_function_permission::Entity::find()
         .filter(plugin_function_permission::Column::Id.eq(id))
         .one(db)
@@ -100,11 +120,12 @@ pub(crate) async fn delete_plugin_function_permission(db: &DatabaseConnection, i
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
+    use sea_orm::{
+        ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
+    };
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
@@ -121,7 +142,11 @@ mod tests {
                 level INTEGER
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_perm.to_string())).await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_perm.to_string(),
+        ))
+        .await?;
 
         // plugin_function table
         let sql_pf = r#"
@@ -135,7 +160,11 @@ mod tests {
                 PRIMARY KEY (function_id, package_id)
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_pf.to_string())).await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_pf.to_string(),
+        ))
+        .await?;
 
         // plugin_function_permission table
         let sql_pfp = r#"
@@ -145,12 +174,20 @@ mod tests {
                 permission_id TEXT NOT NULL
             )
         "#;
-        db.execute(Statement::from_string(DbBackend::Sqlite, sql_pfp.to_string())).await?;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_pfp.to_string(),
+        ))
+        .await?;
 
         Ok(db)
     }
 
-    async fn insert_test_permission(db: &DatabaseConnection, id: i32, plugin_function_id: &str) -> Result<(), DbErr> {
+    async fn insert_test_permission(
+        db: &DatabaseConnection,
+        id: i32,
+        plugin_function_id: &str,
+    ) -> Result<(), DbErr> {
         let perm = permission::Model {
             id,
             plugin_function_id: plugin_function_id.to_string(),
@@ -182,8 +219,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_and_get_permission_link() -> Result<(), DbErr> {
         let db = setup_db().await?;
-    insert_test_function(&db, "func1").await?;
-    insert_test_permission(&db, 1, "func1").await?;
+        insert_test_function(&db, "func1").await?;
+        insert_test_permission(&db, 1, "func1").await?;
 
         let pfp = plugin_function_permission::Model {
             id: 0,
@@ -205,9 +242,9 @@ mod tests {
     #[tokio::test]
     async fn test_update_and_delete_permission_link() -> Result<(), DbErr> {
         let db = setup_db().await?;
-    insert_test_function(&db, "func2").await?;
-    insert_test_permission(&db, 2, "func2").await?;
-    insert_test_permission(&db, 3, "func2").await?;
+        insert_test_function(&db, "func2").await?;
+        insert_test_permission(&db, 2, "func2").await?;
+        insert_test_permission(&db, 3, "func2").await?;
 
         let mut pfp = plugin_function_permission::Model {
             id: 0,
@@ -220,16 +257,16 @@ mod tests {
         assert_eq!(list.len(), 1);
         let id = list.remove(0).0.id;
 
-    // update permission to 3
-    pfp.id = id;
-    pfp.permission_id = "3".to_string();
+        // update permission to 3
+        pfp.id = id;
+        pfp.permission_id = "3".to_string();
         update_plugin_function_permission(&db, pfp.clone()).await?;
 
         let got = get_plugin_function_permission(&db, id).await?;
         assert!(got.is_some());
         let (_got, perm, _) = got.unwrap();
         assert!(perm.is_some());
-    assert_eq!(perm.unwrap().id, 3);
+        assert_eq!(perm.unwrap().id, 3);
 
         delete_plugin_function_permission(&db, id).await?;
         let got_after = get_plugin_function_permission(&db, id).await?;

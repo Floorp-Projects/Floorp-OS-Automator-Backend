@@ -16,7 +16,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 use base64::Engine as _;
 use base64::engine::general_purpose;
 use entity::entity::workflow;
@@ -43,7 +42,10 @@ pub(crate) async fn get_workflow(
 }
 
 #[allow(dead_code)]
-pub(crate) async fn update_workflow(db: &DatabaseConnection, wf: workflow::Model) -> Result<(), DbErr> {
+pub(crate) async fn update_workflow(
+    db: &DatabaseConnection,
+    wf: workflow::Model,
+) -> Result<(), DbErr> {
     let existing = get_workflow(db, &wf.id).await?;
     if let Some(existing) = existing {
         let mut active_model: workflow::ActiveModel = existing.into();
@@ -121,7 +123,7 @@ pub(crate) async fn delete_workflow(db: &DatabaseConnection, id: &str) -> Result
 mod tests {
     use super::*;
     use entity::entity::workflow as entity_wf;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement};
+    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
