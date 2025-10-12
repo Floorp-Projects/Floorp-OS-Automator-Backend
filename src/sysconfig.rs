@@ -22,6 +22,15 @@ use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+/// Builds the static system configuration used during application startup.
+///
+/// # Arguments
+///
+/// This function takes no arguments.
+///
+/// # Returns
+///
+/// Returns a [`SysConfig`] populated with metadata and packaged plugins.
 pub fn sysconfig() -> SysConfig {
     SysConfig {
         app_name: "Sapphillon",
@@ -49,6 +58,15 @@ pub struct SysConfig {
 }
 
 impl SysConfig {
+    /// Formats human-readable application metadata for logs and console output.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - The configuration whose metadata should be rendered.
+    ///
+    /// # Returns
+    ///
+    /// Returns a multi-line string summarizing the application identity and licensing.
     pub fn app_info(&self) -> String {
         format!(
             "----------------------------------------\n\

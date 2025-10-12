@@ -39,6 +39,15 @@ use server::start_server; // bring `up`/`down` methods into scope
 #[allow(unused)]
 pub(crate) static GLOBAL_STATE: global::GlobalState = global::GlobalState::new();
 
+/// Bootstraps the application, wiring logging, migrations, and the gRPC server lifecycle.
+///
+/// # Arguments
+///
+/// This entry point takes no arguments beyond the implicit command-line parsing performed by `clap`.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the server exits cleanly, or an error propagated from initialization tasks.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let args = Args::parse();

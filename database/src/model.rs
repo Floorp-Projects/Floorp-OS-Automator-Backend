@@ -21,6 +21,16 @@ use base64::engine::general_purpose;
 use entity::entity::model;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
+/// Inserts a new model row into the database.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use for the insert.
+/// * `model` - The model entity to persist.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the row is created successfully, or a [`DbErr`] on failure.
 pub async fn create_model(db: &DatabaseConnection, model: model::Model) -> Result<(), DbErr> {
     let active_model: model::ActiveModel = model.into();
     // Use insert to guarantee creation of a new row.
@@ -28,11 +38,31 @@ pub async fn create_model(db: &DatabaseConnection, model: model::Model) -> Resul
     Ok(())
 }
 
+/// Fetches a model by its resource name.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `name` - The model resource identifier.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(model))` when found, `Ok(None)` when missing, or a [`DbErr`] on query failure.
 pub async fn get_model(db: &DatabaseConnection, name: &str) -> Result<Option<model::Model>, DbErr> {
     let m = model::Entity::find_by_id(name.to_string()).one(db).await?;
     Ok(m)
 }
 
+/// Updates an existing model record if it exists.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `model` - The model data whose fields should be applied.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after the update completes, even if the model was not present.
 pub async fn update_model(db: &DatabaseConnection, model: model::Model) -> Result<(), DbErr> {
     let existing = get_model(db, &model.name).await?;
     if let Some(existing) = existing {
@@ -46,6 +76,17 @@ pub async fn update_model(db: &DatabaseConnection, model: model::Model) -> Resul
     Ok(())
 }
 
+/// Lists models using base64-encoded offset pagination.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `next_page_token` - An optional opaque cursor indicating the starting offset.
+/// * `page_size` - An optional limit on the number of models to fetch.
+///
+/// # Returns
+///
+/// Returns a tuple containing the fetched models and the next page token (empty if none).
 pub async fn list_models(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
@@ -96,6 +137,16 @@ pub async fn list_models(
     Ok((items, next_token))
 }
 
+/// Deletes a model if one exists with the supplied name.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to execute against.
+/// * `name` - The model identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` regardless of whether the record existed, or a [`DbErr`] on failure.
 pub async fn delete_model(db: &DatabaseConnection, name: &str) -> Result<(), DbErr> {
     let found = model::Entity::find_by_id(name.to_string()).one(db).await?;
     if let Some(found) = found {
@@ -113,6 +164,15 @@ mod tests {
         ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
     };
 
+    /// Sets up an in-memory database schema used by model tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a connected [`DatabaseConnection`] with the required tables created.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         // In-memory SQLite for tests
         let db = Database::connect("sqlite::memory:").await?;
@@ -150,6 +210,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Ensures models can be created and fetched using the helper functions.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the inserted model is retrieved and validated.
     #[tokio::test]
     async fn test_create_model() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -182,6 +251,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms fetching a missing model returns `None`.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying a non-existent model yields `None`.
     #[tokio::test]
     async fn test_get_model_not_found() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -190,6 +268,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates pagination logic over the model table.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after iterating through multiple pages of results.
     #[tokio::test]
     async fn test_list_models_pagination() -> Result<(), DbErr> {
         use std::collections::HashSet;
@@ -232,6 +319,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures invalid pagination tokens are treated as offset zero.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once items are returned and a next token is emitted.
     #[tokio::test]
     async fn test_list_models_invalid_token() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -267,6 +363,15 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies pagination tokens round-trip correctly through encoding and decoding.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the decoded offset matches expectations and pages are exhausted.
     #[tokio::test]
     async fn test_page_token_roundtrip() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -309,6 +414,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures updates overwrite fields and deletions remove models as expected.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying update and delete operations.
     #[tokio::test]
     async fn test_update_and_delete_model() -> Result<(), DbErr> {
         let db = setup_db().await?;

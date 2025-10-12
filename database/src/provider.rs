@@ -21,6 +21,16 @@ use base64::engine::general_purpose;
 use entity::entity::provider;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
+/// Inserts a new provider record into the database.
+///
+/// # Arguments
+///
+/// * `db` - The database connection on which to execute the insert.
+/// * `provider` - The provider entity to persist.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the insert succeeds, or a [`DbErr`] otherwise.
 pub async fn create_provider(
     db: &DatabaseConnection,
     provider: provider::Model,
@@ -33,6 +43,16 @@ pub async fn create_provider(
     Ok(())
 }
 
+/// Retrieves a provider by its unique name.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `name` - The provider identifier to search for.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(provider))` when found, `Ok(None)` when missing, or a [`DbErr`] if the query fails.
 pub async fn get_provider(
     db: &DatabaseConnection,
     name: &str,
@@ -43,6 +63,16 @@ pub async fn get_provider(
     Ok(provider)
 }
 
+/// Updates the mutable fields of an existing provider.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use for persistence.
+/// * `provider` - The provider data containing the new field values.
+///
+/// # Returns
+///
+/// Returns `Ok(())` once the update completes, even if the provider does not exist.
 pub async fn update_provider(
     db: &DatabaseConnection,
     provider: provider::Model,
@@ -64,6 +94,17 @@ pub async fn update_provider(
     Ok(())
 }
 
+/// Lists providers using base64-encoded offset pagination.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `next_page_token` - An optional cursor specifying the next offset.
+/// * `page_size` - An optional limit on the number of results to fetch.
+///
+/// # Returns
+///
+/// Returns a tuple of provider models and the next page token (empty when no more results).
 pub async fn list_providers(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
@@ -119,6 +160,16 @@ pub async fn list_providers(
     Ok((providers, next_page_token))
 }
 
+/// Deletes a provider with the given name if it exists.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for deletion.
+/// * `name` - The provider identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` regardless of whether the provider was present, or a [`DbErr`] on errors.
 pub async fn delete_provider(db: &DatabaseConnection, name: &str) -> Result<(), DbErr> {
     let provider = provider::Entity::find_by_id(name.to_string())
         .one(db)
@@ -137,6 +188,15 @@ mod tests {
         ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait, Statement,
     };
 
+    /// Prepares an in-memory SQLite database with the provider schema for tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a connected [`DatabaseConnection`] ready for CRUD testing.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         // Use an in-memory SQLite database for testing
         let db = Database::connect("sqlite::memory:").await?;
@@ -156,6 +216,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Verifies providers can be created and retrieved from storage.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the inserted provider matches expectations.
     #[tokio::test]
     async fn test_create_provider() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -184,6 +253,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures inserting multiple providers stores each record.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying all inserted providers exist.
     #[tokio::test]
     async fn test_create_multiple_providers() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -217,6 +295,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms `get_provider` returns an existing provider.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after retrieving the expected provider data.
     #[tokio::test]
     async fn test_get_provider_found() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -245,6 +332,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures requesting a missing provider yields `None`.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the lookup result is empty.
     #[tokio::test]
     async fn test_get_provider_not_found() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -259,6 +355,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates pagination produces complete coverage when iterating providers.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once every inserted provider name is observed.
     #[tokio::test]
     async fn test_list_providers_pagination() -> Result<(), DbErr> {
         use std::collections::HashSet;
@@ -297,6 +402,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms invalid pagination tokens fall back to the first page.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once results are returned despite the malformed token.
     #[tokio::test]
     async fn test_list_providers_invalid_token() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -328,6 +442,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures pagination tokens encode and decode the expected offset.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the offset embedded in the token is correct.
     #[tokio::test]
     async fn test_page_token_roundtrip() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -370,6 +493,15 @@ mod tests {
         Ok(())
     }
 
+    /// Verifies providers are removed when deleted and extra deletes are safe.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once deletions succeed without errors.
     #[tokio::test]
     async fn test_delete_provider() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -404,6 +536,15 @@ mod tests {
 
         Ok(())
     }
+    /// Confirms updates overwrite provider fields as expected.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying the persisted provider reflects the new values.
     #[tokio::test]
     async fn test_update_provider() -> Result<(), DbErr> {
         let db = setup_db().await?;

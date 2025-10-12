@@ -24,6 +24,16 @@ use sea_orm::{
 };
 
 #[allow(dead_code)]
+/// Creates an association between a plugin function and a permission.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used to insert the relation.
+/// * `pfp` - The relation model to store.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the link is persisted, or a [`DbErr`] on failure.
 pub(crate) async fn create_plugin_function_permission(
     db: &DatabaseConnection,
     pfp: plugin_function_permission::Model,
@@ -34,6 +44,16 @@ pub(crate) async fn create_plugin_function_permission(
 }
 
 #[allow(dead_code)]
+/// Retrieves a plugin-function permission link with optional related entities.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `id` - The primary key of the relation to fetch.
+///
+/// # Returns
+///
+/// Returns `Ok(Some((relation, permission, function)))` when found, `Ok(None)` when missing, or a [`DbErr`] on failure.
 pub(crate) async fn get_plugin_function_permission(
     db: &DatabaseConnection,
     id: i32,
@@ -59,6 +79,16 @@ pub(crate) async fn get_plugin_function_permission(
 }
 
 #[allow(dead_code)]
+/// Updates an existing plugin function permission relation.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `pfp` - The updated relation data.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after applying changes, regardless of whether the relation existed.
 pub(crate) async fn update_plugin_function_permission(
     db: &DatabaseConnection,
     pfp: plugin_function_permission::Model,
@@ -78,6 +108,16 @@ pub(crate) async fn update_plugin_function_permission(
 }
 
 #[allow(dead_code)]
+/// Lists plugin function permission relations, optionally filtered by plugin function ID.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `plugin_function_id` - Optional function identifier to filter results.
+///
+/// # Returns
+///
+/// Returns the matching relations paired with related permission and function records.
 pub(crate) async fn list_plugin_function_permissions(
     db: &DatabaseConnection,
     plugin_function_id: Option<String>,
@@ -105,6 +145,16 @@ pub(crate) async fn list_plugin_function_permissions(
 }
 
 #[allow(dead_code)]
+/// Deletes a plugin function permission relation by primary key.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used to perform the deletion.
+/// * `id` - The relation identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even if the relation was absent, or a [`DbErr`] when deletion fails.
 pub(crate) async fn delete_plugin_function_permission(
     db: &DatabaseConnection,
     id: i32,
@@ -125,6 +175,15 @@ mod tests {
     use super::*;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Configures an in-memory database with the tables required for relation tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] ready for link CRUD operations.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -181,6 +240,17 @@ mod tests {
         Ok(db)
     }
 
+    /// Inserts a permission used by tests to satisfy foreign key constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection on which to insert.
+    /// * `id` - The numeric identifier to assign.
+    /// * `plugin_function_id` - The related plugin function identifier.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the permission row is written.
     async fn insert_test_permission(
         db: &DatabaseConnection,
         id: i32,
@@ -200,6 +270,16 @@ mod tests {
         Ok(())
     }
 
+    /// Inserts a plugin function to link against during tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection used for insertion.
+    /// * `id` - The function identifier to create.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the function is persisted.
     async fn insert_test_function(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
         let pf = plugin_function::Model {
             function_id: id.to_string(),
@@ -214,6 +294,15 @@ mod tests {
         Ok(())
     }
 
+    /// Exercises creating and retrieving plugin function permission links with relations.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after asserting the created link can be retrieved with relations.
     #[tokio::test]
     async fn test_create_and_get_permission_link() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -237,6 +326,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates updating and deleting plugin function permission links.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the link updates and deletes behave as expected.
     #[tokio::test]
     async fn test_update_and_delete_permission_link() -> Result<(), DbErr> {
         let db = setup_db().await?;

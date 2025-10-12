@@ -38,15 +38,42 @@ pub struct MyProviderService {
 }
 
 impl MyProviderService {
+    /// Constructs a new provider service backed by the supplied database connection.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection used to persist provider records.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`MyProviderService`] wrapping the given connection inside an [`Arc`].
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db: Arc::new(db) }
     }
 
+    /// Clears sensitive fields from a provider proto before returning it to clients.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` - The provider proto to sanitize.
+    ///
+    /// # Returns
+    ///
+    /// Returns a provider proto with the API key field cleared.
     fn sanitize_provider(mut provider: Provider) -> Provider {
         provider.api_key.clear();
         provider
     }
 
+    /// Creates a success status wrapper to embed in API responses.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - Human-readable detail describing the successful operation.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`RpcStatus`] marked as `Ok` with the supplied message.
     fn ok_status(message: impl Into<String>) -> Option<RpcStatus> {
         Some(RpcStatus {
             code: RpcCode::Ok as i32,
@@ -55,6 +82,15 @@ impl MyProviderService {
         })
     }
 
+    /// Converts a SeaORM error into a gRPC [`Status`] while logging diagnostic details.
+    ///
+    /// # Arguments
+    ///
+    /// * `err` - The database error encountered during an operation.
+    ///
+    /// # Returns
+    ///
+    /// Returns an internal gRPC status suitable for surfacing to clients.
     fn map_db_error(err: DbErr) -> Status {
         error!("Database error occurred while handling provider request: {err:?}");
         Status::internal("database operation failed")
@@ -63,6 +99,15 @@ impl MyProviderService {
 
 #[tonic::async_trait]
 impl ProviderService for MyProviderService {
+    /// Handles provider creation requests by validating input and persisting the record.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing the provider definition to create.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response with the sanitized provider or an error if validation or persistence fails.
     async fn create_provider(
         &self,
         request: Request<CreateProviderRequest>,
@@ -116,6 +161,15 @@ impl ProviderService for MyProviderService {
         Ok(Response::new(response))
     }
 
+    /// Fetches a provider by name and returns a sanitized representation.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request specifying the provider name to retrieve.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response containing the provider when found, or a not-found error otherwise.
     async fn get_provider(
         &self,
         request: Request<GetProviderRequest>,
@@ -139,6 +193,15 @@ impl ProviderService for MyProviderService {
         Ok(Response::new(response))
     }
 
+    /// Lists providers with optional pagination support.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing pagination inputs.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response with the sanitized providers list and the next page token when available.
     async fn list_providers(
         &self,
         request: Request<ListProvidersRequest>,
@@ -178,6 +241,15 @@ impl ProviderService for MyProviderService {
         Ok(Response::new(response))
     }
 
+    /// Deletes a provider after confirming it exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request identifying which provider to remove.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response containing a success status, or an error if the provider is missing or deletion fails.
     async fn delete_provider(
         &self,
         request: Request<DeleteProviderRequest>,
@@ -203,6 +275,15 @@ impl ProviderService for MyProviderService {
         Ok(Response::new(response))
     }
 
+    /// Applies updates to an existing provider record based on the supplied field mask.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing the provider data and update mask.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response with the updated provider or an error if validation or persistence fails.
     async fn update_provider(
         &self,
         request: Request<UpdateProviderRequest>,
@@ -261,6 +342,15 @@ mod tests {
     use migration::MigratorTrait;
     use sapphillon_core::proto::google::protobuf::FieldMask;
 
+    /// Creates a provider service backed by an in-memory SQLite database for testing.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`MyProviderService`] connected to a temporary database.
     async fn setup_service() -> MyProviderService {
         let conn = sea_orm::Database::connect("sqlite::memory:?cache=shared")
             .await
@@ -272,6 +362,15 @@ mod tests {
         MyProviderService::new(conn)
     }
 
+    /// Tests creating, retrieving, and sanitizing a provider end-to-end.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the round-trip assertions succeed.
     #[tokio::test]
     async fn create_and_get_provider_roundtrip() {
         let service = setup_service().await;
@@ -310,6 +409,15 @@ mod tests {
         assert_eq!(fetched_provider.display_name, "Test Provider");
     }
 
+    /// Validates update and list operations behave as expected for providers.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after the provider is updated, listed, and deleted successfully.
     #[tokio::test]
     async fn update_and_list_providers() {
         let service = setup_service().await;

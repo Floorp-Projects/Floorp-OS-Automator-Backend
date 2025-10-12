@@ -22,6 +22,16 @@ use entity::entity::workflow;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
 #[allow(dead_code)]
+/// Inserts a workflow record into the database.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use for insertion.
+/// * `wf` - The workflow model to persist.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when creation succeeds, or a [`DbErr`] on failure.
 pub(crate) async fn create_workflow(
     db: &DatabaseConnection,
     wf: workflow::Model,
@@ -33,6 +43,16 @@ pub(crate) async fn create_workflow(
 }
 
 #[allow(dead_code)]
+/// Retrieves a workflow by its identifier.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `id` - The workflow identifier to fetch.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(workflow))` when found, `Ok(None)` when missing, or a [`DbErr`] on failure.
 pub(crate) async fn get_workflow(
     db: &DatabaseConnection,
     id: &str,
@@ -42,6 +62,16 @@ pub(crate) async fn get_workflow(
 }
 
 #[allow(dead_code)]
+/// Updates an existing workflow's metadata when present.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for persistence.
+/// * `wf` - The workflow data containing updated fields.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after attempting the update, even if the workflow was absent.
 pub(crate) async fn update_workflow(
     db: &DatabaseConnection,
     wf: workflow::Model,
@@ -59,6 +89,17 @@ pub(crate) async fn update_workflow(
 }
 
 #[allow(dead_code)]
+/// Lists workflows with base64-encoded offset pagination.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `next_page_token` - An optional cursor indicating the next offset.
+/// * `page_size` - An optional limit on the number of workflows to fetch.
+///
+/// # Returns
+///
+/// Returns the retrieved workflows and the next page token (empty when no further results exist).
 pub(crate) async fn list_workflows(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
@@ -110,6 +151,16 @@ pub(crate) async fn list_workflows(
 }
 
 #[allow(dead_code)]
+/// Deletes a workflow by its identifier if it exists.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for deletion.
+/// * `id` - The workflow identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even if the workflow is absent, or a [`DbErr`] if deletion fails.
 pub(crate) async fn delete_workflow(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
     let found = workflow::Entity::find_by_id(id.to_string()).one(db).await?;
     if let Some(found) = found {
@@ -125,6 +176,15 @@ mod tests {
     use entity::entity::workflow as entity_wf;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Creates an in-memory workflow table used by the unit tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] prepared for workflow CRUD tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -144,6 +204,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Ensures workflows can be inserted successfully.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the workflow creation helper completes without error.
     #[tokio::test]
     async fn test_create_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -162,6 +231,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates workflows can be retrieved after insertion.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the stored workflow matches expected values.
     #[tokio::test]
     async fn test_get_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -187,6 +265,15 @@ mod tests {
 
         Ok(())
     }
+    /// Verifies pagination iterates over all workflows.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once all inserted workflow identifiers have been collected.
     #[tokio::test]
     async fn test_list_workflows_pagination() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -220,6 +307,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms updates persist new workflow metadata.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying fields are updated as expected.
     #[tokio::test]
     async fn test_update_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -255,6 +351,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures workflows can be deleted and no longer retrieved.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the workflow has been removed.
     #[tokio::test]
     async fn test_delete_workflow() -> Result<(), DbErr> {
         let db = setup_db().await?;

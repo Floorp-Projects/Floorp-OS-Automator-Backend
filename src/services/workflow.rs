@@ -49,6 +49,15 @@ impl WorkflowService for MyWorkflowService {
         >,
     >;
 
+    /// Returns an unimplemented status for workflow updates until persistence is supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The incoming update payload (currently unused).
+    ///
+    /// # Returns
+    ///
+    /// Always returns an unimplemented error status.
     async fn update_workflow(
         &self,
         request: tonic::Request<UpdateWorkflowRequest>,
@@ -59,6 +68,15 @@ impl WorkflowService for MyWorkflowService {
             "update_workflow is not implemented",
         ))
     }
+    /// Returns an unimplemented status for workflow deletion until persistence is supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The deletion request payload (currently unused).
+    ///
+    /// # Returns
+    ///
+    /// Always returns an unimplemented error status.
     async fn delete_workflow(
         &self,
         request: tonic::Request<DeleteWorkflowRequest>,
@@ -69,6 +87,15 @@ impl WorkflowService for MyWorkflowService {
             "delete_workflow is not implemented",
         ))
     }
+    /// Returns an unimplemented status because listing workflows is not yet supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The list request payload (currently unused).
+    ///
+    /// # Returns
+    ///
+    /// Always returns an unimplemented error status.
     async fn list_workflows(
         &self,
         request: tonic::Request<ListWorkflowsRequest>,
@@ -79,6 +106,15 @@ impl WorkflowService for MyWorkflowService {
             "list_workflow is not implemented",
         ))
     }
+    /// Returns an unimplemented status because workflow fixing streams are not yet implemented.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The fix request payload (currently unused).
+    ///
+    /// # Returns
+    ///
+    /// Always returns an unimplemented error status.
     async fn fix_workflow(
         &self,
         request: tonic::Request<FixWorkflowRequest>,
@@ -90,6 +126,15 @@ impl WorkflowService for MyWorkflowService {
         ))
     }
 
+    /// Returns an unimplemented status because workflow retrieval is not yet supported.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The get request payload (currently unused).
+    ///
+    /// # Returns
+    ///
+    /// Always returns an unimplemented error status.
     async fn get_workflow(
         &self,
         request: tonic::Request<GetWorkflowRequest>,
@@ -100,6 +145,15 @@ impl WorkflowService for MyWorkflowService {
             "get_workflow is not implemented",
         ))
     }
+    /// Generates a workflow by invoking the asynchronous LLM helper and streaming the result.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing the prompt used to synthesize a workflow.
+    ///
+    /// # Returns
+    ///
+    /// Returns a streaming response with a single generated workflow or an error if generation fails.
     async fn generate_workflow(
         &self,
         request: tonic::Request<GenerateWorkflowRequest>,
@@ -162,6 +216,15 @@ impl WorkflowService for MyWorkflowService {
         Ok(tonic::Response::new(boxed_stream))
     }
 
+    /// Executes the provided workflow definition and returns the latest result entry.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - Either a workflow identifier or an inline definition to execute.
+    ///
+    /// # Returns
+    ///
+    /// Returns the most recent execution result, or an error when validation fails or the workflow cannot be located.
     async fn run_workflow(
         &self,
         request: tonic::Request<RunWorkflowRequest>,

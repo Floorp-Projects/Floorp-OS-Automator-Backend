@@ -26,6 +26,16 @@ use sea_orm::{
 };
 
 #[allow(dead_code)]
+/// Inserts an allowed permission mapping for a workflow code.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for persistence.
+/// * `a` - The allowed permission relation to store.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the mapping is saved, or a [`DbErr`] on failure.
 pub(crate) async fn create_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     a: workflow_code_allowed_permission::Model,
@@ -36,6 +46,16 @@ pub(crate) async fn create_workflow_code_allowed_permission(
 }
 
 #[allow(dead_code)]
+/// Retrieves an allowed permission relation and its optional permission record.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `id` - The relation identifier to fetch.
+///
+/// # Returns
+///
+/// Returns `Ok(Some((relation, permission)))` when found, `Ok(None)` when missing, or a [`DbErr`] on failure.
 pub(crate) async fn get_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     id: i32,
@@ -60,6 +80,16 @@ pub(crate) async fn get_workflow_code_allowed_permission(
 }
 
 #[allow(dead_code)]
+/// Updates an existing allowed permission mapping with new references.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `a` - The relation containing updated fields.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after the update attempt, regardless of whether the relation existed.
 pub(crate) async fn update_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     a: workflow_code_allowed_permission::Model,
@@ -78,6 +108,18 @@ pub(crate) async fn update_workflow_code_allowed_permission(
 }
 
 #[allow(dead_code)]
+/// Lists allowed permission mappings, optionally filtered by workflow code ID.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `workflow_code_id` - Optional workflow code identifier to filter results.
+/// * `next_page_token` - An optional cursor specifying the next offset.
+/// * `page_size` - An optional limit on the number of rows to fetch.
+///
+/// # Returns
+///
+/// Returns the matching relations paired with their permissions plus the next page token.
 pub(crate) async fn list_workflow_code_allowed_permissions(
     db: &DatabaseConnection,
     workflow_code_id: Option<String>,
@@ -152,6 +194,16 @@ pub(crate) async fn list_workflow_code_allowed_permissions(
 }
 
 #[allow(dead_code)]
+/// Deletes an allowed permission relation by its identifier.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for deletion.
+/// * `id` - The relation identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even when the relation is absent, or a [`DbErr`] if deletion fails.
 pub(crate) async fn delete_workflow_code_allowed_permission(
     db: &DatabaseConnection,
     id: i32,
@@ -172,6 +224,15 @@ mod tests {
     use entity::entity::{permission as entity_permission, workflow_code as entity_wc};
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Sets up in-memory tables required for workflow code permission tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] prepared for allowed permission CRUD tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -224,6 +285,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Validates allowed permissions can be created after inserting dependencies.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the relation is inserted without error.
     #[tokio::test]
     async fn test_create_allowed_permission() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -263,6 +333,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures allowed permissions can be fetched, updated, and listed with related permissions.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying the relation and associated permission remain accessible.
     #[tokio::test]
     async fn test_get_and_update_allowed_permission() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -323,6 +402,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms deleting an allowed permission removes the mapping.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the relation cannot be retrieved anymore.
     #[tokio::test]
     async fn test_delete_allowed_permission() -> Result<(), DbErr> {
         let db = setup_db().await?;

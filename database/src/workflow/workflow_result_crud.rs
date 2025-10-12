@@ -21,6 +21,14 @@ use base64::engine::general_purpose;
 use entity::entity::workflow_result;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
+/// Inserts a new workflow result into the database.
+///
+/// # Arguments
+/// * `db` - The database connection used for executing the insert.
+/// * `r` - The workflow result model to persist.
+///
+/// # Returns
+/// An empty result on success or a database error if the insert fails.
 #[allow(dead_code)]
 pub(crate) async fn create_workflow_result(
     db: &DatabaseConnection,
@@ -31,6 +39,14 @@ pub(crate) async fn create_workflow_result(
     Ok(())
 }
 
+/// Retrieves a workflow result by its identifier.
+///
+/// # Arguments
+/// * `db` - The database connection used for the lookup.
+/// * `id` - The workflow result identifier to search for.
+///
+/// # Returns
+/// The matching workflow result model if found, or `None` when absent.
 #[allow(dead_code)]
 pub(crate) async fn get_workflow_result(
     db: &DatabaseConnection,
@@ -42,6 +58,14 @@ pub(crate) async fn get_workflow_result(
     Ok(r)
 }
 
+/// Updates an existing workflow result if it already exists.
+///
+/// # Arguments
+/// * `db` - The database connection used for the update.
+/// * `r` - The new workflow result data to apply.
+///
+/// # Returns
+/// An empty result when the update completes, or an error on failure.
 #[allow(dead_code)]
 pub(crate) async fn update_workflow_result(
     db: &DatabaseConnection,
@@ -65,6 +89,15 @@ pub(crate) async fn update_workflow_result(
     Ok(())
 }
 
+/// Lists workflow results using offset-based pagination.
+///
+/// # Arguments
+/// * `db` - The database connection used for the query.
+/// * `next_page_token` - The token indicating where to resume the listing.
+/// * `page_size` - The maximum number of items to retrieve per page.
+///
+/// # Returns
+/// A tuple containing the fetched workflow results and the token for the next page.
 #[allow(dead_code)]
 pub(crate) async fn list_workflow_results(
     db: &DatabaseConnection,
@@ -115,6 +148,14 @@ pub(crate) async fn list_workflow_results(
     Ok((items, next_token))
 }
 
+/// Removes a workflow result from the database if it exists.
+///
+/// # Arguments
+/// * `db` - The database connection used for the deletion.
+/// * `id` - The identifier of the workflow result to delete.
+///
+/// # Returns
+/// An empty result when the deletion succeeds or a database error otherwise.
 #[allow(dead_code)]
 pub(crate) async fn delete_workflow_result(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
     let found = workflow_result::Entity::find_by_id(id.to_string())
@@ -133,6 +174,7 @@ mod tests {
     use entity::entity::{workflow as entity_wf, workflow_code as entity_wc};
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Creates an in-memory SQLite database with the tables required for the tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -195,6 +237,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Validates that a workflow result can be created successfully.
     async fn test_create_workflow_result() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
@@ -238,6 +281,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Ensures retrieval and update logic works for existing workflow results.
     async fn test_get_and_update_workflow_result() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
@@ -300,6 +344,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Verifies that deleting a workflow result removes it from storage.
     async fn test_delete_workflow_result() -> Result<(), DbErr> {
         let db = setup_db().await?;
 
@@ -349,6 +394,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Confirms paginated listing returns all workflow results across pages.
     async fn test_list_workflow_results_pagination() -> Result<(), DbErr> {
         let db = setup_db().await?;
 

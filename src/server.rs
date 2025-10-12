@@ -27,6 +27,15 @@ use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowSer
 use tonic::transport::Server;
 use tower_http::cors::CorsLayer;
 
+/// Boots the gRPC server, wiring service implementations and enabling web compatibility.
+///
+/// # Arguments
+///
+/// This asynchronous function takes no arguments.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the server shuts down cleanly or an error if any initialization step fails.
 pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
     let version_service = MyVersionService {};

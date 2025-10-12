@@ -22,6 +22,16 @@ use entity::entity::workflow_code;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
 #[allow(dead_code)]
+/// Inserts a workflow code revision into the database.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for persistence.
+/// * `wc` - The workflow code model to insert.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the record is stored successfully, or a [`DbErr`] otherwise.
 pub(crate) async fn create_workflow_code(
     db: &DatabaseConnection,
     wc: workflow_code::Model,
@@ -32,6 +42,16 @@ pub(crate) async fn create_workflow_code(
 }
 
 #[allow(dead_code)]
+/// Retrieves a workflow code by its identifier.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `id` - The workflow code identifier to fetch.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(code))` when found, `Ok(None)` when missing, or a [`DbErr`] on failure.
 pub(crate) async fn get_workflow_code(
     db: &DatabaseConnection,
     id: &str,
@@ -43,6 +63,16 @@ pub(crate) async fn get_workflow_code(
 }
 
 #[allow(dead_code)]
+/// Updates an existing workflow code revision with new data.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `wc` - The workflow code data to persist.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after the update attempt, even if the record was absent.
 pub(crate) async fn update_workflow_code(
     db: &DatabaseConnection,
     wc: workflow_code::Model,
@@ -61,6 +91,17 @@ pub(crate) async fn update_workflow_code(
 }
 
 #[allow(dead_code)]
+/// Lists workflow codes with pagination support.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `next_page_token` - An optional cursor identifying the next offset.
+/// * `page_size` - An optional limit on the number of revisions to fetch.
+///
+/// # Returns
+///
+/// Returns the retrieved codes and the next page token (empty when no further pages exist).
 pub(crate) async fn list_workflow_codes(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
@@ -111,6 +152,16 @@ pub(crate) async fn list_workflow_codes(
 }
 
 #[allow(dead_code)]
+/// Deletes a workflow code by its identifier if present.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for deletion.
+/// * `id` - The workflow code identifier to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even if the code is absent, or a [`DbErr`] if the deletion fails.
 pub(crate) async fn delete_workflow_code(db: &DatabaseConnection, id: &str) -> Result<(), DbErr> {
     let found = workflow_code::Entity::find_by_id(id.to_string())
         .one(db)
@@ -128,6 +179,15 @@ mod tests {
     use entity::entity::workflow as entity_wf;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Sets up an in-memory database with workflow and workflow_code tables for tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] ready for workflow code tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -168,6 +228,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Verifies workflow codes can be created successfully.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the inserted code is persisted without error.
     #[tokio::test]
     async fn test_create_workflow_code() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -197,6 +266,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures workflow codes can be fetched, updated, and observed with new values.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying the update changed the stored code and revision.
     #[tokio::test]
     async fn test_get_workflow_code_and_update() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -245,6 +323,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms workflow codes can be deleted and no longer retrieved.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the deleted workflow code is absent.
     #[tokio::test]
     async fn test_delete_workflow_code() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -279,6 +366,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates pagination returns all workflow code identifiers across pages.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after iterating through pages and collecting every code ID.
     #[tokio::test]
     async fn test_list_workflow_codes_pagination() -> Result<(), DbErr> {
         let db = setup_db().await?;

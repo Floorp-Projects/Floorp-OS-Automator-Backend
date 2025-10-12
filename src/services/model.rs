@@ -38,14 +38,41 @@ pub struct MyModelService {
 }
 
 impl MyModelService {
+    /// Constructs a new model service using the provided database connection.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection used to persist model records.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`MyModelService`] with the connection wrapped in an [`Arc`].
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db: Arc::new(db) }
     }
 
+    /// Sanitizes a model proto before returning it to clients.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The model proto to sanitize.
+    ///
+    /// # Returns
+    ///
+    /// Returns the sanitized model proto. Currently returns the input unchanged.
     fn sanitize_model(model: Models) -> Models {
         model
     }
 
+    /// Builds a success status message for API responses.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - Human-readable text describing the successful operation.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`RpcStatus`] tagged with the `Ok` code and containing the provided message.
     fn ok_status(message: impl Into<String>) -> Option<RpcStatus> {
         Some(RpcStatus {
             code: RpcCode::Ok as i32,
@@ -54,11 +81,29 @@ impl MyModelService {
         })
     }
 
+    /// Converts SeaORM errors into gRPC [`Status`] instances while logging the context.
+    ///
+    /// # Arguments
+    ///
+    /// * `err` - The database error that occurred.
+    ///
+    /// # Returns
+    ///
+    /// Returns an internal error status suitable for returning to API callers.
     fn map_db_error(err: DbErr) -> Status {
         error!("Database error occurred while handling model request: {err:?}");
         Status::internal("database operation failed")
     }
 
+    /// Ensures a referenced provider exists before performing model updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider_name` - The name of the provider to verify.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` when the provider is present, or a not-found status otherwise.
     async fn ensure_provider_exists(&self, provider_name: &str) -> Result<(), Status> {
         provider_db::get_provider(&self.db, provider_name)
             .await
@@ -74,6 +119,15 @@ impl MyModelService {
 
 #[tonic::async_trait]
 impl ModelService for MyModelService {
+    /// Creates a new model after validating the payload and provider reference.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing the model to persist.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response with the sanitized model or an error when validation fails.
     async fn create_model(
         &self,
         request: Request<CreateModelRequest>,
@@ -125,6 +179,15 @@ impl ModelService for MyModelService {
         Ok(Response::new(response))
     }
 
+    /// Retrieves a model by name, returning a sanitized proto when found.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request specifying the model name to fetch.
+    ///
+    /// # Returns
+    ///
+    /// Returns the located model or a not-found status when it does not exist.
     async fn get_model(
         &self,
         request: Request<GetModelRequest>,
@@ -148,6 +211,15 @@ impl ModelService for MyModelService {
         Ok(Response::new(response))
     }
 
+    /// Lists models with optional pagination parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing pagination options.
+    ///
+    /// # Returns
+    ///
+    /// Returns a paginated list of sanitized models plus the next page token when available.
     async fn list_models(
         &self,
         request: Request<ListModelsRequest>,
@@ -183,6 +255,15 @@ impl ModelService for MyModelService {
         Ok(Response::new(response))
     }
 
+    /// Deletes a model after confirming it exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request identifying which model to remove.
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response conveying success or an error if the model is missing or deletion fails.
     async fn delete_model(
         &self,
         request: Request<DeleteModelRequest>,
@@ -208,6 +289,15 @@ impl ModelService for MyModelService {
         Ok(Response::new(response))
     }
 
+    /// Applies updates to an existing model using an optional field mask.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request containing the model changes and mask.
+    ///
+    /// # Returns
+    ///
+    /// Returns the updated model or an error when validation, provider lookup, or persistence fails.
     async fn update_model(
         &self,
         request: Request<UpdateModelRequest>,
@@ -280,6 +370,15 @@ mod tests {
     use migration::MigratorTrait;
     use sapphillon_core::proto::google::protobuf::FieldMask;
 
+    /// Creates a model service seeded with the provided providers for testing scenarios.
+    ///
+    /// # Arguments
+    ///
+    /// * `providers` - The providers to insert before constructing the service.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`MyModelService`] backed by an in-memory database populated with the given providers.
     async fn setup_service_with_providers(
         providers: Vec<entity::entity::provider::Model>,
     ) -> MyModelService {
@@ -299,6 +398,16 @@ mod tests {
         MyModelService::new(conn)
     }
 
+    /// Builds a provider model for use in tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The provider resource name.
+    /// * `display_name` - The human-readable label for the provider.
+    ///
+    /// # Returns
+    ///
+    /// Returns a populated provider model struct suitable for database insertion.
     fn provider(name: &str, display_name: &str) -> entity::entity::provider::Model {
         entity::entity::provider::Model {
             name: name.to_string(),
@@ -308,6 +417,15 @@ mod tests {
         }
     }
 
+    /// Verifies creating and fetching a model persists the expected data.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the round-trip assertions complete successfully.
     #[tokio::test]
     async fn create_and_get_model_roundtrip() {
         let service = setup_service_with_providers(vec![provider("providers/test", "Test")]).await;
@@ -346,6 +464,15 @@ mod tests {
         assert_eq!(fetched_model.description.as_deref(), Some("desc"));
     }
 
+    /// Ensures updating a model and listing models reflects the latest changes.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after verifying update operations and paginated listing.
     #[tokio::test]
     async fn update_and_list_models() {
         let service = setup_service_with_providers(vec![provider("providers/base", "Base")]).await;
@@ -403,6 +530,15 @@ mod tests {
         assert!(list_resp.next_page_token.is_empty());
     }
 
+    /// Confirms deleting a model removes it from persistence.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after asserting the model is no longer retrievable.
     #[tokio::test]
     async fn delete_model_removes_record() {
         let service = setup_service_with_providers(vec![provider("providers/main", "Main")]).await;
@@ -439,6 +575,15 @@ mod tests {
         assert_eq!(err.code(), tonic::Code::NotFound);
     }
 
+    /// Ensures model creation fails when the referenced provider is missing.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the expected not-found error is observed.
     #[tokio::test]
     async fn create_model_requires_existing_provider() {
         let service = setup_service_with_providers(vec![]).await;

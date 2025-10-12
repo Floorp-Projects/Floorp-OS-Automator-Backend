@@ -26,6 +26,15 @@ use async_openai::{
 };
 
 #[allow(dead_code)]
+/// Generates a JavaScript workflow synchronously by issuing a blocking LLM call.
+///
+/// # Arguments
+///
+/// * `user_query` - The natural-language prompt describing the desired workflow.
+///
+/// # Returns
+///
+/// Returns the extracted JavaScript snippet on success, or an error when prompt building or LLM execution fails.
 pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = llm_call(&prompt)?;
@@ -33,6 +42,15 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
     workflow_code.ok_or_else(|| "No code section found in the response".into())
 }
 
+/// Generates a JavaScript workflow asynchronously using the non-blocking LLM client.
+///
+/// # Arguments
+///
+/// * `user_query` - The natural-language prompt describing the desired workflow.
+///
+/// # Returns
+///
+/// Returns the extracted JavaScript snippet on success, or an error when the LLM request fails.
 pub async fn generate_workflow_async(
     user_query: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -43,6 +61,15 @@ pub async fn generate_workflow_async(
 }
 
 #[allow(dead_code)]
+/// Builds the LLM prompt that instructs the model how to craft workflow JavaScript.
+///
+/// # Arguments
+///
+/// * `user_query` - The user's task description incorporated into the prompt.
+///
+/// # Returns
+///
+/// Returns the fully formatted prompt string or an error when formatting fails.
 fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let prompt = format!(
@@ -140,6 +167,15 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
 }
 
 #[allow(dead_code)]
+/// Extracts the first JavaScript code block from a markdown-like response.
+///
+/// # Arguments
+///
+/// * `xml` - The LLM response text that may contain fenced JavaScript.
+///
+/// # Returns
+///
+/// Returns `Some(code)` when a JavaScript fence is located, or `None` if not found.
 fn extract_first_code(xml: &str) -> Option<String> {
     let open = "```javascript\n";
     let close = "\n```";
@@ -155,11 +191,29 @@ fn extract_first_code(xml: &str) -> Option<String> {
 }
 
 #[allow(dead_code)]
+/// Performs a blocking LLM call by spinning up a temporary Tokio runtime.
+///
+/// # Arguments
+///
+/// * `user_query` - The prompt to send to the LLM backend.
+///
+/// # Returns
+///
+/// Returns the raw LLM response string or an error when runtime creation or the request fails.
 pub fn llm_call(user_query: &str) -> Result<String, Box<dyn Error>> {
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(_llm_call_async(user_query))
 }
 
+/// Sends the prompt to the configured LLM provider asynchronously and yields the response content.
+///
+/// # Arguments
+///
+/// * `user_query` - The prompt to send to the LLM backend.
+///
+/// # Returns
+///
+/// Returns the response text produced by the model, or an error when environment variables or the API call fail.
 pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>> {
     // OpenRouter のエンドポイント
     let api_base = &env::var("OPENAI_API_BASE")?;
@@ -193,6 +247,15 @@ pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>>
     Ok(content)
 }
 
+/// Ensures `extract_first_code` returns the inner JavaScript block when present.
+///
+/// # Arguments
+///
+/// This test takes no arguments.
+///
+/// # Returns
+///
+/// Returns `Ok(())` once the assertion on the extracted code succeeds.
 #[test]
 fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
     let result = extract_first_code("```javascript\nHello World\n```");

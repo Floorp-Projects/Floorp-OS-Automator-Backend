@@ -44,6 +44,15 @@ pub enum LogLevel {
 }
 
 impl From<LogLevel> for LevelFilter {
+    /// Converts a [`LogLevel`] value into the corresponding `log::LevelFilter` constant.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The log level specified via the command-line interface.
+    ///
+    /// # Returns
+    ///
+    /// Returns the `LevelFilter` variant that matches the provided log level.
     fn from(level: LogLevel) -> Self {
         match level {
             LogLevel::Trace => LevelFilter::Trace,
@@ -56,6 +65,15 @@ impl From<LogLevel> for LevelFilter {
 }
 
 impl From<LogLevel> for tracing::Level {
+    /// Converts a [`LogLevel`] into the equivalent `tracing::Level` for the tracing subscriber.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The user-selected verbosity level.
+    ///
+    /// # Returns
+    ///
+    /// Returns the matching `tracing::Level` variant.
     fn from(level: LogLevel) -> Self {
         match level {
             LogLevel::Trace => tracing::Level::TRACE,
@@ -68,6 +86,15 @@ impl From<LogLevel> for tracing::Level {
 }
 
 impl std::fmt::Display for LogLevel {
+    /// Formats the [`LogLevel`] as its lowercase string representation for human-readable output.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The formatter receiving the rendered log level.
+    ///
+    /// # Returns
+    ///
+    /// Returns `fmt::Result::Ok` when the level string is written successfully, or an error propagated from the formatter.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             LogLevel::Trace => "trace",

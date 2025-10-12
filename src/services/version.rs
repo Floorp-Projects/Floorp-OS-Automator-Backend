@@ -28,6 +28,15 @@ pub struct MyVersionService;
 
 #[tonic::async_trait]
 impl VersionService for MyVersionService {
+    /// Returns the running service version derived from crate metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `request` - The gRPC request payload for version lookup (unused).
+    ///
+    /// # Returns
+    ///
+    /// Returns a gRPC response containing the semantic version string.
     async fn get_version(
         &self,
         request: Request<GetVersionRequest>,
@@ -49,6 +58,15 @@ mod test {
     #[allow(unused_imports)]
     use super::*;
 
+    /// Ensures the version service echoes the crate's package version.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after asserting the returned version matches the build metadata.
     #[tokio::test]
     async fn test_get_version() {
         let service = MyVersionService;

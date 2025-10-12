@@ -32,6 +32,15 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
+    /// Creates a new [`GlobalState`] with default, uninitialized database settings.
+    ///
+    /// # Arguments
+    ///
+    /// This constructor takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`GlobalState`] instance backed by a lazily initialized [`RwLock`].
     pub const fn new() -> Self {
         GlobalState {
             data: LazyLock::new(|| {
@@ -43,6 +52,15 @@ impl GlobalState {
         }
     }
 
+    /// Opens a new database connection using the recorded URL after ensuring initialization.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous method takes no additional arguments beyond the borrowed [`GlobalState`].
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] when the URL is present and initialization is complete, or an error if the state is invalid.
     pub async fn get_db_connection(&self) -> anyhow::Result<DatabaseConnection> {
         let data = self.data.read().await;
 
@@ -57,16 +75,44 @@ impl GlobalState {
         Ok(conn)
     }
 
+    /// Waits for database initialization to complete and then provides a connection handle.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous method takes no additional arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] once initialization succeeds, or an error if waiting fails.
     pub async fn wait_init_and_get_connection(&self) -> anyhow::Result<DatabaseConnection> {
         self.wait_db_initialized().await?;
         self.get_db_connection().await
     }
 
+    /// Stores the database URL asynchronously, replacing any previous value.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The connection string to persist for future database operations.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the URL has been written to the shared state.
     pub async fn async_set_db_url(&self, url: String) {
         let mut data = self.data.write().await;
         data.db_url = url;
     }
 
+    /// Spawns a background task that updates the stored database URL.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - An [`Arc`] clone of the global state used inside the spawned task.
+    /// * `url` - The database connection string to record.
+    ///
+    /// # Returns
+    ///
+    /// Returns immediately after scheduling the write operation in a background task.
     pub fn set_db_url(self: std::sync::Arc<Self>, url: String) {
         tokio::spawn(async move {
             let mut data = self.data.write().await;
@@ -74,11 +120,29 @@ impl GlobalState {
         });
     }
 
+    /// Reads the stored database URL asynchronously.
+    ///
+    /// # Arguments
+    ///
+    /// This method takes no additional arguments beyond the borrowed [`GlobalState`].
+    ///
+    /// # Returns
+    ///
+    /// Returns a clone of the current database URL string.
     pub async fn async_get_db_url(&self) -> String {
         let data = self.data.read().await;
         data.db_url.clone()
     }
 
+    /// Obtains the database URL by blocking within a Tokio-compatible context.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - An [`Arc`] handle to the global state used to access the shared data.
+    ///
+    /// # Returns
+    ///
+    /// Returns the persisted database URL string, blocking the current thread until the read completes.
     pub fn get_db_url_blocking(self: std::sync::Arc<Self>) -> String {
         // Use block_in_place to synchronously block on the async read
         tokio::task::block_in_place(|| {
@@ -90,17 +154,45 @@ impl GlobalState {
         })
     }
 
+    /// Updates the initialization flag asynchronously to reflect the database readiness state.
+    ///
+    /// # Arguments
+    ///
+    /// * `initialized` - Whether the database has been fully initialized.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after the flag has been written.
     pub async fn async_set_db_initialized(&self, initialized: bool) {
         let mut data = self.data.write().await;
         data.db_initialized = initialized;
     }
 
+    /// Spawns a task to update the database initialization flag.
+    ///
+    /// # Arguments
+    ///
+    /// * `self` - An [`Arc`] pointing to the shared state used inside the spawned task.
+    /// * `initialized` - The new readiness value to persist.
+    ///
+    /// # Returns
+    ///
+    /// Returns immediately after spawning the asynchronous setter.
     pub fn set_db_initialized(self: std::sync::Arc<Self>, initialized: bool) {
         tokio::spawn(async move {
             self.async_set_db_initialized(initialized).await;
         });
     }
 
+    /// Indicates whether the database has been marked as initialized, using a non-blocking read.
+    ///
+    /// # Arguments
+    ///
+    /// This method takes no additional arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` when the initialization flag is set, or `false` if it is unset or currently locked.
     pub fn is_db_initialized(&self) -> bool {
         // Use the non-blocking try_read so we don't block the current thread
         // (blocking_read would panic if called from a Tokio runtime thread).
@@ -113,6 +205,15 @@ impl GlobalState {
         }
     }
 
+    /// Waits for the database initialization flag to become `true`, logging progress as it polls.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous method takes no additional arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once initialization completes, or an error when the timeout elapses.
     pub async fn wait_db_initialized(&self) -> anyhow::Result<()> {
         let mut count = 1;
         loop {
@@ -141,6 +242,15 @@ impl GlobalState {
 }
 
 impl std::fmt::Display for GlobalState {
+    /// Renders the global state for debugging, falling back to a locked message when data is unavailable.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The formatter receiving the textual representation.
+    ///
+    /// # Returns
+    ///
+    /// Returns `fmt::Result::Ok` when writing succeeds, or propagates formatter errors.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Use the non-blocking try_read so we don't block the current thread
         // (blocking_read would panic if called from a Tokio runtime thread).
@@ -161,6 +271,15 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
+    /// Ensures the [`Display`] implementation surfaces default values when unlocked.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after verifying the string representation contains the expected defaults.
     #[test]
     fn display_unlocked_shows_defaults() {
         let gs = GlobalState::new();
@@ -175,6 +294,15 @@ mod tests {
         );
     }
 
+    /// Confirms the [`Display`] implementation reports when the state is locked.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after asserting the locked indicator appears in the formatted output.
     #[test]
     fn display_locked_shows_locked() {
         let gs = GlobalState::new();
@@ -191,6 +319,15 @@ mod tests {
         drop(write_guard);
     }
 
+    /// Validates that mutating the state is reflected by the [`Display`] output.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after checking the formatter shows the updated values.
     #[test]
     fn mutate_state_and_display() {
         let gs = GlobalState::new();
@@ -213,6 +350,15 @@ mod tests {
         );
     }
 
+    /// Asserts `is_db_initialized` reflects flag changes and locked scenarios.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after toggling the initialization flag under different locking conditions.
     #[test]
     fn is_db_initialized_reflects_state_changes_and_locked() {
         let gs = GlobalState::new();
@@ -242,6 +388,15 @@ mod tests {
         drop(guard);
     }
 
+    /// Verifies `wait_db_initialized` exits immediately when the flag is already set.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after ensuring the wait call completes without timing out.
     #[tokio::test]
     async fn wait_db_initialized_returns_if_already_initialized() {
         let gs = GlobalState::new();
@@ -260,6 +415,15 @@ mod tests {
         );
     }
 
+    /// Confirms `wait_db_initialized` blocks until another task sets the flag.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the spawned task flips the flag and the wait completes.
     #[tokio::test]
     async fn wait_db_initialized_waits_until_flag_set() {
         let gs = Arc::new(GlobalState::new());
@@ -280,6 +444,15 @@ mod tests {
         );
     }
 
+    /// Ensures multiple concurrent waiters unblock when initialization completes.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after verifying every wait task observes the flag change.
     #[tokio::test]
     async fn concurrent_waiters_unblocked() {
         let gs = Arc::new(GlobalState::new());
@@ -311,6 +484,15 @@ mod tests {
         }
     }
 
+    /// Checks that the display output includes an updated database URL.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after mutating the stored URL and formatting the state.
     #[test]
     fn db_url_mutation_and_display_shows_value() {
         let gs = GlobalState::new();
@@ -327,6 +509,15 @@ mod tests {
         );
     }
 
+    /// Ensures the asynchronous setter flips the initialized flag immediately.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after asserting the flag is set to `true`.
     #[tokio::test]
     async fn async_set_db_initialized_sets_flag_immediately() {
         let gs = GlobalState::new();
@@ -341,6 +532,15 @@ mod tests {
         );
     }
 
+    /// Validates the spawning setter eventually marks the database as initialized.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after polling until the spawned task updates the flag.
     #[tokio::test]
     async fn set_db_initialized_spawns_and_sets_flag() {
         use std::sync::Arc;
@@ -367,6 +567,15 @@ mod tests {
         assert!(res, "set_db_initialized spawn did not set the flag in time");
     }
 
+    /// Confirms the asynchronous getter returns the URL set via its paired setter.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after ensuring the stored URL matches the input value.
     #[tokio::test]
     async fn async_set_and_get_db_url_roundtrip() {
         let gs = GlobalState::new();
@@ -377,6 +586,15 @@ mod tests {
         assert_eq!(got, "sqlite://async-test");
     }
 
+    /// Verifies the blocking getter can be used safely from a non-async context.
+    ///
+    /// # Arguments
+    ///
+    /// This test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after reading the URL from a blocking context and confirming it matches.
     #[test]
     fn get_db_url_blocking_returns_value_from_background() {
         use std::sync::Arc;
@@ -401,6 +619,15 @@ mod tests {
         assert_eq!(got, "postgres://blocking");
     }
 
+    /// Ensures the spawning URL setter writes the value for subsequent asynchronous reads.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after polling until the spawned task updates the URL.
     #[tokio::test]
     async fn set_db_url_spawns_and_sets_value() {
         use std::sync::Arc;
@@ -427,6 +654,15 @@ mod tests {
         assert!(res, "set_db_url spawn did not set the db_url in time");
     }
 
+    /// Confirms `get_db_connection` succeeds when the URL and initialization flag are set.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after verifying a connection handle is obtained.
     #[tokio::test]
     async fn get_db_connection_returns_connection_when_url_set() {
         // Ensure that when a valid DB URL is present, get_db_connection returns a connection
@@ -446,6 +682,15 @@ mod tests {
         );
     }
 
+    /// Ensures `wait_init_and_get_connection` blocks until setup completes and then returns a connection.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` after confirming the helper waits and yields a valid handle.
     #[tokio::test]
     async fn wait_init_and_get_connection_waits_and_returns_connection() {
         use std::sync::Arc;

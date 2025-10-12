@@ -21,12 +21,32 @@ use base64::engine::general_purpose;
 use entity::entity::permission;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, QuerySelect};
 
+/// Inserts a permission record into the database.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for persistence.
+/// * `p` - The permission entity to insert.
+///
+/// # Returns
+///
+/// Returns `Ok(())` on success or a [`DbErr`] when insertion fails.
 pub async fn create_permission(db: &DatabaseConnection, p: permission::Model) -> Result<(), DbErr> {
     let active_model: permission::ActiveModel = p.into();
     active_model.insert(db).await?;
     Ok(())
 }
 
+/// Retrieves a permission by primary key.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `id` - The permission identifier.
+///
+/// # Returns
+///
+/// Returns `Ok(Some(permission))` when found, `Ok(None)` when absent, or a [`DbErr`] on failure.
 pub async fn get_permission(
     db: &DatabaseConnection,
     id: i32,
@@ -35,6 +55,16 @@ pub async fn get_permission(
     Ok(p)
 }
 
+/// Updates an existing permission's mutable fields when it exists.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `p` - The permission data containing the desired field values.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after applying updates, regardless of whether the record existed.
 pub async fn update_permission(db: &DatabaseConnection, p: permission::Model) -> Result<(), DbErr> {
     let existing = get_permission(db, p.id).await?;
     if let Some(existing) = existing {
@@ -51,6 +81,17 @@ pub async fn update_permission(db: &DatabaseConnection, p: permission::Model) ->
     Ok(())
 }
 
+/// Lists permissions using encoded offsets for pagination.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `next_page_token` - An optional cursor indicating the starting offset.
+/// * `page_size` - An optional limit on the number of rows to return.
+///
+/// # Returns
+///
+/// Returns the retrieved permission models and the next page token (empty when exhausted).
 pub async fn list_permissions(
     db: &DatabaseConnection,
     next_page_token: Option<String>,
@@ -100,6 +141,16 @@ pub async fn list_permissions(
     Ok((items, next_token))
 }
 
+/// Removes a permission by its identifier if it exists.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to execute against.
+/// * `id` - The permission identifier to delete.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even if the permission was absent, or a [`DbErr`] if the delete fails.
 pub async fn delete_permission(db: &DatabaseConnection, id: i32) -> Result<(), DbErr> {
     let found = permission::Entity::find_by_id(id).one(db).await?;
     if let Some(found) = found {
@@ -115,6 +166,15 @@ mod tests {
     use entity::entity::plugin_function;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Creates a temporary SQLite database with the tables required for permission tests.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a ready-to-use [`DatabaseConnection`] for unit tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -157,6 +217,15 @@ mod tests {
         Ok(db)
     }
 
+    /// Exercises the full lifecycle of a permission record, including create, update, and delete.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the lifecycle operations succeed.
     #[tokio::test]
     async fn test_create_get_update_delete_permission() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -212,6 +281,15 @@ mod tests {
         Ok(())
     }
 
+    /// Validates pagination over the permission table returns all rows.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after iterating through pages covering all inserted permissions.
     #[tokio::test]
     async fn test_list_permissions_pagination() -> Result<(), DbErr> {
         let db = setup_db().await?;

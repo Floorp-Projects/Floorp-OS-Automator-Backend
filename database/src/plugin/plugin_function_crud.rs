@@ -26,6 +26,16 @@ use sea_orm::{
 };
 
 #[allow(dead_code)]
+/// Inserts a plugin function definition into the catalog.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for persistence.
+/// * `pf` - The plugin function model to insert.
+///
+/// # Returns
+///
+/// Returns `Ok(())` when the record is created, or a [`DbErr`] if insertion fails.
 pub(crate) async fn create_plugin_function(
     db: &DatabaseConnection,
     pf: plugin_function::Model,
@@ -36,6 +46,16 @@ pub(crate) async fn create_plugin_function(
 }
 
 #[allow(dead_code)]
+/// Fetches a plugin function along with its optional package metadata.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `function_id` - The unique function identifier to locate.
+///
+/// # Returns
+///
+/// Returns `Ok(Some((function, package)))` when found, `Ok(None)` otherwise, or a [`DbErr`] on failure.
 pub(crate) async fn get_plugin_function(
     db: &DatabaseConnection,
     function_id: &str,
@@ -53,6 +73,16 @@ pub(crate) async fn get_plugin_function(
 }
 
 #[allow(dead_code)]
+/// Updates an existing plugin function with new metadata.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to use.
+/// * `pf` - The updated plugin function data.
+///
+/// # Returns
+///
+/// Returns `Ok(())` after applying changes, regardless of whether the record existed.
 pub(crate) async fn update_plugin_function(
     db: &DatabaseConnection,
     pf: plugin_function::Model,
@@ -75,6 +105,18 @@ pub(crate) async fn update_plugin_function(
 }
 
 #[allow(dead_code)]
+/// Lists plugin functions, optionally filtered by package, with pagination support.
+///
+/// # Arguments
+///
+/// * `db` - The database connection to query.
+/// * `package_id` - Optional package identifier to filter results.
+/// * `next_page_token` - An optional cursor representing the next offset.
+/// * `page_size` - An optional limit on the number of rows to return.
+///
+/// # Returns
+///
+/// Returns the matching plugin functions paired with any related package and the next page token.
 pub(crate) async fn list_plugin_functions(
     db: &DatabaseConnection,
     package_id: Option<String>,
@@ -144,6 +186,16 @@ pub(crate) async fn list_plugin_functions(
 }
 
 #[allow(dead_code)]
+/// Deletes a plugin function identified by its function ID.
+///
+/// # Arguments
+///
+/// * `db` - The database connection used for deletion.
+/// * `function_id` - The identifier of the function to remove.
+///
+/// # Returns
+///
+/// Returns `Ok(())` even if the function did not exist, or a [`DbErr`] on errors.
 pub(crate) async fn delete_plugin_function(
     db: &DatabaseConnection,
     function_id: &str,
@@ -164,6 +216,15 @@ mod tests {
     use super::*;
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
+    /// Sets up an in-memory SQLite database with plugin tables for testing.
+    ///
+    /// # Arguments
+    ///
+    /// This helper takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns a [`DatabaseConnection`] ready for plugin function tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
 
@@ -210,6 +271,15 @@ mod tests {
     }
 
     // helpers for tests
+    /// Inserts a sample plugin package required for foreign keys in tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection used to insert the package.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the package is inserted.
     async fn insert_test_package(db: &DatabaseConnection) -> Result<(), DbErr> {
         let pkg = plugin_package::Model {
             package_id: "pkg1".to_string(),
@@ -228,6 +298,17 @@ mod tests {
         Ok(())
     }
 
+    /// Inserts a plugin function row for use within tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - The database connection on which to insert.
+    /// * `id` - The function identifier.
+    /// * `name` - The function name to store.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the function entry is persisted.
     async fn insert_test_function(
         db: &DatabaseConnection,
         id: &str,
@@ -244,6 +325,15 @@ mod tests {
         create_plugin_function(db, pf).await
     }
 
+    /// Validates plugin functions can be created and retrieved with their associated package.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after confirming the stored function and package are returned.
     #[tokio::test]
     async fn test_create_plugin_function() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -259,6 +349,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures fetching a missing plugin function returns `None`.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying the lookup yields no result.
     #[tokio::test]
     async fn test_get_plugin_function_when_missing() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -268,6 +367,15 @@ mod tests {
         Ok(())
     }
 
+    /// Confirms updates replace stored plugin function metadata.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the updated function name is observed.
     #[tokio::test]
     async fn test_update_plugin_function() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -287,6 +395,15 @@ mod tests {
         Ok(())
     }
 
+    /// Checks that plugin functions can be listed and paginated successfully.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` after verifying the list contains the seeded function.
     #[tokio::test]
     async fn test_list_plugin_functions_basic() -> Result<(), DbErr> {
         let db = setup_db().await?;
@@ -299,6 +416,15 @@ mod tests {
         Ok(())
     }
 
+    /// Ensures deleting a plugin function removes it from storage.
+    ///
+    /// # Arguments
+    ///
+    /// This asynchronous test takes no arguments.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` once the deleted function can no longer be fetched.
     #[tokio::test]
     async fn test_delete_plugin_function() -> Result<(), DbErr> {
         let db = setup_db().await?;
