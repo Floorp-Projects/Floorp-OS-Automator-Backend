@@ -3,7 +3,14 @@
 pub mod prelude;
 
 pub mod model;
+pub mod permission;
 pub mod plugin_function;
 pub mod plugin_function_permission;
 pub mod plugin_package;
 pub mod provider;
+pub mod workflow;
+pub mod workflow_code;
+pub mod workflow_code_allowed_permission;
+pub mod workflow_code_plugin_function;
+pub mod workflow_code_plugin_package;
+pub mod workflow_result;

@@ -8,16 +8,19 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub plugin_function_id: String,
-    pub display_name: Option<String>,
-    pub description: Option<String>,
-    pub r#type: i32,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub resource_json: Option<String>,
-    pub level: Option<i32>,
+    pub permission_id: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(
+        belongs_to = "super::permission::Entity",
+        from = "Column::PermissionId",
+        to = "super::permission::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Permission,
     #[sea_orm(
         belongs_to = "super::plugin_function::Entity",
         from = "Column::PluginFunctionId",
@@ -28,22 +31,15 @@ pub enum Relation {
     PluginFunction,
 }
 
-impl Related<super::plugin_function::Entity> for Entity {
+impl Related<super::permission::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::PluginFunction.def()
+        Relation::Permission.def()
     }
 }
 
-impl Related<super::plugin_package::Entity> for Entity {
+impl Related<super::plugin_function::Entity> for Entity {
     fn to() -> RelationDef {
-        super::plugin_function::Relation::PluginPackage.def()
-    }
-    fn via() -> Option<RelationDef> {
-        Some(
-            super::plugin_function::Relation::PluginFunctionPermission
-                .def()
-                .rev(),
-        )
+        Relation::PluginFunction.def()
     }
 }
 

@@ -5,7 +5,7 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "plugin_function")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key, auto_increment = false, unique)]
     pub function_id: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub package_id: String,
@@ -19,6 +19,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::permission::Entity")]
+    Permission,
     #[sea_orm(has_many = "super::plugin_function_permission::Entity")]
     PluginFunctionPermission,
     #[sea_orm(
@@ -29,6 +31,14 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PluginPackage,
+    #[sea_orm(has_many = "super::workflow_code_plugin_function::Entity")]
+    WorkflowCodePluginFunction,
+}
+
+impl Related<super::permission::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Permission.def()
+    }
 }
 
 impl Related<super::plugin_function_permission::Entity> for Entity {
@@ -40,6 +50,12 @@ impl Related<super::plugin_function_permission::Entity> for Entity {
 impl Related<super::plugin_package::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PluginPackage.def()
+    }
+}
+
+impl Related<super::workflow_code_plugin_function::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::WorkflowCodePluginFunction.def()
     }
 }
 

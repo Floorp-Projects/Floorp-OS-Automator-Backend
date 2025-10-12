@@ -26,6 +26,8 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     PluginFunction,
+    #[sea_orm(has_many = "super::plugin_function_permission::Entity")]
+    PluginFunctionPermission,
     #[sea_orm(has_many = "super::workflow_code_allowed_permission::Entity")]
     WorkflowCodeAllowedPermission,
 }
@@ -33,6 +35,12 @@ pub enum Relation {
 impl Related<super::plugin_function::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PluginFunction.def()
+    }
+}
+
+impl Related<super::plugin_function_permission::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PluginFunctionPermission.def()
     }
 }
 
