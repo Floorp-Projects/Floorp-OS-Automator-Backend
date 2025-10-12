@@ -19,3 +19,4 @@
 pub mod workflow_crud;
 pub mod workflow_result_crud;
 pub mod workflow_code_crud;
+pub mod workflow_code_allowed_permission_crud;
