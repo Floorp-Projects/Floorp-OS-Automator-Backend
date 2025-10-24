@@ -1245,6 +1245,7 @@ dependencies = [
  "log",
  "sapphillon_core",
  "tempfile",
+ "unescaper",
 ]
 
 [[package]]
