@@ -59,7 +59,7 @@ pub async fn generate_workflow_async(
     let workflow_code = extract_first_code(&workflow_raw)
     .ok_or_else(|| "No code section found in the response")?;
 
-    let prefix_code = r"#
+    let prefix_code = r"
 function get_github_commits(repo, user) {
 const github_search_url = `https://github.com/search?q=author%3A${user}+repo%3A${repo}&type=commits&s=committer-date&o=desc`;
 const tabId = JSON.parse(floorpCreateTab(github_search_url, false)).id;
@@ -72,7 +72,7 @@ const tabId = JSON.parse(floorpCreateTab('https://myactivity.google.com/product/
 floorpTabWaitForElement(tabId, 'span.hFYxqd', 5000);
 let location_html = floorpTabElement(tabId, 'div.vwWeec', 1000000);
 return location_html;
-}#";
+}";
     Ok(format!("{prefix_code}{workflow_code}"))
 }
 
@@ -95,9 +95,8 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
 
     ### 出力ルール
     - 出力は必ず ```javascript``` タグで囲まれた **Javascript Codeのみ**とする。
-    - `workflow()` 関数を作成して、その中に全てのロジックを記述する（関数の外に処理を記述しない）。
-    - コードの最後に`workflow()`を呼び出して実行する。
-    - 実際の関数呼び出しや実行結果の表示は行わない。
+    - `workflow()` 関数は **定義のみ** を行い、その中に全てのロジックを記述する（関数の外に処理を記述しない）。
+    - **実際の関数呼び出しや実行結果の表示は行わない。**
     - 各ステップにおいて **コメントで意図や処理内容を説明** すること。
     - 必要に応じて例外処理を入れることで、失敗時の理由を明確にする。
     - 実行結果の出力はすべてconsole.log()を使用すること。
@@ -126,6 +125,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ### 利用可能なTool
     - `fetch(url: str) -> str`
     - `console.log(str) -> stdout`
+    - `writeFile(path: str, content: str)`
     - `get_github_commits(repo: str, user: str) -> str`
     - `get_google_maps_location() -> str`
     ---
@@ -167,7 +167,6 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
             }}));
         }}
     }}
-    workflow()
     ```
     #### 例2: GitHub コミット履歴の取得
     ```javascript
@@ -181,7 +180,6 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
         writeFile('./example/nippou_result.txt', llm_res);
         console.log(llm_res);
     }}
-    workflow();
     ```
     ## User
     User Query(Task):
@@ -270,9 +268,9 @@ fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
 //     Ok(())
 // }
 
-// #[test]
-// fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
-//     let workflow = generate_workflow("repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。")?;
-//     println!("{}", workflow);
-//     Ok(())
-// }
+#[test]
+fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
+    let workflow = generate_workflow("repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。")?;
+    println!("{}", workflow);
+    Ok(())
+}
