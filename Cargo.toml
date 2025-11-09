@@ -2,7 +2,7 @@
 
 # name = "Sapphillon"
 version = "0.5.6"
-edition = "2024" 
+edition = "2024"
 authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
 license-file = "LICENSE"
 readme = "README.md"
@@ -12,16 +12,12 @@ homepage = "https://github.com/Walkmana-25/Sapphillon"
 
 [workspace]
 resolver = "3"
-members = [
-    "plugins/*",
-    "migration",
-    "entity"
-, "database"]
+members = ["plugins/*", "migration", "entity", "database"]
 
 [workspace.dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
-tokio = { version = "1", features = ["full"] } # reqwest needs a tokio runtime
+tokio = { version = "1", features = ["full"] }    # reqwest needs a tokio runtime
 chrono = "0.4"
 log = "0.4"
 env_logger = "0.11"
@@ -31,13 +27,20 @@ deno_error = "0.7.0"
 tonic = "0.12.0"
 prost = "0.13.1"
 prost-types = "0.13.1"
-sapphillon_core = { git = "ssh://git@github.com/Walkmana-25/Sapphillon-Core.git", tag = "v0.8.4-alpha" }
+sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.8.4-alpha" }
 tonic-build = "0.12.0"
 
-sea-orm = { version = "1.1.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "mock", "with-chrono", "debug-print"] }
-entity = {path = "./entity"}
-migration = {path = "./migration"}
-database = {path = "./database"}
+sea-orm = { version = "1.1.0", features = [
+  "sqlx-sqlite",
+  "runtime-tokio-rustls",
+  "macros",
+  "mock",
+  "with-chrono",
+  "debug-print",
+] }
+entity = { path = "./entity" }
+migration = { path = "./migration" }
+database = { path = "./database" }
 base64 = "0.21"
 
 [package]
@@ -47,7 +50,7 @@ edition.workspace = true
 authors.workspace = true
 license-file.workspace = true
 readme.workspace = true
-repository.workspace =  true
+repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
@@ -68,13 +71,15 @@ migration.workspace = true
 database.workspace = true
 
 async-openai = "0.18.0"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio-stream = "0.1.17"
 
-fetch = {path = "./plugins/fetch"}
-filesystem = {path = "./plugins/filesystem"}
+fetch = { path = "./plugins/fetch" }
+filesystem = { path = "./plugins/filesystem" }
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.12.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
@@ -82,7 +87,6 @@ tonic-web = "0.12.0"
 unescaper = "0.1.6"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-
 
 
 [build-dependencies]

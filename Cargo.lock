@@ -3340,7 +3340,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "sapphillon_core"
 version = "0.8.4"
-source = "git+ssh://git@github.com/Walkmana-25/Sapphillon-Core.git?tag=v0.8.4-alpha#c29192d500867962f78451fc3e10292fa7eb5936"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.8.4-alpha#c29192d500867962f78451fc3e10292fa7eb5936"
 dependencies = [
  "anyhow",
  "async-trait",
