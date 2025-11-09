@@ -1190,6 +1190,7 @@ name = "entity"
 version = "0.5.6"
 dependencies = [
  "anyhow",
+ "chrono",
  "sapphillon_core",
  "sea-orm",
  "serde_json",

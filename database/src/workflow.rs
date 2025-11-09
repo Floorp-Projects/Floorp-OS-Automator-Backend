@@ -22,9 +22,7 @@ pub mod workflow_crud;
 pub mod workflow_result_crud;
 
 use sapphillon_core::proto::sapphillon::v1::{Workflow, WorkflowCode};
-use sea_orm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
-};
+use sea_orm::{ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter};
 
 use uuid::Uuid;
 
@@ -153,9 +151,7 @@ pub async fn get_workflow_by_id(
     let wm = match workflow {
         Some(m) => m,
         None => {
-            return Err(DbErr::Custom(format!(
-                "workflow not found: {workflow_id}"
-            )));
+            return Err(DbErr::Custom(format!("workflow not found: {workflow_id}")));
         }
     };
 

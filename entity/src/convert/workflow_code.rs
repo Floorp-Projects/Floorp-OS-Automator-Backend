@@ -22,10 +22,10 @@ use crate::entity::plugin_package::Model as EntityPluginPackage;
 use crate::entity::workflow_code::Model as EntityWorkflowCode;
 use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
 use sapphillon_core::proto::sapphillon::v1::WorkflowCode as ProtoWorkflowCode;
+use sapphillon_core::proto::sapphillon::v1::WorkflowResult as ProtoWorkflowResult;
 use sapphillon_core::proto::sapphillon::v1::{
     AllowedPermission as ProtoAllowedPermission, Permission as ProtoPermission,
 };
-use sapphillon_core::proto::sapphillon::v1::WorkflowResult as ProtoWorkflowResult;
 use serde_json;
 use std::collections::HashMap;
 
@@ -81,10 +81,7 @@ pub fn workflow_code_to_proto_with_relations(
 
     if let Some(pp_entities) = plugin_packages {
         // convert entity plugin packages into proto messages
-        p.plugin_packages = pp_entities
-            .iter()
-            .map(plugin_package_to_proto)
-            .collect();
+        p.plugin_packages = pp_entities.iter().map(plugin_package_to_proto).collect();
     }
 
     if let Some(pf_ids) = plugin_function_ids {
