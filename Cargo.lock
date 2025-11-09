@@ -956,7 +956,9 @@ version = "0.5.6"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
+ "chrono",
  "entity",
+ "prost-types",
  "sapphillon_core",
  "sea-orm",
  "tokio",

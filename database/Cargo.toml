@@ -16,3 +16,5 @@ anyhow.workspace = true
 tokio.workspace = true
 base64.workspace = true
 uuid = { version = "1.18.1", features = ["v4"] }
+chrono.workspace = true
+prost-types.workspace = true

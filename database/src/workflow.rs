@@ -27,8 +27,7 @@ use sapphillon_core::proto::sapphillon::v1::{Workflow, WorkflowCode};
 
 use uuid::Uuid;
 
-#[allow(dead_code)]
-pub(crate) async fn create_workflow_code(
+pub async fn create_workflow_code(
     db: &DatabaseConnection,
     code: String,
     workflow_id: i32,
@@ -94,9 +93,47 @@ pub(crate) async fn create_workflow_code(
 
 pub async fn create_workflow(
     db: &DatabaseConnection,
-    workflow_code: String,
+    display_name: String,
+    description: Option<String>,
 ) -> Result<Workflow, DbErr> {
-    todo!();
+    
+    // TODO: Support different workflow languages.
+    const WORKFLOW_LANGUAGE: i32 = 0; // WORKFLOW_LANGUAGE_UNSPECIFIED
+    
+    let wm = entity::entity::workflow::Model {
+        id: Uuid::new_v4().to_string(),
+        display_name: display_name.clone(),
+        description: description.clone(),
+        workflow_language: WORKFLOW_LANGUAGE,
+        created_at: Some(chrono::Utc::now()),
+        updated_at: Some(chrono::Utc::now()),
+    };
+    
+    workflow_crud::create_workflow(db, wm.clone()).await?;
+
+    // Return a Workflow proto object
+    let proto = Workflow {
+        id: wm.id,
+        display_name: wm.display_name,
+        description: wm.description.unwrap_or("".to_string()),
+        workflow_language: wm.workflow_language,
+        workflow_code: Vec::new(),
+        created_at: wm.created_at.map(|dt| {
+            sapphillon_core::proto::google::protobuf::Timestamp {
+                seconds: dt.timestamp(),
+                nanos: dt.timestamp_subsec_nanos() as i32,
+            }
+        }),
+        updated_at: wm.updated_at.map(|dt| {
+            sapphillon_core::proto::google::protobuf::Timestamp {
+                seconds: dt.timestamp(),
+                nanos: dt.timestamp_subsec_nanos() as i32,
+            }
+        }),
+        workflow_results: Vec::new(),
+    };
+
+    Ok(proto)
 }
 
 
