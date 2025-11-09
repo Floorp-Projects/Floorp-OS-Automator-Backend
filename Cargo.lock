@@ -1192,6 +1192,7 @@ dependencies = [
  "anyhow",
  "sapphillon_core",
  "sea-orm",
+ "serde_json",
 ]
 
 [[package]]

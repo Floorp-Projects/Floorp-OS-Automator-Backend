@@ -22,6 +22,16 @@ use sapphillon_core::proto::sapphillon::v1::{
     WorkflowResult as ProtoWorkflowResult,
     PluginPackage as ProtoPluginPackage,
 };
+use crate::entity::permission::Model as EntityPermission;
+use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
+use crate::entity::plugin_package::Model as EntityPluginPackage;
+use super::plugin_code::plugin_package_to_proto;
+use sapphillon_core::proto::sapphillon::v1::{
+    AllowedPermission as ProtoAllowedPermission,
+    Permission as ProtoPermission,
+};
+use std::collections::HashMap;
+use serde_json;
 
 /// Convert an entity `workflow_code::Model` into the corresponding
 /// proto `WorkflowCode` message.
@@ -62,9 +72,9 @@ pub fn workflow_code_to_proto(entity: &EntityWorkflowCode) -> ProtoWorkflowCode 
 pub fn workflow_code_to_proto_with_relations(
     entity: &EntityWorkflowCode,
     result: Option<&[ProtoWorkflowResult]>,
-    plugin_packages: Option<&[ProtoPluginPackage]>,
+    plugin_packages: Option<&[EntityPluginPackage]>,
     plugin_function_ids: Option<&[String]>,
-    allowed_permissions: Option<&[sapphillon_core::proto::sapphillon::v1::AllowedPermission]>,
+    allowed_permissions: Option<&[(EntityWCAllowed, Option<EntityPermission>)]>,
 ) -> ProtoWorkflowCode {
     let mut p = workflow_code_to_proto(entity);
 
@@ -72,30 +82,82 @@ pub fn workflow_code_to_proto_with_relations(
         p.result = r.to_vec();
     }
 
-    if let Some(pp) = plugin_packages {
-        p.plugin_packages = pp.to_vec();
+    if let Some(pp_entities) = plugin_packages {
+        // convert entity plugin packages into proto messages
+        p.plugin_packages = pp_entities
+            .iter()
+            .map(|e| plugin_package_to_proto(e))
+            .collect();
     }
 
     if let Some(pf_ids) = plugin_function_ids {
         p.plugin_function_ids = pf_ids.to_vec();
     }
 
-    if let Some(ap) = allowed_permissions {
-        p.allowed_permissions = ap.to_vec();
+    if let Some(ap_entities) = allowed_permissions {
+        // convert entity allowed-permission relation tuples into proto grouping
+        p.allowed_permissions = allowed_permissions_to_proto(ap_entities);
     }
 
     p
+}
+
+/// Convert DB allowed permission relations into the protobuf AllowedPermission
+/// grouping by plugin_function_id. The input is a slice of tuples where the
+/// second element is the optional related permission record. This mirrors the
+/// return shape of the CRUD helper that loads the relation plus permission.
+pub fn allowed_permissions_to_proto(
+    items: &[(EntityWCAllowed, Option<EntityPermission>)],
+) -> Vec<ProtoAllowedPermission> {
+    let mut map: HashMap<String, Vec<ProtoPermission>> = HashMap::new();
+
+    for (_rel, perm_opt) in items.iter() {
+        let perm = match perm_opt {
+            Some(p) => p,
+            None => continue, // no permission row; skip
+        };
+
+        // Parse resource_json (stored as JSON array of strings) into Vec<String>
+        let resources: Vec<String> = match &perm.resource_json {
+            Some(s) => serde_json::from_str::<Vec<String>>(s).unwrap_or_else(|_| Vec::new()),
+            None => Vec::new(),
+        };
+
+        let proto_perm = ProtoPermission {
+            display_name: perm.display_name.clone().unwrap_or_default(),
+            description: perm.description.clone().unwrap_or_default(),
+            permission_type: perm.r#type,
+            resource: resources,
+            permission_level: perm.level.unwrap_or_default(),
+        };
+
+        map.entry(perm.plugin_function_id.clone())
+            .or_insert_with(Vec::new)
+            .push(proto_perm);
+    }
+
+    // Convert hashmap into Vec<AllowedPermission>
+    let mut out: Vec<ProtoAllowedPermission> = map
+        .into_iter()
+        .map(|(plugin_function_id, permissions)| ProtoAllowedPermission {
+            plugin_function_id,
+            permissions,
+        })
+        .collect();
+
+    // Keep ordering deterministic: sort by plugin_function_id
+    out.sort_by(|a, b| a.plugin_function_id.cmp(&b.plugin_function_id));
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::entity::workflow_code::Model as EntityWorkflowCode;
-    use sapphillon_core::proto::sapphillon::v1::{
-        PluginPackage as ProtoPluginPackage,
-        Permission, PermissionLevel, PermissionType,
-        AllowedPermission as ProtoAllowedPermission,
-    };
+    use crate::entity::plugin_package::Model as EntityPluginPackage;
+    use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
+    use crate::entity::permission::Model as EntityPermission;
+    use sapphillon_core::proto::sapphillon::v1::{PermissionLevel, PermissionType};
 
     #[test]
     fn converts_minimal_entity_to_proto() {
@@ -128,29 +190,33 @@ mod tests {
             created_at: None,
         };
 
-        let pkg = ProtoPluginPackage {
+        let pkg = EntityPluginPackage {
             package_id: "pkg1".to_string(),
             package_name: "P".to_string(),
-            description: "".to_string(),
-            functions: Vec::new(),
             package_version: "v1".to_string(),
-            deprecated: None,
-            plugin_store_url: "BUILTIN".to_string(),
-            internal_plugin: Some(true),
+            description: None,
+            plugin_store_url: None,
+            internal_plugin: true,
+            verified: true,
+            deprecated: false,
             installed_at: None,
             updated_at: None,
-            verified: Some(true),
         };
 
-        let allowed = ProtoAllowedPermission {
+        let wc_allowed = EntityWCAllowed {
+            id: 1,
+            workflow_code_id: e.id.clone(),
+            permission_id: 1,
+        };
+
+        let perm_entity = EntityPermission {
+            id: 1,
             plugin_function_id: "pf1".to_string(),
-            permissions: vec![Permission {
-                display_name: "X".to_string(),
-                description: "D".to_string(),
-                permission_type: PermissionType::FilesystemRead as i32,
-                permission_level: PermissionLevel::Unspecified as i32,
-                resource: vec![],
-            }],
+            display_name: Some("X".to_string()),
+            description: Some("D".to_string()),
+            r#type: PermissionType::FilesystemRead as i32,
+            resource_json: None,
+            level: Some(PermissionLevel::Unspecified as i32),
         };
 
         let p = workflow_code_to_proto_with_relations(
@@ -158,7 +224,7 @@ mod tests {
             None,
             Some(&[pkg.clone()]),
             Some(&["pf1".to_string()]),
-            Some(&[allowed.clone()]),
+            Some(&[(wc_allowed, Some(perm_entity))]),
         );
 
         assert_eq!(p.id, e.id);
