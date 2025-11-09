@@ -16,22 +16,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use super::plugin_code::plugin_package_to_proto;
+use crate::entity::permission::Model as EntityPermission;
+use crate::entity::plugin_package::Model as EntityPluginPackage;
 use crate::entity::workflow_code::Model as EntityWorkflowCode;
+use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
 use sapphillon_core::proto::sapphillon::v1::WorkflowCode as ProtoWorkflowCode;
 use sapphillon_core::proto::sapphillon::v1::{
-    WorkflowResult as ProtoWorkflowResult,
-    PluginPackage as ProtoPluginPackage,
+    AllowedPermission as ProtoAllowedPermission, Permission as ProtoPermission,
 };
-use crate::entity::permission::Model as EntityPermission;
-use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
-use crate::entity::plugin_package::Model as EntityPluginPackage;
-use super::plugin_code::plugin_package_to_proto;
-use sapphillon_core::proto::sapphillon::v1::{
-    AllowedPermission as ProtoAllowedPermission,
-    Permission as ProtoPermission,
-};
-use std::collections::HashMap;
+use sapphillon_core::proto::sapphillon::v1::WorkflowResult as ProtoWorkflowResult;
 use serde_json;
+use std::collections::HashMap;
 
 /// Convert an entity `workflow_code::Model` into the corresponding
 /// proto `WorkflowCode` message.
@@ -41,12 +37,13 @@ use serde_json;
 /// resolution or implicit conversions.
 pub fn workflow_code_to_proto(entity: &EntityWorkflowCode) -> ProtoWorkflowCode {
     // Map optional created_at (chrono::DateTime<Utc>) to protobuf Timestamp
-    let created_at = entity.created_at.map(|dt| {
-        sapphillon_core::proto::google::protobuf::Timestamp {
-            seconds: dt.timestamp(),
-            nanos: dt.timestamp_subsec_nanos() as i32,
-        }
-    });
+    let created_at =
+        entity
+            .created_at
+            .map(|dt| sapphillon_core::proto::google::protobuf::Timestamp {
+                seconds: dt.timestamp(),
+                nanos: dt.timestamp_subsec_nanos() as i32,
+            });
 
     ProtoWorkflowCode {
         id: entity.id.clone(),
@@ -86,7 +83,7 @@ pub fn workflow_code_to_proto_with_relations(
         // convert entity plugin packages into proto messages
         p.plugin_packages = pp_entities
             .iter()
-            .map(|e| plugin_package_to_proto(e))
+            .map(plugin_package_to_proto)
             .collect();
     }
 
@@ -132,7 +129,7 @@ pub fn allowed_permissions_to_proto(
         };
 
         map.entry(perm.plugin_function_id.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(proto_perm);
     }
 
@@ -153,10 +150,10 @@ pub fn allowed_permissions_to_proto(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity::workflow_code::Model as EntityWorkflowCode;
-    use crate::entity::plugin_package::Model as EntityPluginPackage;
-    use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
     use crate::entity::permission::Model as EntityPermission;
+    use crate::entity::plugin_package::Model as EntityPluginPackage;
+    use crate::entity::workflow_code::Model as EntityWorkflowCode;
+    use crate::entity::workflow_code_allowed_permission::Model as EntityWCAllowed;
     use sapphillon_core::proto::sapphillon::v1::{PermissionLevel, PermissionType};
 
     #[test]

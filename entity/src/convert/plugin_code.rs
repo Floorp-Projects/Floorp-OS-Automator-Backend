@@ -16,27 +16,33 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::entity::plugin_package::Model as EntityPluginPackage;
-use crate::entity::plugin_function::Model as EntityPluginFunction;
 use crate::entity::permission::Model as EntityPermission;
+use crate::entity::plugin_function::Model as EntityPluginFunction;
+use crate::entity::plugin_package::Model as EntityPluginPackage;
 
-use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
-use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
 use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
+use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
+use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
 
 /// Convert an entity `plugin_package::Model` into the proto `PluginPackage`.
 /// This does not attach related `functions` by default; use the "with_relations"
 /// variant when the caller has already loaded related records.
 pub fn plugin_package_to_proto(entity: &EntityPluginPackage) -> ProtoPluginPackage {
-    let installed_at = entity.installed_at.map(|dt| sapphillon_core::proto::google::protobuf::Timestamp {
-        seconds: dt.timestamp(),
-        nanos: dt.timestamp_subsec_nanos() as i32,
-    });
+    let installed_at =
+        entity
+            .installed_at
+            .map(|dt| sapphillon_core::proto::google::protobuf::Timestamp {
+                seconds: dt.timestamp(),
+                nanos: dt.timestamp_subsec_nanos() as i32,
+            });
 
-    let updated_at = entity.updated_at.map(|dt| sapphillon_core::proto::google::protobuf::Timestamp {
-        seconds: dt.timestamp(),
-        nanos: dt.timestamp_subsec_nanos() as i32,
-    });
+    let updated_at =
+        entity
+            .updated_at
+            .map(|dt| sapphillon_core::proto::google::protobuf::Timestamp {
+                seconds: dt.timestamp(),
+                nanos: dt.timestamp_subsec_nanos() as i32,
+            });
 
     ProtoPluginPackage {
         package_id: entity.package_id.clone(),
@@ -99,7 +105,9 @@ pub fn permission_to_proto(entity: &EntityPermission) -> ProtoPermission {
         None => Vec::new(),
     };
 
-    let level = entity.level.unwrap_or(sapphillon_core::proto::sapphillon::v1::PermissionLevel::Unspecified as i32);
+    let level = entity
+        .level
+        .unwrap_or(sapphillon_core::proto::sapphillon::v1::PermissionLevel::Unspecified as i32);
 
     ProtoPermission {
         display_name: entity.display_name.clone().unwrap_or_default(),
@@ -113,10 +121,10 @@ pub fn permission_to_proto(entity: &EntityPermission) -> ProtoPermission {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entity::plugin_package::Model as EntityPluginPackage;
-    use crate::entity::plugin_function::Model as EntityPluginFunction;
     use crate::entity::permission::Model as EntityPermission;
-    use sapphillon_core::proto::sapphillon::v1::{PluginFunction as ProtoPluginFunction, Permission as ProtoPermission};
+    use crate::entity::plugin_function::Model as EntityPluginFunction;
+    use crate::entity::plugin_package::Model as EntityPluginPackage;
+    
 
     #[test]
     fn converts_minimal_package() {
@@ -160,7 +168,9 @@ mod tests {
             description: Some("desc".to_string()),
             r#type: sapphillon_core::proto::sapphillon::v1::PermissionType::FilesystemRead as i32,
             resource_json: Some("[\"secrets/x\"]".to_string()),
-            level: Some(sapphillon_core::proto::sapphillon::v1::PermissionLevel::Unspecified as i32),
+            level: Some(
+                sapphillon_core::proto::sapphillon::v1::PermissionLevel::Unspecified as i32,
+            ),
         };
 
         let proto_perm = permission_to_proto(&perm_entity);
