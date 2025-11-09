@@ -961,6 +961,7 @@ dependencies = [
  "prost-types",
  "sapphillon_core",
  "sea-orm",
+ "serde_json",
  "tokio",
  "uuid",
 ]
