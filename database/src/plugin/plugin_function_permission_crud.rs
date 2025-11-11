@@ -455,7 +455,10 @@ mod tests {
         }
 
         found_permissions.sort();
-        assert_eq!(found_permissions, vec![("funcA".to_string(), 11), ("funcB".to_string(), 12)]);
+        assert_eq!(
+            found_permissions,
+            vec![("funcA".to_string(), 11), ("funcB".to_string(), 12)]
+        );
 
         Ok(())
     }

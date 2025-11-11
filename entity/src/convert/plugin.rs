@@ -118,7 +118,6 @@ pub fn permission_to_proto(entity: &EntityPermission) -> ProtoPermission {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,8 +190,14 @@ mod tests {
             internal_plugin: Some(true),
             verified: Some(true),
             deprecated: Some(false),
-            installed_at: Some(Timestamp { seconds: 1_726_000_000, nanos: 123_000_000 }),
-            updated_at: Some(Timestamp { seconds: 1_726_000_001, nanos: 987_000_000 }),
+            installed_at: Some(Timestamp {
+                seconds: 1_726_000_000,
+                nanos: 123_000_000,
+            }),
+            updated_at: Some(Timestamp {
+                seconds: 1_726_000_001,
+                nanos: 987_000_000,
+            }),
         };
 
         // We only have entity->proto helpers here; ensure plugin_package_to_proto consumes entity fields correctly
@@ -214,7 +219,13 @@ mod tests {
         assert_eq!(out.package_id, entity.package_id);
         assert_eq!(out.package_name, entity.package_name);
         assert_eq!(out.package_version, entity.package_version);
-        assert_eq!(out.description, entity.description.clone().unwrap_or_default());
-        assert_eq!(out.plugin_store_url, entity.plugin_store_url.clone().unwrap_or_default());
+        assert_eq!(
+            out.description,
+            entity.description.clone().unwrap_or_default()
+        );
+        assert_eq!(
+            out.plugin_store_url,
+            entity.plugin_store_url.clone().unwrap_or_default()
+        );
     }
 }

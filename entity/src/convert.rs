@@ -17,17 +17,17 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod model;
-pub mod plugin_code;
 pub mod plugin;
+pub mod plugin_code;
 pub mod provider;
 pub mod workflow_code;
 
 #[allow(unused)]
 pub use model::*;
 #[allow(unused)]
-pub use plugin_code::*;
-#[allow(unused)]
 pub use plugin::*;
+#[allow(unused)]
+pub use plugin_code::*;
 #[allow(unused)]
 pub use provider::*;
 #[allow(unused)]
