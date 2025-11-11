@@ -249,10 +249,7 @@ impl ProviderService for MyProviderService {
                 .map_err(Self::map_db_error)?;
 
         let returned_count = providers.len();
-        let providers = providers
-            .into_iter()
-            .map(Self::sanitize_provider)
-            .collect();
+        let providers = providers.into_iter().map(Self::sanitize_provider).collect();
 
         let response = ListProvidersResponse {
             providers,

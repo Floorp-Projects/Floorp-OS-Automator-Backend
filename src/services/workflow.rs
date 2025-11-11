@@ -132,11 +132,7 @@ impl MyWorkflowService {
                 "workflow_code" => desired.workflow_code = incoming.workflow_code.clone(),
                 "workflow_results" => desired.workflow_results = incoming.workflow_results.clone(),
                 "updated_at" => desired.updated_at = incoming.updated_at,
-                "created_at" => {
-                    desired.created_at = incoming
-                        .created_at
-                        .or(existing.created_at)
-                }
+                "created_at" => desired.created_at = incoming.created_at.or(existing.created_at),
                 other => {
                     return Err(Status::invalid_argument(format!(
                         "unsupported update_mask path: {other}"
@@ -675,9 +671,7 @@ impl WorkflowService for MyWorkflowService {
                 .workflow_code
                 .iter_mut()
                 .find(|code| code.id == *code_id)
-                .ok_or_else(|| {
-                    Status::not_found(format!("workflow code '{code_id}' not found"))
-                })?
+                .ok_or_else(|| Status::not_found(format!("workflow code '{code_id}' not found")))?
         } else {
             workflow
                 .workflow_code

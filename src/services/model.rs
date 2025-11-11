@@ -156,7 +156,8 @@ impl ModelService for MyModelService {
         );
 
         let mut model = incoming;
-        self.ensure_provider_exists(&provider_name_requested).await?;
+        self.ensure_provider_exists(&provider_name_requested)
+            .await?;
         model.provider_name = provider_name_requested.clone();
 
         let model_name = if has_custom_name {
