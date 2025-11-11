@@ -38,7 +38,19 @@ pub(crate) async fn create_plugin_function_permission(
     db: &DatabaseConnection,
     pfp: plugin_function_permission::Model,
 ) -> Result<(), DbErr> {
-    let active: plugin_function_permission::ActiveModel = pfp.into();
+    // The entity's `Model` contains an `id: i32` field which may be 0 in
+    // tests. If we convert the model directly into an ActiveModel the id
+    // will be treated as a set value and an explicit `0` may cause
+    // UNIQUE constraint violations on `id` for subsequent inserts. To
+    // ensure the database assigns the autoincremented primary key, build
+    // the ActiveModel explicitly and leave `id` as NotSet so SQLite will
+    // generate the value.
+    use sea_orm::ActiveValue::{NotSet, Set};
+    let active = plugin_function_permission::ActiveModel {
+        id: NotSet,
+        plugin_function_id: Set(pfp.plugin_function_id),
+        permission_id: Set(pfp.permission_id),
+    };
     active.insert(db).await?;
     Ok(())
 }

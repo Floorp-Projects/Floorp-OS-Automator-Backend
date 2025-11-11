@@ -204,13 +204,13 @@ mod tests {
 	}
 
 	async fn link_permission(db: &DatabaseConnection, func_id: &str, perm_id: &str) -> Result<(), sea_orm::DbErr> {
-		let pfp = entity::entity::plugin_function_permission::Model {
-			id: 0,
-			plugin_function_id: func_id.to_string(),
-			permission_id: perm_id.to_string(),
-		};
-		let active: entity::entity::plugin_function_permission::ActiveModel = pfp.into();
-		active.insert(db).await?;
+			use sea_orm::ActiveValue::{NotSet, Set};
+			let active = entity::entity::plugin_function_permission::ActiveModel {
+				id: NotSet,
+				plugin_function_id: Set(func_id.to_string()),
+				permission_id: Set(perm_id.to_string()),
+			};
+			active.insert(db).await?;
 		Ok(())
 	}
 
