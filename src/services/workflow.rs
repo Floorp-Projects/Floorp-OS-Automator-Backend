@@ -102,7 +102,11 @@ impl MyWorkflowService {
             .trim()
             .to_string();
         if name.len() > MAX_DISPLAY_NAME_LEN {
-            name.truncate(MAX_DISPLAY_NAME_LEN);
+            let mut index = MAX_DISPLAY_NAME_LEN;
+            while !name.is_char_boundary(index) {
+                index -= 1;
+            }
+            name.truncate(index);
         }
         name
     }
@@ -571,6 +575,7 @@ impl WorkflowService for MyWorkflowService {
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
         let now_ts = Self::now_timestamp();
 
+        // TODO: generate display_name from prompt by ai
         let workflow = Workflow {
             id: workflow_id,
             display_name: Self::derive_display_name(&req.prompt),
