@@ -32,28 +32,7 @@ use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
 /// The returned entity only contains scalar fields present on the package table.
 /// Related records (e.g. plugin functions) must be handled separately by the caller.
 pub fn proto_to_plugin_package(proto: &ProtoPluginPackage) -> EntityPluginPackage {
-    let installed_at = proto
-        .installed_at
-        .as_ref()
-        .and_then(proto_timestamp_to_datetime);
-
-    let updated_at = proto
-        .updated_at
-        .as_ref()
-        .and_then(proto_timestamp_to_datetime);
-
-    EntityPluginPackage {
-        package_id: proto.package_id.clone(),
-        package_name: proto.package_name.clone(),
-        package_version: proto.package_version.clone(),
-        description: proto_string_to_option(&proto.description),
-        plugin_store_url: proto_string_to_option(&proto.plugin_store_url),
-        internal_plugin: proto.internal_plugin.unwrap_or(false),
-        verified: proto.verified.unwrap_or(false),
-        deprecated: proto.deprecated.unwrap_or(false),
-        installed_at,
-        updated_at,
-    }
+    proto.into()
 }
 
 /// Convert a protobuf `PluginFunction` into the entity model.
@@ -65,14 +44,7 @@ pub fn proto_to_plugin_function(
     proto: &ProtoPluginFunction,
     package_id: impl Into<String>,
 ) -> EntityPluginFunction {
-    EntityPluginFunction {
-        function_id: proto.function_id.clone(),
-        package_id: package_id.into(),
-        function_name: proto.function_name.clone(),
-        description: proto_string_to_option(&proto.description),
-        arguments: proto_string_to_option(&proto.arguments),
-        returns: proto_string_to_option(&proto.returns),
-    }
+    (proto, package_id.into()).into()
 }
 
 /// Convert a protobuf `Permission` into the entity model.
@@ -123,6 +95,58 @@ pub use crate::convert::plugin::{
     permission_to_proto, plugin_function_to_proto, plugin_package_to_proto,
     plugin_package_to_proto_with_functions,
 };
+
+impl From<&ProtoPluginPackage> for EntityPluginPackage {
+    fn from(proto: &ProtoPluginPackage) -> Self {
+        let installed_at = proto
+            .installed_at
+            .as_ref()
+            .and_then(proto_timestamp_to_datetime);
+
+        let updated_at = proto
+            .updated_at
+            .as_ref()
+            .and_then(proto_timestamp_to_datetime);
+
+        EntityPluginPackage {
+            package_id: proto.package_id.clone(),
+            package_name: proto.package_name.clone(),
+            package_version: proto.package_version.clone(),
+            description: proto_string_to_option(&proto.description),
+            plugin_store_url: proto_string_to_option(&proto.plugin_store_url),
+            internal_plugin: proto.internal_plugin.unwrap_or(false),
+            verified: proto.verified.unwrap_or(false),
+            deprecated: proto.deprecated.unwrap_or(false),
+            installed_at,
+            updated_at,
+        }
+    }
+}
+
+impl From<ProtoPluginPackage> for EntityPluginPackage {
+    fn from(proto: ProtoPluginPackage) -> Self {
+        EntityPluginPackage::from(&proto)
+    }
+}
+
+impl From<(&ProtoPluginFunction, String)> for EntityPluginFunction {
+    fn from((proto, package_id): (&ProtoPluginFunction, String)) -> Self {
+        EntityPluginFunction {
+            function_id: proto.function_id.clone(),
+            package_id,
+            function_name: proto.function_name.clone(),
+            description: proto_string_to_option(&proto.description),
+            arguments: proto_string_to_option(&proto.arguments),
+            returns: proto_string_to_option(&proto.returns),
+        }
+    }
+}
+
+impl From<(&ProtoPluginFunction, &str)> for EntityPluginFunction {
+    fn from((proto, package_id): (&ProtoPluginFunction, &str)) -> Self {
+        (proto, package_id.to_string()).into()
+    }
+}
 
 pub fn proto_string_to_option(value: &str) -> Option<String> {
     if value.is_empty() {
@@ -263,6 +287,12 @@ mod tests {
             entity.updated_at.unwrap().timestamp(),
             proto.updated_at.as_ref().unwrap().seconds
         );
+
+        let from_ref: EntityPluginPackage = (&proto).into();
+        assert_eq!(from_ref, entity);
+
+        let from_owned: EntityPluginPackage = proto.clone().into();
+        assert_eq!(from_owned, entity);
     }
 
     #[test]
@@ -284,6 +314,13 @@ mod tests {
         assert_eq!(entity.description.as_deref(), Some("do it"));
         assert_eq!(entity.arguments.as_deref(), Some("{}"));
         assert_eq!(entity.returns.as_deref(), Some("{}"));
+
+        let entity_from_tuple: EntityPluginFunction = (&proto, "pkg1").into();
+        assert_eq!(entity_from_tuple, entity);
+
+        let entity_from_tuple_string: EntityPluginFunction =
+            (&proto, "pkg1".to_string()).into();
+        assert_eq!(entity_from_tuple_string, entity);
     }
 
     #[test]
