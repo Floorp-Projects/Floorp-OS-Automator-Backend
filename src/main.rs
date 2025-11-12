@@ -17,10 +17,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 mod args;
+mod init;
 mod server;
 mod services;
 mod workflow;
-mod init;
 
 #[allow(unused)]
 mod global;
@@ -74,7 +74,6 @@ async fn main() -> Result<()> {
     }
     // END
 
-
     // Check db_url
     info!("Using database URL: {}", args.db_url);
     if args.db_url == "sqlite:memory:" {
@@ -86,12 +85,9 @@ async fn main() -> Result<()> {
 
     match args.command {
         Command::Start => {
-
             // Initialize system (migrations, etc.)
-            
-                init::initialize_system(&args).await?;
-           
 
+            init::initialize_system(&args).await?;
 
             // Start server in a background task
             let server_handle = tokio::spawn(async {
