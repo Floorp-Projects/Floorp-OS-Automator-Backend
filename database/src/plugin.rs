@@ -20,6 +20,7 @@ pub mod plugin_function_crud;
 pub mod plugin_function_permission_crud;
 pub mod plugin_package_crud;
 
+
 use sea_orm::{DatabaseConnection, DbErr};
 
 // entity models are converted via helpers in `entity::convert::plugin_code`.
@@ -101,11 +102,220 @@ pub async fn list_plugins(
     Ok((out, token))
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct PermissionKey {
+    plugin_function_id: String,
+    display_name: Option<String>,
+    description: Option<String>,
+    permission_type: i32,
+    resource_json: Option<String>,
+    level: Option<i32>,
+}
+
+impl From<&entity::entity::permission::Model> for PermissionKey {
+    fn from(model: &entity::entity::permission::Model) -> Self {
+        Self {
+            plugin_function_id: model.plugin_function_id.clone(),
+            display_name: model.display_name.clone(),
+            description: model.description.clone(),
+            permission_type: model.r#type,
+            resource_json: model.resource_json.clone(),
+            level: model.level,
+        }
+    }
+}
+
+pub async fn init_register_plugins(
+    db: &DatabaseConnection,
+    plugins: Vec<ProtoPluginPackage>,
+) -> Result<(), DbErr> {
+    use entity::convert::plugin_code::{
+        proto_to_permission, proto_to_plugin_function, proto_to_plugin_package,
+    };
+    use entity::entity::{permission, plugin_function, plugin_function_permission, plugin_package};
+    use sea_orm::ActiveValue::{NotSet, Set};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
+    use std::collections::{HashMap, HashSet};
+
+    if plugins.is_empty() {
+        return Ok(());
+    }
+
+    let mut package_models: HashMap<String, plugin_package::Model> = HashMap::new();
+    let mut function_models: HashMap<String, plugin_function::Model> = HashMap::new();
+    let mut permission_models: HashMap<PermissionKey, permission::Model> = HashMap::new();
+
+    for pkg_proto in &plugins {
+        let package_model = proto_to_plugin_package(pkg_proto);
+        package_models.insert(package_model.package_id.clone(), package_model.clone());
+
+        for func_proto in &pkg_proto.functions {
+            let function_model =
+                proto_to_plugin_function(func_proto, package_model.package_id.clone());
+            function_models.insert(function_model.function_id.clone(), function_model.clone());
+
+            for perm_proto in &func_proto.permissions {
+                let permission_model =
+                    proto_to_permission(perm_proto, function_model.function_id.clone(), None);
+                let key = PermissionKey::from(&permission_model);
+                permission_models.entry(key).or_insert(permission_model);
+            }
+        }
+    }
+
+    let package_ids: Vec<String> = package_models.keys().cloned().collect();
+    let function_ids: Vec<String> = function_models.keys().cloned().collect();
+    let package_values: Vec<plugin_package::Model> = package_models.into_values().collect();
+    let function_values: Vec<plugin_function::Model> = function_models.into_values().collect();
+    let permission_entries: Vec<(PermissionKey, permission::Model)> =
+        permission_models.into_iter().collect();
+
+    let txn = db.begin().await?;
+
+    if !package_values.is_empty() {
+        let existing_packages = plugin_package::Entity::find()
+            .filter(plugin_package::Column::PackageId.is_in(package_ids.clone()))
+            .all(&txn)
+            .await?;
+        let existing_package_ids: HashSet<String> = existing_packages
+            .into_iter()
+            .map(|pkg| pkg.package_id)
+            .collect();
+
+        let packages_to_insert: Vec<plugin_package::Model> = package_values
+            .into_iter()
+            .filter(|pkg| !existing_package_ids.contains(&pkg.package_id))
+            .collect();
+
+        if !packages_to_insert.is_empty() {
+            let active_packages: Vec<plugin_package::ActiveModel> = packages_to_insert
+                .into_iter()
+                .map(plugin_package::ActiveModel::from)
+                .collect();
+
+            plugin_package::Entity::insert_many(active_packages)
+                .exec(&txn)
+                .await?;
+        }
+    }
+
+    if !function_values.is_empty() {
+        let existing_functions = plugin_function::Entity::find()
+            .filter(plugin_function::Column::FunctionId.is_in(function_ids.clone()))
+            .all(&txn)
+            .await?;
+        let existing_function_ids: HashSet<String> = existing_functions
+            .into_iter()
+            .map(|func| func.function_id)
+            .collect();
+
+        let functions_to_insert: Vec<plugin_function::Model> = function_values
+            .into_iter()
+            .filter(|func| !existing_function_ids.contains(&func.function_id))
+            .collect();
+
+        if !functions_to_insert.is_empty() {
+            let active_functions: Vec<plugin_function::ActiveModel> = functions_to_insert
+                .into_iter()
+                .map(plugin_function::ActiveModel::from)
+                .collect();
+
+            plugin_function::Entity::insert_many(active_functions)
+                .exec(&txn)
+                .await?;
+        }
+    }
+
+    if !function_ids.is_empty() && !permission_entries.is_empty() {
+        let mut existing_permissions: HashMap<PermissionKey, permission::Model> = HashMap::new();
+
+        let found_permissions = permission::Entity::find()
+            .filter(permission::Column::PluginFunctionId.is_in(function_ids.clone()))
+            .all(&txn)
+            .await?;
+        for perm in found_permissions {
+            existing_permissions.insert(PermissionKey::from(&perm), perm);
+        }
+
+        let mut new_permission_models = Vec::new();
+        for (key, model) in &permission_entries {
+            if !existing_permissions.contains_key(key) {
+                new_permission_models.push(model.clone());
+            }
+        }
+
+        if !new_permission_models.is_empty() {
+            let active_permissions: Vec<permission::ActiveModel> = new_permission_models
+                .into_iter()
+                .map(|model| permission::ActiveModel {
+                    id: NotSet,
+                    plugin_function_id: Set(model.plugin_function_id.clone()),
+                    display_name: Set(model.display_name.clone()),
+                    description: Set(model.description.clone()),
+                    r#type: Set(model.r#type),
+                    resource_json: Set(model.resource_json.clone()),
+                    level: Set(model.level),
+                })
+                .collect();
+
+            permission::Entity::insert_many(active_permissions)
+                .exec(&txn)
+                .await?;
+        }
+
+        existing_permissions.clear();
+        let refreshed_permissions = permission::Entity::find()
+            .filter(permission::Column::PluginFunctionId.is_in(function_ids.clone()))
+            .all(&txn)
+            .await?;
+        for perm in refreshed_permissions {
+            existing_permissions.insert(PermissionKey::from(&perm), perm);
+        }
+
+        let existing_links = plugin_function_permission::Entity::find()
+            .filter(
+                plugin_function_permission::Column::PluginFunctionId.is_in(function_ids.clone()),
+            )
+            .all(&txn)
+            .await?;
+
+        let mut link_set: HashSet<(String, String)> = existing_links
+            .into_iter()
+            .map(|link| (link.plugin_function_id, link.permission_id))
+            .collect();
+
+        let mut new_link_models = Vec::new();
+        for (key, _) in &permission_entries {
+            if let Some(permission_model) = existing_permissions.get(key) {
+                let perm_id_str = permission_model.id.to_string();
+                let fn_id = permission_model.plugin_function_id.clone();
+                if link_set.insert((fn_id.clone(), perm_id_str.clone())) {
+                    new_link_models.push(plugin_function_permission::ActiveModel {
+                        id: NotSet,
+                        plugin_function_id: Set(fn_id),
+                        permission_id: Set(perm_id_str),
+                    });
+                }
+            }
+        }
+
+        if !new_link_models.is_empty() {
+            plugin_function_permission::Entity::insert_many(new_link_models)
+                .exec(&txn)
+                .await?;
+        }
+    }
+
+    txn.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use sea_orm::{
-        ActiveModelTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement,
+        ActiveModelTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait,
+        Statement,
     };
 
     async fn setup_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
@@ -256,6 +466,76 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn test_init_register_plugins_registers_data_once() -> Result<(), sea_orm::DbErr> {
+        use sapphillon_core::proto::sapphillon::v1::{
+            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+        };
+
+        let db = setup_db().await?;
+
+        let permission_proto = Permission {
+            display_name: "Network Access".to_string(),
+            description: "Allows outbound requests".to_string(),
+            permission_type: PermissionType::NetAccess as i32,
+            resource: vec!["https://example.com".to_string()],
+            permission_level: PermissionLevel::Medium as i32,
+        };
+
+        let function_proto = PluginFunction {
+            function_id: "pkg.fn".to_string(),
+            function_name: "Fn".to_string(),
+            description: "Example function".to_string(),
+            permissions: vec![permission_proto.clone()],
+            arguments: String::new(),
+            returns: String::new(),
+        };
+
+        let package_proto = PluginPackage {
+            package_id: "pkg".to_string(),
+            package_name: "Pkg".to_string(),
+            package_version: "1.0.0".to_string(),
+            description: "Example package".to_string(),
+            functions: vec![function_proto],
+            plugin_store_url: "builtin".to_string(),
+            internal_plugin: Some(true),
+            verified: Some(true),
+            deprecated: Some(false),
+            installed_at: None,
+            updated_at: None,
+        };
+
+        init_register_plugins(&db, vec![package_proto.clone()]).await?;
+        // Second call should be a no-op
+        init_register_plugins(&db, vec![package_proto]).await?;
+
+        let packages = entity::entity::plugin_package::Entity::find()
+            .all(&db)
+            .await?;
+        assert_eq!(packages.len(), 1);
+        assert_eq!(packages[0].package_id, "pkg");
+
+        let functions = entity::entity::plugin_function::Entity::find()
+            .all(&db)
+            .await?;
+        assert_eq!(functions.len(), 1);
+        assert_eq!(functions[0].function_id, "pkg.fn");
+
+        let permissions = entity::entity::permission::Entity::find().all(&db).await?;
+        assert_eq!(permissions.len(), 1);
+        let permission_id = permissions[0].id;
+        assert_eq!(permissions[0].plugin_function_id, "pkg.fn");
+
+        let links = entity::entity::plugin_function_permission::Entity::find()
+            .all(&db)
+            .await?;
+        assert_eq!(links.len(), 1);
+        let link = &links[0];
+        assert_eq!(link.plugin_function_id, "pkg.fn");
+        assert_eq!(link.permission_id, permission_id.to_string());
+
+        Ok(())
+    }
     #[tokio::test]
     async fn test_list_plugins_includes_function_permissions() -> Result<(), sea_orm::DbErr> {
         let db = setup_db().await?;

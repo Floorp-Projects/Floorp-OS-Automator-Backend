@@ -318,8 +318,7 @@ mod tests {
         let entity_from_tuple: EntityPluginFunction = (&proto, "pkg1").into();
         assert_eq!(entity_from_tuple, entity);
 
-        let entity_from_tuple_string: EntityPluginFunction =
-            (&proto, "pkg1".to_string()).into();
+        let entity_from_tuple_string: EntityPluginFunction = (&proto, "pkg1".to_string()).into();
         assert_eq!(entity_from_tuple_string, entity);
     }
 
