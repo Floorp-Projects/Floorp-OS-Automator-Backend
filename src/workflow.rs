@@ -37,13 +37,13 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
 function get_github_commits(repo, user) {
 const github_search_url = `https://github.com/search?q=author%3A${user}+repo%3A${repo}&type=commits&s=committer-date&o=desc`;
 const tabId = JSON.parse(floorpCreateTab(github_search_url, false)).id;
-let commits_html = floorpTabElement(tabId, 'div.Box-sc-62in7e-0.gwXVXe', 5000);
+let commits_html = floorpTabElement(tabId, 'div.Box-sc-62in7e-0.gwXVXe', 1000000);
 return commits_html;
 }
 
 function get_google_maps_location() {
 const tabId = JSON.parse(floorpCreateTab('https://myactivity.google.com/product/maps', false)).id;
-floorpTabWaitForElement(tabId, 'span.hFYxqd', 5000);
+floorpTabWaitForElement(tabId, 'span.hFYxqd', 1000000);
 let location_html = floorpTabElement(tabId, 'div.vwWeec', 1000000);
 return location_html;
 }
