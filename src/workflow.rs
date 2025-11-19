@@ -30,8 +30,8 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = llm_call(&prompt)?;
     // TODO: insert javascript tool code.
-    let workflow_code = extract_first_code(&workflow_raw)
-        .ok_or_else(|| "No code section found in the response")?;
+    let workflow_code =
+        extract_first_code(&workflow_raw).ok_or_else(|| "No code section found in the response")?;
 
     let prefix_code = r"
 function get_github_commits(repo, user) {
@@ -56,8 +56,8 @@ pub async fn generate_workflow_async(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = _llm_call_async(&prompt).await?;
-    let workflow_code = extract_first_code(&workflow_raw)
-    .ok_or_else(|| "No code section found in the response")?;
+    let workflow_code =
+        extract_first_code(&workflow_raw).ok_or_else(|| "No code section found in the response")?;
 
     let prefix_code = r"
 function get_github_commits(repo, user) {
@@ -270,7 +270,9 @@ fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
-    let workflow = generate_workflow("repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。")?;
+    let workflow = generate_workflow(
+        "repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。",
+    )?;
     println!("{}", workflow);
     Ok(())
 }

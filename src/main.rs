@@ -20,6 +20,7 @@ mod args;
 mod server;
 mod services;
 mod workflow;
+mod utils;
 
 /// System Configuration
 #[allow(unused)]
