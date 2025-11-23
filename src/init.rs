@@ -18,7 +18,7 @@
 
 use crate::GLOBAL_STATE;
 use crate::args::Args;
-use anyhow::Result;
+use anyhow::{Result, Error};
 use migration::MigratorTrait;
 
 #[allow(unused)]
@@ -39,6 +39,43 @@ async fn setup_database() -> Result<()> {
     // Run migrations immediately after setting DB URL so the schema
     // is ready before the server starts accepting requests.
     info!("Running database migrations...");
+    
+    let db_path = match GLOBAL_STATE.async_get_db_url().await {
+        // String starts with "sqlite://"
+        url if url.starts_with("sqlite://") => {
+            // Extract the path after "sqlite://"
+            Some(url.trim_start_matches("sqlite://").to_string())
+        }
+        url if url == "sqlite::memory:" => {
+            // In-memory database
+            Some(":memory:".to_string())
+        }
+
+        _ => {
+            error!("Database migrations are only supported for SQLite databases in this version.");
+            None
+        }
+    };
+    
+    if db_path.is_none() {
+        return Err(anyhow::anyhow!("Unsupported database type for migrations"));
+    }
+    
+    // If DB path is no db files, create the db file
+    if let Some(ref path) = db_path {
+        if path != ":memory:" && !std::path::Path::new(path).exists() {
+            info!("Database file does not exist. Creating new database at: {path}");
+            match std::fs::File::create(path) {
+                Ok(_) => info!("Database file created successfully."),
+                Err(e) => {
+                    error!("Failed to create database file: {e:#?}");
+                    return Err(Error::new(e));
+                }
+            }
+        }
+    }
+
+    
     let database_connection =
         sea_orm::Database::connect(GLOBAL_STATE.async_get_db_url().await.as_str()).await;
     match database_connection {
