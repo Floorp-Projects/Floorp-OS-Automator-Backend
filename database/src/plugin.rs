@@ -20,7 +20,6 @@ pub mod plugin_function_crud;
 pub mod plugin_function_permission_crud;
 pub mod plugin_package_crud;
 
-
 use sea_orm::{DatabaseConnection, DbErr};
 
 // entity models are converted via helpers in `entity::convert::plugin_code`.
@@ -655,7 +654,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_init_register_plugins_updates_on_diff() -> Result<(), sea_orm::DbErr> {
-        use sapphillon_core::proto::sapphillon::v1::{Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage};
+        use sapphillon_core::proto::sapphillon::v1::{
+            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+        };
 
         let db = setup_db().await?;
 
@@ -716,7 +717,10 @@ mod tests {
         // NOTE: current implementation does NOT perform updates, so this assertion reflects
         // desired behavior (update should happen). If this test fails, behavior is the
         // current 'insert-only' semantics.
-        assert_eq!(functions[0].description.as_deref(), Some("Updated description"));
+        assert_eq!(
+            functions[0].description.as_deref(),
+            Some("Updated description")
+        );
 
         let packages = entity::entity::plugin_package::Entity::find()
             .all(&db)

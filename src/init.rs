@@ -18,7 +18,7 @@
 
 use crate::GLOBAL_STATE;
 use crate::args::Args;
-use anyhow::{Result, Error};
+use anyhow::{Error, Result};
 use migration::MigratorTrait;
 
 #[allow(unused)]
@@ -30,7 +30,7 @@ pub async fn initialize_system(args: &Args) -> Result<()> {
 
     // Init Database
     setup_database().await?;
-    
+
     // Register Internal Plugins
     register_internal_plugins().await?;
 
@@ -43,7 +43,7 @@ async fn setup_database() -> Result<()> {
     // Run migrations immediately after setting DB URL so the schema
     // is ready before the server starts accepting requests.
     info!("Running database migrations...");
-    
+
     let db_path = match GLOBAL_STATE.async_get_db_url().await {
         // String starts with "sqlite://"
         url if url.starts_with("sqlite://") => {
@@ -60,11 +60,11 @@ async fn setup_database() -> Result<()> {
             None
         }
     };
-    
+
     if db_path.is_none() {
         return Err(anyhow::anyhow!("Unsupported database type for migrations"));
     }
-    
+
     // If DB path is no db files, create the db file
     if let Some(ref path) = db_path {
         if path != ":memory:" && !std::path::Path::new(path).exists() {
@@ -79,7 +79,6 @@ async fn setup_database() -> Result<()> {
         }
     }
 
-    
     let database_connection =
         sea_orm::Database::connect(GLOBAL_STATE.async_get_db_url().await.as_str()).await;
     match database_connection {
@@ -106,15 +105,13 @@ async fn setup_database() -> Result<()> {
     Ok(())
 }
 
-
 async fn register_internal_plugins() -> Result<()> {
-    use database::plugin::init_register_plugins; 
+    use database::plugin::init_register_plugins;
 
-    let database_connection = 
-        GLOBAL_STATE.get_db_connection().await?;
-    
+    let database_connection = GLOBAL_STATE.get_db_connection().await?;
+
     let plugin_packages = crate::sysconfig::sysconfig().plugin_package;
-    
+
     init_register_plugins(&database_connection, plugin_packages).await?;
 
     Ok(())
