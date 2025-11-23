@@ -337,7 +337,7 @@ mod tests {
         let p = workflow_code_to_proto_with_relations(
             &e,
             None,
-            Some(&[pkg.clone()]),
+            Some(std::slice::from_ref(&pkg)),
             Some(&["pf1".to_string()]),
             Some(&[(wc_allowed, Some(perm_entity))]),
         );
