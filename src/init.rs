@@ -28,7 +28,11 @@ pub async fn initialize_system(args: &Args) -> Result<()> {
     debug!("Initializing system...");
     debug!("Log level set to: {:?}", args.loglevel);
 
+    // Init Database
     setup_database().await?;
+    
+    // Register Internal Plugins
+    register_internal_plugins().await?;
 
     debug!("Initializing Completed.");
     debug!("Global State: {:?}", &GLOBAL_STATE);
@@ -98,6 +102,20 @@ async fn setup_database() -> Result<()> {
             std::process::exit(1);
         }
     }
+
+    Ok(())
+}
+
+
+async fn register_internal_plugins() -> Result<()> {
+    use database::plugin::init_register_plugins; 
+
+    let database_connection = 
+        GLOBAL_STATE.get_db_connection().await?;
+    
+    let plugin_packages = crate::sysconfig::sysconfig().plugin_package;
+    
+    init_register_plugins(&database_connection, plugin_packages).await?;
 
     Ok(())
 }
