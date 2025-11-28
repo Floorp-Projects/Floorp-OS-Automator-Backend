@@ -73,7 +73,7 @@ jobs:
             TAG_NAME="${{ steps.bump.outputs.new_tag }}"
              git commit -m "chore: bump version to $TAG_NAME"
              git push
-             # We also push the tag explicitly if cargo-bump didn't do it, but here we let gh release create handle the tag
+             # Note: We do not push the tag here. The tag is created by the 'gh release create' command below, which attaches the tag to the current commit.
           fi
 
       - name: Create Draft Release
