@@ -70,7 +70,7 @@ jobs:
           git add Cargo.toml
           # Check if there are changes to commit
           if ! git diff-index --quiet HEAD; then
-             TAG_NAME="${{ steps.bump.outputs.new_tag }}"
+            TAG_NAME="${{ steps.bump.outputs.new_tag }}"
              git commit -m "chore: bump version to $TAG_NAME"
              git push
              # We also push the tag explicitly if cargo-bump didn't do it, but here we let gh release create handle the tag
