@@ -203,7 +203,7 @@ jobs:
           gh release edit "$TAG_NAME" --draft=false
 
       - name: Delete Release (Failure)
-        if: needs.build.result != 'success'
+        if: needs.build.result == 'failure'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
