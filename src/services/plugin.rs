@@ -76,10 +76,9 @@ impl PluginService for MyPluginService {
             Some(req.page_token)
         };
 
-        let (plugins, next_token) =
-            list_plugins(&self.db, next_page_token, page_size)
-                .await
-                .map_err(Self::map_db_error)?;
+        let (plugins, next_token) = list_plugins(&self.db, next_page_token, page_size)
+            .await
+            .map_err(Self::map_db_error)?;
 
         let response = ListPluginsResponse {
             plugins,
@@ -94,7 +93,7 @@ impl PluginService for MyPluginService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{Database, DbBackend, ConnectionTrait, Statement};
+    use sea_orm::{ConnectionTrait, Database, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let db = Database::connect("sqlite::memory:").await?;
@@ -183,7 +182,10 @@ mod tests {
             page_token: "".to_string(),
         });
 
-        let resp = service.list_plugins(req).await.expect("list_plugins failed");
+        let resp = service
+            .list_plugins(req)
+            .await
+            .expect("list_plugins failed");
         let inner = resp.into_inner();
         assert!(inner.plugins.is_empty());
         assert!(inner.next_page_token.is_empty());
