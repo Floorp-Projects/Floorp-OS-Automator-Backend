@@ -26,7 +26,6 @@ use log::{debug, error, info, warn};
 use sapphillon_core::permission::{Permissions, PluginFunctionPermissions};
 use sapphillon_core::proto::google::protobuf::Timestamp;
 use sapphillon_core::proto::google::rpc::{Code as RpcCode, Status as RpcStatus};
-use sapphillon_core::proto::sapphillon::v1::run_workflow_request::Source;
 use sapphillon_core::proto::sapphillon::v1::workflow_service_server::WorkflowService;
 use sapphillon_core::proto::sapphillon::v1::{
     AllowedPermission, DeleteWorkflowRequest, DeleteWorkflowResponse, FixWorkflowRequest,
@@ -627,18 +626,17 @@ impl WorkflowService for MyWorkflowService {
         request: Request<RunWorkflowRequest>,
     ) -> Result<Response<RunWorkflowResponse>, Status> {
         let req = request.into_inner();
-        let mut persist_results = false;
-        let mut target_code_id: Option<String> = None;
+        let persist_results = true;
+        let target_code_id: Option<String>;
 
-        let source_label = match &req.source {
-            Some(Source::ById(_)) => "by_id",
-            Some(Source::WorkflowDefinition(_)) => "definition",
+        let source_label = match &req.by_id {
+            Some(_) => "by_id",
             None => "missing",
         };
         info!("run_workflow request received: source={source_label}");
 
-        let mut workflow = match req.source {
-            Some(Source::ById(by_id)) => {
+        let mut workflow = match req.by_id {
+            Some(by_id) => {
                 if by_id.workflow_id.trim().is_empty() {
                     return Err(Status::invalid_argument("workflow_id must not be empty"));
                 }
@@ -647,7 +645,6 @@ impl WorkflowService for MyWorkflowService {
                         "workflow_code_id must not be empty",
                     ));
                 }
-                persist_results = true;
                 target_code_id = Some(by_id.workflow_code_id.clone());
                 get_workflow_by_id(&self.db, &by_id.workflow_id)
                     .await
@@ -655,10 +652,9 @@ impl WorkflowService for MyWorkflowService {
                         Self::map_not_found(err, format!("workflow '{}'", by_id.workflow_id))
                     })?
             }
-            Some(Source::WorkflowDefinition(workflow)) => workflow,
             None => {
                 return Err(Status::invalid_argument(
-                    "RunWorkflowRequest.source is required (ById or WorkflowDefinition)",
+                    "RunWorkflowRequest.by_id is required",
                 ));
             }
         };
