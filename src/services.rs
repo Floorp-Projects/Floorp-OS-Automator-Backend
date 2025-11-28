@@ -19,11 +19,13 @@
 // Service root module
 
 mod model;
+mod plugin;
 mod provider;
 mod version;
 mod workflow;
 
 pub use model::*;
+pub use plugin::*;
 pub use provider::*;
 pub use version::*;
 pub use workflow::*;
