@@ -35,7 +35,11 @@ pub fn sysconfig() -> SysConfig {
             core_filesystem_plugin_package(),
             core_floorp_plugin_package(),
         ],
-        plugin_package: vec![fetch_plugin_package(), filesystem_plugin_package(), floorp_plugin_package()],
+        plugin_package: vec![
+            fetch_plugin_package(),
+            filesystem_plugin_package(),
+            floorp_plugin_package(),
+        ],
     }
 }
 

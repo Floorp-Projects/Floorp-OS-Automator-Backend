@@ -157,7 +157,8 @@ fn op2_filesystem_write(
 }
 
 fn write_file_text_filesystem_write(path: &str, content: &str) -> anyhow::Result<()> {
-    fs::write(path, content)?;
+    let unescaped_content = unescaper::unescape(content)?;
+    fs::write(path, unescaped_content)?;
     Ok(())
 }
 
@@ -286,6 +287,17 @@ mod tests {
         assert_eq!(s, "written-content");
     }
 
+    #[test]
+    fn test_write_file_unescape_text() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let path = tmp.path().to_str().unwrap().to_string();
+        // Write a string with escaped newline and tab
+        let res = write_file_text_filesystem_write(&path, "line1\\nline2\\tend");
+        assert!(res.is_ok());
+        let s = std::fs::read_to_string(&path).unwrap();
+        // Should be unescaped: actual newlines and tabs
+        assert_eq!(s, "line1\nline2\tend");
+    }
     #[test]
     fn test_permission_in_workflow() {
         // Create a platform-appropriate temp path and write the file

@@ -29,8 +29,26 @@ use async_openai::{
 pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = llm_call(&prompt)?;
-    let workflow_code = extract_first_code(&workflow_raw);
-    workflow_code.ok_or_else(|| "No code section found in the response".into())
+    // TODO: insert javascript tool code.
+    let workflow_code =
+        extract_first_code(&workflow_raw).ok_or_else(|| "No code section found in the response")?;
+
+    let prefix_code = r"
+function get_github_commits(repo, user) {
+const github_search_url = `https://github.com/search?q=author%3A${user}+repo%3A${repo}&type=commits&s=committer-date&o=desc`;
+const tabId = JSON.parse(floorpCreateTab(github_search_url, false)).id;
+let commits_html = floorpTabElement(tabId, 'div.Box-sc-62in7e-0.gwXVXe', 1000000);
+return commits_html;
+}
+
+function get_google_maps_location() {
+const tabId = JSON.parse(floorpCreateTab('https://myactivity.google.com/product/maps', false)).id;
+floorpTabWaitForElement(tabId, 'span.hFYxqd', 1000000);
+let location_html = floorpTabElement(tabId, 'div.vwWeec', 1000000);
+return location_html;
+}
+";
+    Ok(format!("{prefix_code}{workflow_code}"))
 }
 
 pub async fn generate_workflow_async(
@@ -38,13 +56,30 @@ pub async fn generate_workflow_async(
 ) -> Result<String, Box<dyn std::error::Error>> {
     let prompt = generate_prompt(user_query)?;
     let workflow_raw = _llm_call_async(&prompt).await?;
-    let workflow_code = extract_first_code(&workflow_raw);
-    workflow_code.ok_or_else(|| "No code section found in the response".into())
+    let workflow_code =
+        extract_first_code(&workflow_raw).ok_or_else(|| "No code section found in the response")?;
+
+    let prefix_code = r"
+function get_github_commits(repo, user) {
+const github_search_url = `https://github.com/search?q=author%3A${user}+repo%3A${repo}&type=commits&s=committer-date&o=desc`;
+const tabId = JSON.parse(floorpCreateTab(github_search_url, false)).id;
+let commits_html = floorpTabElement(tabId, 'div.Box-sc-62in7e-0.gwXVXe', 5000);
+return commits_html;
+}
+
+function get_google_maps_location() {
+const tabId = JSON.parse(floorpCreateTab('https://myactivity.google.com/product/maps', false)).id;
+floorpTabWaitForElement(tabId, 'span.hFYxqd', 5000);
+let location_html = floorpTabElement(tabId, 'div.vwWeec', 1000000);
+return location_html;
+}";
+    Ok(format!("{prefix_code}{workflow_code}"))
 }
 
 #[allow(dead_code)]
 fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let language = "ja-JP";
     let prompt = format!(
         r#"
     ## System
@@ -62,7 +97,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ### 出力ルール
     - 出力は必ず ```javascript``` タグで囲まれた **Javascript Codeのみ**とする。
     - `workflow()` 関数は **定義のみ** を行い、その中に全てのロジックを記述する（関数の外に処理を記述しない）。
-    - 実際の関数呼び出しや実行結果の表示は行わない。
+    - **実際の関数呼び出しや実行結果の表示は行わない。**
     - 各ステップにおいて **コメントで意図や処理内容を説明** すること。
     - 必要に応じて例外処理を入れることで、失敗時の理由を明確にする。
     - 実行結果の出力はすべてconsole.log()を使用すること。
@@ -91,9 +126,13 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ### 利用可能なTool
     - `fetch(url: str) -> str`
     - `console.log(str) -> stdout`
+    - `writeFile(path: str, content: str)`
+    - `get_github_commits(repo: str, user: str) -> str`
+    - `get_google_maps_location() -> str`
     ---
 
     ### 出力例
+    #### 例1: 天気情報の取得
     ```javascript
     function workflow() {{
         const url = "https://api.example.com/data";
@@ -130,10 +169,23 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
         }}
     }}
     ```
+    #### 例2: GitHub コミット履歴の取得
+    ```javascript
+    function workflow() {{
+        const repo = 'Walkmana-25/Sapphillon';
+        const user = 'Walkmana-25';
+        let commits_html = get_github_commits(repo, user);
+        let location_html = get_google_maps_location();
+        let url = 'http://host.docker.internal:5050/generate?q=' +  encodeURIComponent(`${{commits_html}}\n\n${{location_html}}\n\n上記のGitHubのコミット履歴とGoogleマップの行動履歴から、その人の作業日報を作成してください。`);
+        let llm_res = fetch(url);
+        writeFile('./example/nippou_result.txt', llm_res);
+        console.log(llm_res);
+    }}
+    ```
     ## User
     User Query(Task):
     - {user_query}
-    - 使用言語: ja-JP
+    - 使用言語: {language}
     "#
     );
     Ok(prompt)
@@ -219,7 +271,9 @@ fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
 
 // #[test]
 // fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
-//     let workflow = generate_workflow("今日の天気はなんですか?")?;
+//     let workflow = generate_workflow(
+//         "repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。",
+//     )?;
 //     println!("{}", workflow);
 //     Ok(())
 // }

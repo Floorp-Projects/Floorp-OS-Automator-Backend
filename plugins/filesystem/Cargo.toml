@@ -15,3 +15,4 @@ deno_error.workspace = true
 log.workspace = true
 sapphillon_core.workspace = true
 tempfile = "3"
+unescaper = "0.1.6"
