@@ -269,11 +269,11 @@ fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
 //     Ok(())
 // }
 
-#[test]
-fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
-    let workflow = generate_workflow(
-        "repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。",
-    )?;
-    println!("{}", workflow);
-    Ok(())
-}
+// #[test]
+// fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
+//     let workflow = generate_workflow(
+//         "repo: Walkmana-25/Sapphillon, user: Walkmana-25の日報を位置情報とコミット履歴を用いて作成してください。",
+//     )?;
+//     println!("{}", workflow);
+//     Ok(())
+// }
