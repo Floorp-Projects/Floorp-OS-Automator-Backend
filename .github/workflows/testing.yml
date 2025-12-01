@@ -3,8 +3,8 @@ name: Rust Testing
 
 on:
   pull_request:
-  push:
-    branches: [ main ]
+  # push:
+  #   branches: [ main ]
   workflow_dispatch:
   workflow_call:    
     secrets:
@@ -21,7 +21,7 @@ jobs:
     needs: ["check"]
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2404, macos-latest, blacksmith-4vcpu-windows-2025]
+        os: [blacksmith-2vcpu-ubuntu-2404, macos-latest, blacksmith-4vcpu-windows-2025]
     steps:
       - uses: actions/checkout@v5
       
