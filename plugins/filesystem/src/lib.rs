@@ -29,6 +29,17 @@ pub fn filesystem_read_plugin_function() -> PluginFunction {
     }
 }
 
+pub fn filesystem_list_files_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.filesystem.list_files".to_string(),
+        function_name: "fs.list".to_string(),
+        description: "List files in a directory.".to_string(),
+        permissions: filesystem_list_files_plugin_permissions(),
+        arguments: "String: path".to_string(),
+        returns: "String: content".to_string(),
+    }
+}
+
 pub fn filesystem_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.filesystem".to_string(),
@@ -37,6 +48,7 @@ pub fn filesystem_plugin_package() -> PluginPackage {
         functions: vec![
             filesystem_read_plugin_function(),
             filesystem_write_plugin_function(),
+            filesystem_list_files_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -59,6 +71,16 @@ pub fn core_filesystem_read_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_filesystem_list_files_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.filesystem.list_files".to_string(),
+        "ListFiles".to_string(),
+        "List files in a directory.".to_string(),
+        op2_filesystem_list_files(),
+        Some(include_str!("00_filesystem.js").to_string()),
+    )
+}
+
 pub fn core_filesystem_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.filesystem".to_string(),
@@ -66,6 +88,7 @@ pub fn core_filesystem_plugin_package() -> CorePluginPackage {
         vec![
             core_filesystem_read_plugin(),
             core_filesystem_write_plugin(),
+            core_filesystem_list_files_plugin(),
         ],
     )
 }
@@ -159,6 +182,79 @@ fn op2_filesystem_write(
     }
 }
 
+fn _permission_check_backend_filesystem_list_files(
+    allow: Vec<PluginFunctionPermissions>,
+    path: String,
+) -> Result<(), JsErrorBox> {
+    let mut perm = filesystem_list_files_plugin_permissions();
+    perm[0].resource = vec![path.clone()];
+    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
+
+    let allowed_permissions = {
+        let permissions_vec = allow;
+
+        permissions_vec
+            .into_iter()
+            .find(|p| {
+                p.plugin_function_id == filesystem_list_files_plugin_function().function_id
+                    || p.plugin_function_id == "*"
+            })
+            .map(|p| p.permissions)
+            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
+                permissions: vec![],
+            })
+    };
+
+    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
+
+    match permission_check_result {
+        CheckPermissionResult::Ok => Ok(()),
+        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
+            "PermissionDenied. Missing Permissions:",
+            perm.to_string(),
+        )),
+    }
+}
+
+fn permission_check_filesystem_list_files(
+    state: &mut OpState,
+    path: String,
+) -> Result<(), JsErrorBox> {
+    let data = state
+        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
+        .lock()
+        .unwrap();
+    let allowed = match &data.get_allowed_permissions() {
+        Some(p) => p,
+        None => &vec![],
+    };
+    _permission_check_backend_filesystem_list_files(allowed.clone(), path)?;
+    Ok(())
+}
+
+#[op2]
+#[string]
+fn op2_filesystem_list_files(
+    state: &mut OpState,
+    #[string] path: String,
+) -> std::result::Result<String, JsErrorBox> {
+    // Permission check
+    permission_check_filesystem_list_files(state, path.clone())?;
+
+    match list_files_in_directory(&path) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(JsErrorBox::new("Error", e.to_string())),
+    }
+}
+
+fn list_files_in_directory(path: &str) -> anyhow::Result<String> {
+    let paths = fs::read_dir(path)?;
+    let files: Vec<String> = paths
+        .map(|res| res.map(|e| e.path().display().to_string()))
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    Ok(serde_json::to_string(&files)?)
+}
+
 fn write_file_text_filesystem_write(path: &str, content: &str) -> anyhow::Result<()> {
     fs::write(path, content)?;
     Ok(())
@@ -169,6 +265,16 @@ fn filesystem_write_plugin_permissions() -> Vec<Permission> {
         display_name: "Filesystem Write".to_string(),
         description: "Allows the plugin to write files to the local filesystem.".to_string(),
         permission_type: PermissionType::FilesystemWrite as i32,
+        permission_level: PermissionLevel::Unspecified as i32,
+        resource: vec![],
+    }]
+}
+
+fn filesystem_list_files_plugin_permissions() -> Vec<Permission> {
+    vec![Permission {
+        display_name: "Filesystem Read".to_string(),
+        description: "Allows the plugin to list files from the local filesystem.".to_string(),
+        permission_type: PermissionType::FilesystemRead as i32,
         permission_level: PermissionLevel::Unspecified as i32,
         resource: vec![],
     }]
@@ -290,6 +396,27 @@ mod tests {
     }
 
     #[test]
+    fn test_list_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let file1_path = dir.path().join("file1.txt");
+        let file2_path = dir.path().join("file2.txt");
+        std::fs::File::create(&file1_path).unwrap();
+        std::fs::File::create(&file2_path).unwrap();
+
+        let res = list_files_in_directory(dir.path().to_str().unwrap());
+        assert!(res.is_ok());
+        let s = res.unwrap();
+        let files: Vec<String> = serde_json::from_str(&s).unwrap();
+        assert_eq!(files.len(), 2);
+        assert!(files
+            .iter()
+            .any(|f| f == file1_path.to_str().unwrap()));
+        assert!(files
+            .iter()
+            .any(|f| f == file2_path.to_str().unwrap()));
+    }
+
+    #[test]
     fn test_permission_in_workflow() {
         // Create a platform-appropriate temp path and write the file
         let mut tmp_path_buf = std::env::temp_dir();
@@ -389,5 +516,97 @@ mod tests {
 
         // Clean up
         let _ = std::fs::remove_file(&tmp_path);
+    }
+
+    #[test]
+    fn test_permission_list_files_in_workflow() {
+        // Create a directory and some files in it
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
+        std::fs::File::create(tmp_dir.path().join("file1.txt")).unwrap();
+        std::fs::File::create(tmp_dir.path().join("file2.txt")).unwrap();
+
+        let escaped_path = tmp_path.replace(r"\", r"\\");
+
+        // Build JS code with the properly-escaped path string so backslashes on Windows
+        // don't create invalid escape sequences in the JS literal.
+        let code = format!(
+            "const path = {escaped_path:?}; const content = fs.list(path); console.log(content);"
+        );
+
+        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
+            plugin_function_id: filesystem_list_files_plugin_function().function_id,
+            permissions: sapphillon_core::permission::Permissions {
+                permissions: vec![Permission {
+                    display_name: "Filesystem Read".to_string(),
+                    description: "Allows reading tests".to_string(),
+                    permission_type: PermissionType::FilesystemRead as i32,
+                    permission_level: PermissionLevel::Unspecified as i32,
+                    resource: vec![tmp_path.clone()],
+                }],
+            },
+        };
+
+        let mut workflow = CoreWorkflowCode::new(
+            "test".to_string(),
+            code.to_string(),
+            vec![core_filesystem_plugin_package()],
+            1,
+            Some(perm.clone()),
+            Some(perm),
+        );
+
+        workflow.run();
+        assert_eq!(workflow.result.len(), 1);
+        let actual = &workflow.result[0].result;
+        // The expected result is a JSON string of a list of files, followed by a newline.
+        let file1 = tmp_dir.path().join("file1.txt");
+        let file2 = tmp_dir.path().join("file2.txt");
+        let expected_files: Vec<String> = vec![
+            file1.to_str().unwrap().to_string(),
+            file2.to_str().unwrap().to_string(),
+        ];
+        let mut actual_files: Vec<String> =
+            serde_json::from_str(actual.trim_end()).unwrap();
+
+        expected_files.iter().for_each(|f| {
+            assert!(actual_files.contains(f));
+        });
+        actual_files.iter().for_each(|f| {
+            assert!(expected_files.contains(f));
+        });
+    }
+
+    #[test]
+    fn test_permission_denied_list_files_in_workflow() {
+        // Create a directory and some files in it
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
+        std::fs::File::create(tmp_dir.path().join("file1.txt")).unwrap();
+        std::fs::File::create(tmp_dir.path().join("file2.txt")).unwrap();
+
+        let escaped_path = tmp_path.replace(r"\", r"\\");
+
+        // Build JS code with the properly-escaped path string so backslashes on Windows
+        // don't create invalid escape sequences in the JS literal.
+        let code = format!(
+            "const path = {escaped_path:?}; const content = fs.list(path); console.log(content);"
+        );
+
+        let mut workflow = CoreWorkflowCode::new(
+            "test".to_string(),
+            code.to_string(),
+            vec![core_filesystem_plugin_package()],
+            1,
+            None,
+            None,
+        );
+
+        workflow.run();
+        assert_eq!(workflow.result.len(), 0);
+        assert!(workflow
+            .error
+            .to_string()
+            .contains("PermissionDenied. Missing Permissions:"));
     }
 }
