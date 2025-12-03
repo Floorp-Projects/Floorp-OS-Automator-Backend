@@ -23,6 +23,8 @@ log = "0.4"
 env_logger = "0.11"
 deno_core = "0.355.0"
 deno_error = "0.7.0"
+x-win = "3.2.0"
+win-control = "0.5.1"
 
 tonic = "0.12.0"
 prost = "0.13.1"
@@ -82,6 +84,7 @@ tokio-stream = "0.1.17"
 
 fetch = { path = "./plugins/fetch" }
 filesystem = { path = "./plugins/filesystem" }
+window = { path = "./plugins/window" }
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.12.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
