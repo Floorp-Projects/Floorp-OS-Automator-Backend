@@ -84,7 +84,8 @@ fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
         allowed
             .into_iter()
             .find(|p| {
-                p.plugin_function_id == search_plugin_function().function_id || p.plugin_function_id == "*"
+                p.plugin_function_id == search_plugin_function().function_id
+                    || p.plugin_function_id == "*"
             })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
