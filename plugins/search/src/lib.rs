@@ -2,6 +2,14 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
+//! Search plugin for Sapphillon.
+//!
+//! This plugin provides file search functionality using native OS search APIs:
+//! - **Windows**: Everything SDK (preferred) or Windows Search API
+//! - **macOS**: Spotlight (MDQuery)
+//! - **Linux**: GNOME Tracker, KDE Baloo, or locate
+//! - **Fallback**: walkdir-based filesystem traversal
+
 use deno_core::{op2, OpState};
 use deno_error::JsErrorBox;
 use sapphillon_core::permission::{check_permission, CheckPermissionResult};
@@ -10,14 +18,66 @@ use sapphillon_core::proto::sapphillon::v1::{
     Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
 };
 use sapphillon_core::runtime::OpStateWorkflowData;
-use std::sync::{Arc, Mutex};
-use walkdir::WalkDir;
+use std::sync::{Arc, Mutex, OnceLock};
+
+// Platform-specific modules
+#[cfg(target_os = "windows")]
+mod windows_search;
+
+#[cfg(target_os = "macos")]
+mod macos_search;
+
+#[cfg(target_os = "linux")]
+mod linux_search;
+
+mod searcher;
+mod walkdir_search;
+
+use searcher::FileSearcher;
+use walkdir_search::WalkdirSearcher;
+
+/// Get the best available file searcher for the current platform.
+///
+/// This function checks for native OS search capabilities and falls back
+/// to walkdir-based traversal if no native search is available.
+fn get_searcher() -> &'static dyn FileSearcher {
+    static SEARCHER: OnceLock<Box<dyn FileSearcher>> = OnceLock::new();
+
+    SEARCHER
+        .get_or_init(|| {
+            // Try platform-specific searchers first
+            #[cfg(target_os = "windows")]
+            if let Some(searcher) = windows_search::get_windows_searcher() {
+                return searcher;
+            }
+
+            #[cfg(target_os = "macos")]
+            if let Some(searcher) = macos_search::get_macos_searcher() {
+                return searcher;
+            }
+
+            #[cfg(target_os = "linux")]
+            if let Some(searcher) = linux_search::get_linux_searcher() {
+                return searcher;
+            }
+
+            // Fallback to walkdir
+            Box::new(WalkdirSearcher::new())
+        })
+        .as_ref()
+}
+
+/// Get the name of the currently active searcher for debugging.
+pub fn get_active_searcher_name() -> &'static str {
+    get_searcher().name()
+}
 
 pub fn search_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.search.file".to_string(),
         function_name: "search.file".to_string(),
-        description: "Searches for files on the local filesystem.".to_string(),
+        description: "Searches for files on the local filesystem using native OS search APIs."
+            .to_string(),
         permissions: search_plugin_permissions(),
         arguments: "String: root_path, String: query".to_string(),
         returns: "String: (JSON) list of file paths".to_string(),
@@ -28,7 +88,7 @@ pub fn search_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.search".to_string(),
         package_name: "Search".to_string(),
-        description: "A plugin to search for files on the local filesystem.".to_string(),
+        description: "A plugin to search for files on the local filesystem using native OS search APIs (Windows Search/Everything, macOS Spotlight, Linux Tracker/Baloo).".to_string(),
         functions: vec![search_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -101,14 +161,10 @@ fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
     }
 }
 
+/// Core search logic using the best available searcher.
 fn search_file_logic(root_path: String, query: String) -> Result<String, JsErrorBox> {
-    let results: Vec<String> = WalkDir::new(root_path)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.file_name().to_string_lossy().contains(&query))
-        .map(|e| e.path().to_string_lossy().into_owned())
-        .collect();
-
+    let searcher = get_searcher();
+    let results = searcher.search(&root_path, &query)?;
     Ok(serde_json::to_string(&results).unwrap())
 }
 
@@ -142,6 +198,8 @@ mod tests {
         fs::write(dir.path().join("another.file"), "test").unwrap();
 
         // Search for a file that exists.
+        // Note: Native searchers may not index temp directories, so this test
+        // primarily exercises the walkdir fallback.
         let result = search_file_logic(dir_path.clone(), "file1".to_string()).unwrap();
         let results: Vec<String> = serde_json::from_str(&result).unwrap();
         assert_eq!(results.len(), 1);
@@ -151,5 +209,13 @@ mod tests {
         let result = search_file_logic(dir_path, "nonexistent".to_string()).unwrap();
         let results: Vec<String> = serde_json::from_str(&result).unwrap();
         assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_get_active_searcher() {
+        // Just verify we can get a searcher name without panicking
+        let name = get_active_searcher_name();
+        assert!(!name.is_empty());
+        println!("Active searcher: {name}");
     }
 }
