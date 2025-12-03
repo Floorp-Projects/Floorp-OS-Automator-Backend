@@ -4,9 +4,7 @@
 
 use deno_core::{op2, OpState};
 use deno_error::JsErrorBox;
-use sapphillon_core::permission::{
-    check_permission, CheckPermissionResult, PluginFunctionPermissions,
-};
+use sapphillon_core::permission::{check_permission, CheckPermissionResult};
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 use sapphillon_core::proto::sapphillon::v1::{
     Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
@@ -75,10 +73,11 @@ fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
         .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
         .lock()
         .unwrap();
-    let allowed = data.get_allowed_permissions().cloned().unwrap_or_default();
+    let allowed = data.get_allowed_permissions().clone().unwrap_or_default();
 
-    let mut perm = search_plugin_permissions();
-    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
+    let required_permissions = sapphillon_core::permission::Permissions {
+        permissions: search_plugin_permissions(),
+    };
 
     let allowed_permissions = {
         allowed
@@ -102,16 +101,7 @@ fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
     }
 }
 
-#[op2]
-#[string]
-fn op2_search_file(
-    state: &mut OpState,
-    #[string] root_path: String,
-    #[string] query: String,
-) -> std::result::Result<String, JsErrorBox> {
-    #[cfg(not(test))]
-    permission_check_search(state)?;
-
+fn search_file_logic(root_path: String, query: String) -> Result<String, JsErrorBox> {
     let results: Vec<String> = WalkDir::new(root_path)
         .into_iter()
         .filter_map(Result::ok)
@@ -120,6 +110,17 @@ fn op2_search_file(
         .collect();
 
     Ok(serde_json::to_string(&results).unwrap())
+}
+
+#[op2]
+#[string]
+fn op2_search_file(
+    state: &mut OpState,
+    #[string] root_path: String,
+    #[string] query: String,
+) -> std::result::Result<String, JsErrorBox> {
+    permission_check_search(state)?;
+    search_file_logic(root_path, query)
 }
 
 #[cfg(test)]
@@ -140,16 +141,14 @@ mod tests {
         fs::write(dir.path().join("subdir/file2.log"), "world").unwrap();
         fs::write(dir.path().join("another.file"), "test").unwrap();
 
-        let mut state = OpState::new(0);
-
         // Search for a file that exists.
-        let result = op2_search_file(&mut state, dir_path.clone(), "file1".to_string()).unwrap();
+        let result = search_file_logic(dir_path.clone(), "file1".to_string()).unwrap();
         let results: Vec<String> = serde_json::from_str(&result).unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].contains("file1.txt"));
 
         // Search for a file that doesn't exist.
-        let result = op2_search_file(&mut state, dir_path, "nonexistent".to_string()).unwrap();
+        let result = search_file_logic(dir_path, "nonexistent".to_string()).unwrap();
         let results: Vec<String> = serde_json::from_str(&result).unwrap();
         assert_eq!(results.len(), 0);
     }
