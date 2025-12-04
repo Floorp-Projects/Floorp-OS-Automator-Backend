@@ -5,6 +5,7 @@
 //! macOS native file search implementation using Spotlight (MDQuery).
 
 use crate::searcher::FileSearcher;
+use crate::walkdir_search::WalkdirSearcher;
 use deno_error::JsErrorBox;
 use std::sync::OnceLock;
 
@@ -12,11 +13,17 @@ use std::sync::OnceLock;
 ///
 /// Spotlight is Apple's built-in file indexing and search system.
 /// It provides fast indexed search across the entire filesystem.
-pub struct SpotlightSearcher;
+/// Falls back to walkdir for directories not indexed by Spotlight
+/// (e.g., temporary directories).
+pub struct SpotlightSearcher {
+    walkdir_fallback: WalkdirSearcher,
+}
 
 impl SpotlightSearcher {
     pub fn new() -> Self {
-        Self
+        Self {
+            walkdir_fallback: WalkdirSearcher::new(),
+        }
     }
 
     /// Check if Spotlight is available and enabled.
@@ -32,23 +39,32 @@ impl SpotlightSearcher {
             })
             .unwrap_or(false)
     }
-}
 
-impl Default for SpotlightSearcher {
-    fn default() -> Self {
-        Self::new()
+    /// Check if a path is likely to be indexed by Spotlight.
+    /// Spotlight typically doesn't index temporary directories.
+    fn is_path_indexed(path: &str) -> bool {
+        // Paths that are typically not indexed by Spotlight
+        let non_indexed_prefixes = [
+            "/private/var/folders/", // Temp directories
+            "/var/folders/",         // Temp directories (symlink)
+            "/tmp/",                 // System temp
+            "/private/tmp/",         // System temp (full path)
+        ];
+
+        !non_indexed_prefixes
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
     }
-}
 
-impl FileSearcher for SpotlightSearcher {
-    fn search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
+    /// Perform Spotlight search using MDQuery.
+    fn spotlight_search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
         use mdquery_rs::{MDQueryBuilder, MDQueryScope};
 
         // Determine search scope
         let scopes = if root_path.is_empty() || root_path == "/" {
             vec![MDQueryScope::Computer]
         } else {
-            vec![MDQueryScope::Path(root_path.to_string())]
+            vec![MDQueryScope::from_path(root_path)]
         };
 
         // Build the query
@@ -85,6 +101,32 @@ impl FileSearcher for SpotlightSearcher {
             .collect();
 
         Ok(paths)
+    }
+}
+
+impl Default for SpotlightSearcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FileSearcher for SpotlightSearcher {
+    fn search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
+        // If the path is not indexed by Spotlight, use walkdir fallback directly
+        if !root_path.is_empty() && root_path != "/" && !Self::is_path_indexed(root_path) {
+            return self.walkdir_fallback.search(root_path, query);
+        }
+
+        // Try Spotlight search first
+        let spotlight_results = self.spotlight_search(root_path, query)?;
+
+        // If Spotlight returns no results and we have a specific path,
+        // fallback to walkdir (the path might not be indexed)
+        if spotlight_results.is_empty() && !root_path.is_empty() && root_path != "/" {
+            return self.walkdir_fallback.search(root_path, query);
+        }
+
+        Ok(spotlight_results)
     }
 
     fn is_available(&self) -> bool {
