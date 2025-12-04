@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
+//! This module provides functions for converting between the plugin-related entities and
+//! their corresponding protobuf representations.
+
 use crate::entity::permission::Model as EntityPermission;
 use crate::entity::plugin_function::Model as EntityPluginFunction;
 use crate::entity::plugin_package::Model as EntityPluginPackage;

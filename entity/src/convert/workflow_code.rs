@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
+//! This module provides functions for converting between the `workflow_code` and
+//! related entities and their corresponding protobuf representations.
+
 use super::plugin_code::{
     plugin_package_to_proto, proto_string_to_option, proto_timestamp_to_datetime,
     proto_to_permission,
