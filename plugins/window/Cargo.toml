@@ -15,6 +15,3 @@ deno_core.workspace = true
 deno_error.workspace = true
 sapphillon_core.workspace = true
 x-win.workspace = true
-
-[target.'cfg(windows)'.dependencies]
-win-control.workspace = true

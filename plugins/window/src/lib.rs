@@ -13,8 +13,6 @@ use sapphillon_core::{
     runtime::OpStateWorkflowData,
 };
 use std::sync::{Arc, Mutex};
-#[cfg(windows)]
-use win_control::{Window, WindowManager};
 use x_win::{get_active_window, get_open_windows};
 
 pub fn get_active_window_title_plugin_function() -> PluginFunction {
@@ -39,28 +37,6 @@ pub fn get_inactive_window_titles_plugin_function() -> PluginFunction {
     }
 }
 
-pub fn minimize_window_plugin_function() -> PluginFunction {
-    PluginFunction {
-        function_id: "app.sapphillon.core.window.minimize_window".to_string(),
-        function_name: "Minimize Window".to_string(),
-        description: "Minimizes a window.".to_string(),
-        permissions: window_plugin_permissions(),
-        arguments: "String: title".to_string(),
-        returns: "".to_string(),
-    }
-}
-
-pub fn activate_window_plugin_function() -> PluginFunction {
-    PluginFunction {
-        function_id: "app.sapphillon.core.window.activate_window".to_string(),
-        function_name: "Activate Window".to_string(),
-        description: "Activates a window.".to_string(),
-        permissions: window_plugin_permissions(),
-        arguments: "String: title".to_string(),
-        returns: "".to_string(),
-    }
-}
-
 pub fn window_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.window".to_string(),
@@ -69,8 +45,6 @@ pub fn window_plugin_package() -> PluginPackage {
         functions: vec![
             get_active_window_title_plugin_function(),
             get_inactive_window_titles_plugin_function(),
-            minimize_window_plugin_function(),
-            activate_window_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -102,26 +76,6 @@ pub fn core_get_inactive_window_titles_plugin() -> CorePluginFunction {
     )
 }
 
-pub fn core_minimize_window_plugin() -> CorePluginFunction {
-    CorePluginFunction::new(
-        "app.sapphillon.core.window.minimize_window".to_string(),
-        "Minimize Window".to_string(),
-        "Minimizes a window.".to_string(),
-        op2_minimize_window(),
-        None,
-    )
-}
-
-pub fn core_activate_window_plugin() -> CorePluginFunction {
-    CorePluginFunction::new(
-        "app.sapphillon.core.window.activate_window".to_string(),
-        "Activate Window".to_string(),
-        "Activates a window.".to_string(),
-        op2_activate_window(),
-        None,
-    )
-}
-
 pub fn core_window_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.window".to_string(),
@@ -129,8 +83,6 @@ pub fn core_window_plugin_package() -> CorePluginPackage {
         vec![
             core_get_active_window_title_plugin(),
             core_get_inactive_window_titles_plugin(),
-            core_minimize_window_plugin(),
-            core_activate_window_plugin(),
         ],
     )
 }
@@ -214,55 +166,6 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
     }
 }
 
-#[op2]
-#[cfg(windows)]
-fn op2_minimize_window(state: &mut OpState, #[string] title: String) -> Result<(), JsErrorBox> {
-    permission_check(state)?;
-    let window_manager = WindowManager::new();
-    let windows: Vec<Window> = window_manager.get_windows(None).unwrap_or_default();
-    for window in windows {
-        if window.get_title().unwrap_or_default() == title {
-            window.minimize().unwrap();
-            return Ok(());
-        }
-    }
-    Err(JsErrorBox::new("Error", "Window not found".to_string()))
-}
-
-#[op2]
-#[cfg(not(windows))]
-fn op2_minimize_window(_state: &mut OpState, _title: String) -> Result<(), JsErrorBox> {
-    Err(JsErrorBox::new(
-        "Error",
-        "Window minimization is only supported on Windows".to_string(),
-    ))
-}
-
-#[op2]
-#[cfg(windows)]
-fn op2_activate_window(state: &mut OpState, #[string] title: String) -> Result<(), JsErrorBox> {
-    permission_check(state)?;
-    let window_manager = WindowManager::new();
-    let windows: Vec<Window> = window_manager.get_windows(None).unwrap_or_default();
-    for window in windows {
-        if window.get_title().unwrap_or_default() == title {
-            window.show().unwrap();
-            window.focus().unwrap();
-            return Ok(());
-        }
-    }
-    Err(JsErrorBox::new("Error", "Window not found".to_string()))
-}
-
-#[op2]
-#[cfg(not(windows))]
-fn op2_activate_window(_state: &mut OpState, _title: String) -> Result<(), JsErrorBox> {
-    Err(JsErrorBox::new(
-        "Error",
-        "Window activation is only supported on Windows".to_string(),
-    ))
-}
-
 fn window_plugin_permissions() -> Vec<Permission> {
     vec![Permission {
         display_name: "Window Management".to_string(),
@@ -315,7 +218,7 @@ mod tests {
         "#;
 
         let perm = PluginFunctionPermissions {
-            plugin_function_id: get_inactive_window_titles_plugin_function().function_id,
+            plugin_function_id: get_inactive_.window_titles_plugin_function().function_id,
             permissions: sapphillon_core::permission::Permissions {
                 permissions: window_plugin_permissions(),
             },
@@ -335,59 +238,5 @@ mod tests {
         // We can't know the exact titles, but we can check that it's a JSON array.
         assert!(workflow.result[0].result.starts_with('['));
         assert!(workflow.result[0].result.ends_with("]\n"));
-    }
-
-    #[test]
-    fn test_minimize_window_in_workflow() {
-        let code = r#"
-            const title = get_active_window_title();
-            minimize_window(title);
-        "#;
-
-        let perm = PluginFunctionPermissions {
-            plugin_function_id: minimize_window_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: window_plugin_permissions(),
-            },
-        };
-
-        let mut workflow = CoreWorkflowCode::new(
-            "test".to_string(),
-            code.to_string(),
-            vec![core_window_plugin_package()],
-            1,
-            Some(perm.clone()),
-            Some(perm),
-        );
-
-        workflow.run();
-        assert_eq!(workflow.result.len(), 0);
-    }
-
-    #[test]
-    fn test_activate_window_in_workflow() {
-        let code = r#"
-            const title = get_active_window_title();
-            activate_window(title);
-        "#;
-
-        let perm = PluginFunctionPermissions {
-            plugin_function_id: activate_window_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: window_plugin_permissions(),
-            },
-        };
-
-        let mut workflow = CoreWorkflowCode::new(
-            "test".to_string(),
-            code.to_string(),
-            vec![core_window_plugin_package()],
-            1,
-            Some(perm.clone()),
-            Some(perm),
-        );
-
-        workflow.run();
-        assert_eq!(workflow.result.len(), 0);
     }
 }
