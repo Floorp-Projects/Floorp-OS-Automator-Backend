@@ -632,11 +632,6 @@ mod tests {
         //         .to_string()
         //         .contains("PermissionDenied. Missing Permissions:")
         // );
-        assert!(
-            workflow.result[0]
-                .result
-                .to_string()
-                .contains("Uncaught")
-        )
+        assert!(workflow.result[0].result.to_string().contains("Uncaught"))
     }
 }
