@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
+//! This module provides functions for converting between the `model` entity and its
+//! corresponding protobuf representation.
+
 use crate::entity::model::Model as EntityModel;
 use sapphillon_core::proto::sapphillon::ai::v1::Models as ProtoModel;
 

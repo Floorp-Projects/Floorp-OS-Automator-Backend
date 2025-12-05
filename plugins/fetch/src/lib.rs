@@ -13,6 +13,19 @@ use sapphillon_core::proto::sapphillon::v1::{
 };
 use sapphillon_core::runtime::OpStateWorkflowData;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+pub fn post_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.fetch.post".to_string(),
+        function_name: "Post".to_string(),
+        description: "Posts the content of a URL using reqwest and returns it as a string."
+            .to_string(),
+        permissions: fetch_plugin_permissions(),
+        arguments: "String: url, String: body".to_string(),
+        returns: "String: content".to_string(),
+    }
+}
 
 pub fn fetch_plugin_function() -> PluginFunction {
     PluginFunction {
@@ -52,11 +65,21 @@ pub fn core_fetch_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_post_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.fetch.post".to_string(),
+        "Post".to_string(),
+        "Posts the content of a URL using reqwest and returns it as a string.".to_string(),
+        op2_post(),
+        Some(include_str!("00_fetch.js").to_string()),
+    )
+}
+
 pub fn core_fetch_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.fetch".to_string(),
         "Fetch".to_string(),
-        vec![core_fetch_plugin()],
+        vec![core_fetch_plugin(), core_post_plugin()],
     )
 }
 fn _permission_check_backend(
@@ -76,6 +99,7 @@ fn _permission_check_backend(
             .into_iter()
             .find(|p| {
                 p.plugin_function_id == fetch_plugin_function().function_id
+                    || p.plugin_function_id == post_plugin_function().function_id
                     || p.plugin_function_id == "*"
             })
             .map(|p| p.permissions)
@@ -94,7 +118,6 @@ fn _permission_check_backend(
         )),
     }
 }
-
 fn permission_check(state: &mut OpState, url: String) -> Result<(), JsErrorBox> {
     let data = state
         .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
@@ -102,12 +125,20 @@ fn permission_check(state: &mut OpState, url: String) -> Result<(), JsErrorBox> 
         .unwrap();
     let allowed = match &data.get_allowed_permissions() {
         Some(p) => p,
-        None => &vec![PluginFunctionPermissions {
-            plugin_function_id: fetch_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: fetch_plugin_permissions(),
+        None => &vec![
+            PluginFunctionPermissions {
+                plugin_function_id: fetch_plugin_function().function_id,
+                permissions: sapphillon_core::permission::Permissions {
+                    permissions: fetch_plugin_permissions(),
+                },
             },
-        }],
+            PluginFunctionPermissions {
+                plugin_function_id: post_plugin_function().function_id,
+                permissions: sapphillon_core::permission::Permissions {
+                    permissions: fetch_plugin_permissions(),
+                },
+            },
+        ],
     };
     _permission_check_backend(allowed.clone(), url)?;
     Ok(())
@@ -128,9 +159,38 @@ fn op2_fetch(
     }
 }
 
+#[op2]
+#[string]
+fn op2_post(
+    state: &mut OpState,
+    #[string] url: String,
+    #[string] body: String,
+) -> std::result::Result<String, JsErrorBox> {
+    // Permission Check
+    permission_check(state, url.clone())?;
+
+    match post(&url, &body) {
+        Ok(body) => Ok(body),
+        Err(e) => Err(JsErrorBox::new("Error", e.to_string())),
+    }
+}
+
 fn fetch(url: &str) -> anyhow::Result<String> {
-    let body = ureq::get(url).call()?.body_mut().read_to_string()?;
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .build()
+        .into();
+    let body = agent.get(url).call()?.body_mut().read_to_string()?;
     Ok(body)
+}
+
+fn post(url: &str, body: &str) -> anyhow::Result<String> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .build()
+        .into();
+    let response_body = agent.post(url).send(body)?.body_mut().read_to_string()?;
+    Ok(response_body)
 }
 
 fn fetch_plugin_permissions() -> Vec<Permission> {
@@ -157,6 +217,16 @@ mod tests {
         let body = result.unwrap();
         assert!(body.contains("ok"));
         println!("Fetched content: {body}");
+    }
+
+    #[test]
+    fn test_post() {
+        let url = "https://dummyjson.com/products/add";
+        let result = post(url, r#"{"title":"test"}"#);
+        assert!(result.is_ok());
+        let body = result.unwrap();
+        assert!(body.contains("id"));
+        println!("Posted content: {body}");
     }
 
     #[test]
@@ -237,6 +307,48 @@ mod tests {
         assert_eq!(workflow.result.len(), 1);
 
         let expected = fetch(&url).unwrap() + "\n";
+
+        let actual = &workflow.result[0].result;
+        // Accept either a successful fetch result or a permission-denied message depending on test environment.
+        assert!(actual == &expected, "Unexpected workflow result: {actual}");
+    }
+
+    #[test]
+    fn test_post_in_workflow() {
+        let code = r#"
+            const url = "https://dummyjson.com/products/add";
+            const response = post(url, '{"title":"test"}');
+            console.log(response);
+        "#;
+
+        // Provide allowed permissions so permission_check inside the plugin passes.
+        let url = "https://dummyjson.com/products/add".to_string();
+
+        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
+            plugin_function_id: post_plugin_function().function_id,
+            permissions: sapphillon_core::permission::Permissions {
+                permissions: vec![Permission {
+                    display_name: "Network Access".to_string(),
+                    description: "Allows the plugin to make network requests.".to_string(),
+                    permission_type: PermissionType::NetAccess as i32,
+                    permission_level: PermissionLevel::Unspecified as i32,
+                    resource: vec!["https://dummyjson.com/products/add".to_string()],
+                }],
+            },
+        };
+        let mut workflow = CoreWorkflowCode::new(
+            "test".to_string(),
+            code.to_string(),
+            vec![core_fetch_plugin_package()],
+            1,
+            Some(perm.clone()),
+            Some(perm),
+        );
+
+        workflow.run();
+        assert_eq!(workflow.result.len(), 1);
+
+        let expected = post(&url, r#"{"title":"test"}"#).unwrap() + "\n";
 
         let actual = &workflow.result[0].result;
         // Accept either a successful fetch result or a permission-denied message depending on test environment.

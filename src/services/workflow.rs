@@ -405,14 +405,11 @@ impl WorkflowService for MyWorkflowService {
                 .await
                 .map_err(|err| Self::map_not_found(err, format!("workflow '{}'", item.id)))?;
 
-            if let Some(ref name) = filter_name
-                && !workflow.display_name.contains(name)
+            if matches!(filter_name.as_deref(), Some(name) if !workflow.display_name.contains(name))
             {
                 continue;
             }
-            if let Some(lang) = filter_language
-                && workflow.workflow_language != lang
-            {
+            if matches!(filter_language, Some(lang) if workflow.workflow_language != lang) {
                 continue;
             }
 

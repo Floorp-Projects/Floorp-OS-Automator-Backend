@@ -1,5 +1,5 @@
 [package]
-name = "fetch"
+name = "exec"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -14,4 +14,3 @@ log.workspace = true
 deno_core.workspace = true
 deno_error.workspace = true
 sapphillon_core.workspace = true
-ureq = { version = "3.1.0", features = ["json"] }

@@ -5,6 +5,7 @@
 use sapphillon_core::plugin::CorePluginPackage;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage;
 
+use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
@@ -29,11 +30,13 @@ pub fn sysconfig() -> SysConfig {
             core_fetch_plugin_package(),
             core_filesystem_plugin_package(),
             core_window_plugin_package(),
+            core_exec_plugin_package(),
         ],
         plugin_package: vec![
             fetch_plugin_package(),
             filesystem_plugin_package(),
             window_plugin_package(),
+            exec_plugin_package(),
         ],
     }
 }

@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
+//! This module provides functions for converting between the plugin-related protobuf
+//! representations and their corresponding entities.
+
 use crate::entity::permission::Model as EntityPermission;
 use crate::entity::plugin_function::Model as EntityPluginFunction;
 use crate::entity::plugin_package::Model as EntityPluginPackage;
@@ -134,6 +137,7 @@ impl From<(&ProtoPluginFunction, &str)> for EntityPluginFunction {
     }
 }
 
+/// Converts an empty string to `None`, otherwise returns `Some(string)`.
 pub fn proto_string_to_option(value: &str) -> Option<String> {
     if value.is_empty() {
         None
@@ -142,6 +146,7 @@ pub fn proto_string_to_option(value: &str) -> Option<String> {
     }
 }
 
+/// Converts a protobuf `Timestamp` to a `DateTime<Utc>`.
 pub fn proto_timestamp_to_datetime(
     ts: &sapphillon_core::proto::google::protobuf::Timestamp,
 ) -> Option<DateTimeUtc> {
