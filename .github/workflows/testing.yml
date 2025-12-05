@@ -39,7 +39,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          sudo apt-get install -y protobuf-compiler libxcb1-dev libx11-dev
 
       - name: Install Dependencies on MacOS
         if: runner.os == 'macOS'
