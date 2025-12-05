@@ -1350,6 +1350,8 @@ dependencies = [
  "deno_error",
  "log",
  "sapphillon_core",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
