@@ -135,9 +135,7 @@ impl FileSearcher for WindowsSearchApiSearcher {
         use windows::Win32::System::Com::{
             CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
         };
-        use windows::Win32::System::Search::{
-            CSearchManager, ISearchManager, ISearchQueryHelper,
-        };
+        use windows::Win32::System::Search::{CSearchManager, ISearchManager, ISearchQueryHelper};
 
         unsafe {
             // Initialize COM
