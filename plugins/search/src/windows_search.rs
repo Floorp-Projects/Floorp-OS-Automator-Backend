@@ -27,10 +27,12 @@ impl EverythingSearcher {
     fn check_availability() -> bool {
         use everything_rs::Everything;
 
-        // Try to create an Everything instance and check version
+        // Try to create an Everything instance and run a simple query
         let everything = Everything::new();
-        // If we can get the major version, Everything is available
-        everything.major_version() > 0
+        everything.set_search("");
+        everything.set_max_results(1);
+        // If query succeeds, Everything is available
+        everything.query().is_ok()
     }
 }
 
@@ -44,7 +46,7 @@ impl FileSearcher for EverythingSearcher {
     fn search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
         use everything_rs::{Everything, EverythingRequestFlags, EverythingSort};
 
-        let mut everything = Everything::new();
+        let everything = Everything::new();
 
         // Build search query: search within root_path for files matching query
         let search_query = if root_path.is_empty() || root_path == "/" || root_path == "\\" {
@@ -62,10 +64,10 @@ impl FileSearcher for EverythingSearcher {
         everything.set_sort(EverythingSort::NameAscending);
         everything.set_max_results(1000); // Limit results to prevent memory issues
 
-        if !everything.query(true) {
+        if let Err(e) = everything.query() {
             return Err(JsErrorBox::new(
                 "SearchError",
-                "Everything query failed. Is Everything running?",
+                format!("Everything query failed: {:?}. Is Everything running?", e),
             ));
         }
 
@@ -129,14 +131,13 @@ impl Default for WindowsSearchApiSearcher {
 
 impl FileSearcher for WindowsSearchApiSearcher {
     fn search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
-        use windows::core::{BSTR, VARIANT};
+        use windows::core::BSTR;
         use windows::Win32::System::Com::{
             CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED,
         };
         use windows::Win32::System::Search::{
-            CSearchManager, ISearchManager, ISearchQueryHelper, DBPROPSET,
+            CSearchManager, ISearchManager, ISearchQueryHelper,
         };
-        use windows::Win32::System::Variant::VT_BSTR;
 
         unsafe {
             // Initialize COM
@@ -181,10 +182,8 @@ impl FileSearcher for WindowsSearchApiSearcher {
             };
 
             let user_query = BSTR::from(format!("*{}*", query));
-            let mut sql_query: windows::core::PWSTR = windows::core::PWSTR::null();
-
-            query_helper
-                .GenerateSQLFromUserQuery(&user_query, &mut sql_query)
+            let _sql_query = query_helper
+                .GenerateSQLFromUserQuery(&user_query)
                 .map_err(|e| {
                     JsErrorBox::new("SearchError", format!("Failed to generate SQL: {}", e))
                 })?;
