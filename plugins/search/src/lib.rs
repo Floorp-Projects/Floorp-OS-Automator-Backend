@@ -5,7 +5,7 @@
 //! Search plugin for Sapphillon.
 //!
 //! This plugin provides file search functionality using native OS search APIs:
-//! - **Windows**: Everything SDK (preferred) or Windows Search API
+//! - **Windows**: Windows Search API (Windows Index Search)
 //! - **macOS**: Spotlight (MDQuery)
 //! - **Linux**: GNOME Tracker, KDE Baloo, or locate
 //! - **Fallback**: walkdir-based filesystem traversal

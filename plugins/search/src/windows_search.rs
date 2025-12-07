@@ -2,89 +2,14 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
-//! Windows native file search implementations.
+//! Windows native file search implementation using Windows Search API.
 //!
-//! This module provides two searchers:
-//! 1. `EverythingSearcher` - Uses the Everything SDK (requires Everything app)
-//! 2. `WindowsSearchApiSearcher` - Uses Windows Search API (built-in)
+//! This module provides `WindowsSearchApiSearcher` which uses the built-in
+//! Windows Search indexer (Windows Index Search) available on all modern Windows versions.
 
 use crate::searcher::FileSearcher;
 use deno_error::JsErrorBox;
 use std::sync::OnceLock;
-
-/// Searcher using the Everything SDK.
-///
-/// Everything is a third-party application that provides extremely fast file indexing.
-/// This searcher requires Everything to be installed and running.
-pub struct EverythingSearcher;
-
-impl EverythingSearcher {
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// Check if Everything is installed and running.
-    fn check_availability() -> bool {
-        use everything_rs::Everything;
-
-        // Try to create an Everything instance and run a simple query
-        let everything = Everything::new();
-        everything.set_search("");
-        everything.set_max_results(1);
-        // If query succeeds, Everything is available
-        everything.query().is_ok()
-    }
-}
-
-impl Default for EverythingSearcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl FileSearcher for EverythingSearcher {
-    fn search(&self, root_path: &str, query: &str) -> Result<Vec<String>, JsErrorBox> {
-        use everything_rs::{Everything, EverythingRequestFlags, EverythingSort};
-
-        let everything = Everything::new();
-
-        // Build search query: search within root_path for files matching query
-        let search_query = if root_path.is_empty() || root_path == "/" || root_path == "\\" {
-            query.to_string()
-        } else {
-            // Normalize path separators for Windows
-            let normalized_path = root_path.replace('/', "\\");
-            format!("\"{}\" {}", normalized_path, query)
-        };
-
-        everything.set_search(&search_query);
-        everything.set_request_flags(
-            EverythingRequestFlags::FullPathAndFileName | EverythingRequestFlags::Size,
-        );
-        everything.set_sort(EverythingSort::NameAscending);
-        everything.set_max_results(1000); // Limit results to prevent memory issues
-
-        if let Err(e) = everything.query() {
-            return Err(JsErrorBox::new(
-                "SearchError",
-                format!("Everything query failed: {:?}. Is Everything running?", e),
-            ));
-        }
-
-        let results: Vec<String> = everything.full_path_iter().filter_map(|r| r.ok()).collect();
-
-        Ok(results)
-    }
-
-    fn is_available(&self) -> bool {
-        static AVAILABLE: OnceLock<bool> = OnceLock::new();
-        *AVAILABLE.get_or_init(Self::check_availability)
-    }
-
-    fn name(&self) -> &'static str {
-        "Everything"
-    }
-}
 
 /// Searcher using the Windows Search API (Windows Desktop Search).
 ///
@@ -244,15 +169,8 @@ impl FileSearcher for WindowsSearchApiSearcher {
     }
 }
 
-/// Get the best available Windows searcher.
-///
-/// Prefers Everything (faster) over Windows Search API.
+/// Get the Windows searcher using Windows Search API.
 pub fn get_windows_searcher() -> Option<Box<dyn FileSearcher>> {
-    let everything = EverythingSearcher::new();
-    if everything.is_available() {
-        return Some(Box::new(everything));
-    }
-
     let windows_search = WindowsSearchApiSearcher::new();
     if windows_search.is_available() {
         return Some(Box::new(windows_search));
@@ -264,13 +182,6 @@ pub fn get_windows_searcher() -> Option<Box<dyn FileSearcher>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_everything_availability_check() {
-        // This test just checks that the availability check doesn't panic
-        let searcher = EverythingSearcher::new();
-        let _ = searcher.is_available();
-    }
 
     #[test]
     fn test_windows_search_api_availability_check() {
