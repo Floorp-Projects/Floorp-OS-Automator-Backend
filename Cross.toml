@@ -1,8 +1,14 @@
 [target.x86_64-unknown-linux-gnu]
 image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main"
+pre-build = [
+    "apt-get update && apt-get install -y pkg-config libssl-dev",
+]
 
 [target.aarch64-unknown-linux-gnu]
 image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
+pre-build = [
+    "apt-get update && apt-get install -y pkg-config libssl-dev",
+]
 
 # [target.x86_64-unknown-linux-gnu]
 # image = "ghcr.io/cross-rs/x86_64-unknown-linux-gnu:main-centos"

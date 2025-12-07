@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "Sapphillon-Controller"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -1190,7 +1190,7 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
 name = "database"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -1473,7 +1473,7 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 
 [[package]]
 name = "entity"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1613,7 +1613,7 @@ dependencies = [
 
 [[package]]
 name = "exec"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -1674,7 +1674,7 @@ dependencies = [
 
 [[package]]
 name = "fetch"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -1686,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "filesystem"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -2796,7 +2796,7 @@ dependencies = [
 
 [[package]]
 name = "migration"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "async-std",
  "sea-orm-migration",
@@ -6007,7 +6007,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "window"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "deno_core",
