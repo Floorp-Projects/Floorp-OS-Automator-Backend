@@ -1,3 +1,6 @@
 [submodule "plugins/floorp"]
 	path = plugins/floorp
 	url = https://github.com/Floorp-Projects/Floorp-OS-Plugin.git
+[submodule "plugins/vscode"]
+	path = plugins/vscode
+	url = https://github.com/Floorp-Projects/VS-Code-Plugin.git

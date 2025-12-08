@@ -9,6 +9,7 @@ use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
 use floorp::{core_floorp_plugin_package, floorp_plugin_package};
+use vscode::{core_vscode_plugin_package, vscode_plugin_package};
 use search::{core_search_plugin_package, search_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
 
@@ -32,6 +33,7 @@ pub fn sysconfig() -> SysConfig {
             core_fetch_plugin_package(),
             core_filesystem_plugin_package(),
             core_floorp_plugin_package(),
+            core_vscode_plugin_package(),
             core_search_plugin_package(),
             core_window_plugin_package(),
             core_exec_plugin_package(),
@@ -40,6 +42,7 @@ pub fn sysconfig() -> SysConfig {
             fetch_plugin_package(),
             filesystem_plugin_package(),
             floorp_plugin_package(),
+            vscode_plugin_package(),
             search_plugin_package(),
             window_plugin_package(),
             exec_plugin_package(),
