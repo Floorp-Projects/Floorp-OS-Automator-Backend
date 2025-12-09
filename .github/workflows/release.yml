@@ -207,6 +207,23 @@ jobs:
           echo "All builds succeeded. Publishing release..."
           gh release edit "$TAG_NAME" --draft=false
 
+      - name: Upload to FTP
+        if: needs.build.result == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
+        run: |
+          echo "Downloading release assets..."
+          gh release download "$TAG_NAME" --dir release_assets
+
+          echo "Uploading assets to FTP..."
+          for file in release_assets/*; do
+            if [ -f "$file" ]; then
+              echo "Uploading $file..."
+              curl -T "$file" "ftp://${{ secrets.FOA_FTP_HOST }}/" --user "${{ secrets.FOA_FTP_NAME }}:${{ secrets.FOA_FTP_PASS }}"
+            fi
+          done
+
       - name: Delete Release (Failure)
         if: needs.build.result == 'failure'
         env:
