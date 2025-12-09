@@ -24,7 +24,9 @@ jobs:
         os: [blacksmith-2vcpu-ubuntu-2404, macos-latest, blacksmith-4vcpu-windows-2025]
     steps:
       - uses: actions/checkout@v5
-      
+        with:
+          submodules: recursive
+
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -68,6 +70,8 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
