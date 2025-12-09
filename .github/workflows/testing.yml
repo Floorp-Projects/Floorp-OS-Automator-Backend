@@ -23,7 +23,7 @@ jobs:
       matrix:
         os: [blacksmith-2vcpu-ubuntu-2404, macos-latest, blacksmith-4vcpu-windows-2025]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -69,7 +69,7 @@ jobs:
     name: Rustfmt
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Setup SSH
