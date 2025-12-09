@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'The type of version bump to apply (major, minor, or patch)'
+        description: "The type of version bump to apply (major, minor, or patch)"
         required: true
-        default: 'patch'
+        default: "patch"
         type: choice
         options:
-        - major
-        - minor
-        - patch
+          - major
+          - minor
+          - patch
       prerelease:
-        description: 'Whether this is a pre-release'
+        description: "Whether this is a pre-release"
         required: true
         default: false
         type: boolean
@@ -61,8 +61,8 @@ jobs:
       - name: Bump version
         id: bump
         run: |
-           NEW_TAG=$(python3 scripts/bump_version.py ${{ github.event.inputs.version_type }})
-           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          NEW_TAG=$(python3 scripts/bump_version.py ${{ github.event.inputs.version_type }})
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
 
       # Check if Cargo.toml was modified and commit if so
       - name: Commit and Push Version Bump
@@ -130,7 +130,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          
+
       - name: Setup SSH KNOWN_HOSTS
         shell: bash
         run: |
@@ -139,23 +139,23 @@ jobs:
       - name: Install Dependencies on Windows
         if: runner.os == 'Windows'
         run: |
-            choco install make --yes
-            choco install nasm --yes
-            choco install protoc --yes
-            choco install llvm -y
-            echo 'LIBCLANG_PATH=C:\Program Files\LLVM\bin' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-            echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          choco install make --yes
+          choco install nasm --yes
+          choco install protoc --yes
+          choco install llvm -y
+          echo 'LIBCLANG_PATH=C:\Program Files\LLVM\bin' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Dependencies on MacOS
         if: runner.os == 'macOS'
         run: |
-            brew install make protobuf
+          brew install make protobuf
 
       - name: Install Dependencies on Linux
         if: runner.os == 'Linux'
         run: |
-            sudo apt-get update
-            sudo apt-get install -y protobuf-compiler libxcb1-dev libx11-dev
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler libxcb1-dev libx11-dev
 
       - name: Install cross (if needed)
         if: ${{ matrix.cross }}
@@ -164,7 +164,7 @@ jobs:
       - name: Build Project on cross
         if: ${{ matrix.cross }}
         run: |
-            cross build --workspace --release --target ${{ matrix.target }} --verbose
+          cross build --workspace --release --target ${{ matrix.target }} --verbose
 
       - name: Build Project
         if: ${{ !matrix.cross }}
@@ -220,7 +220,7 @@ jobs:
           for file in release_assets/*; do
             if [ -f "$file" ]; then
               echo "Uploading $file..."
-              curl -T "$file" "ftp://${{ secrets.FOA_FTP_HOST }}/" --user "${{ secrets.FOA_FTP_NAME }}:${{ secrets.FOA_FTP_PASS }}"
+              curl -T "$file" "ftp://${{ secrets.FOA_FTP_HOST }}/public_html/automator/" --user "${{ secrets.FOA_FTP_NAME }}:${{ secrets.FOA_FTP_PASS }}" --ftp-create-dirs
             fi
           done
 
