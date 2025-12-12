@@ -37,6 +37,17 @@ pub fn get_inactive_window_titles_plugin_function() -> PluginFunction {
     }
 }
 
+pub fn close_window_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.window.close_window".to_string(),
+        function_name: "Close Window".to_string(),
+        description: "Closes a window by its title (partial match supported).".to_string(),
+        permissions: window_plugin_permissions(),
+        arguments: "String: title".to_string(),
+        returns: "String: result".to_string(),
+    }
+}
+
 pub fn window_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.window".to_string(),
@@ -45,6 +56,7 @@ pub fn window_plugin_package() -> PluginPackage {
         functions: vec![
             get_active_window_title_plugin_function(),
             get_inactive_window_titles_plugin_function(),
+            close_window_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -76,6 +88,16 @@ pub fn core_get_inactive_window_titles_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_close_window_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.window.close_window".to_string(),
+        "Close Window".to_string(),
+        "Closes a window by its title (partial match supported).".to_string(),
+        op2_close_window(),
+        None,
+    )
+}
+
 pub fn core_window_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.window".to_string(),
@@ -83,6 +105,7 @@ pub fn core_window_plugin_package() -> CorePluginPackage {
         vec![
             core_get_active_window_title_plugin(),
             core_get_inactive_window_titles_plugin(),
+            core_close_window_plugin(),
         ],
     )
 }
@@ -163,6 +186,58 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
             "Error",
             "Could not get inactive window titles".to_string(),
         )),
+    }
+}
+
+#[op2]
+#[string]
+fn op2_close_window(
+    state: &mut OpState,
+    #[string] title_pattern: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(state)?;
+    
+    let windows = get_open_windows().map_err(|_| {
+        JsErrorBox::new("Error", "Could not get open windows".to_string())
+    })?;
+    
+    let mut closed_count = 0;
+    
+    for window in windows {
+        if window.title.contains(&title_pattern) {
+            // On Windows, use taskkill to close the window by process ID
+            #[cfg(target_os = "windows")]
+            {
+                let result = std::process::Command::new("taskkill")
+                    .args(["/PID", &window.info.process_id.to_string(), "/F"])
+                    .output();
+                
+                if result.is_ok() {
+                    closed_count += 1;
+                }
+            }
+            
+            // On Unix-like systems, send SIGTERM
+            #[cfg(not(target_os = "windows"))]
+            {
+                let result = std::process::Command::new("kill")
+                    .arg(&window.info.process_id.to_string())
+                    .output();
+                
+                if result.is_ok() {
+                    closed_count += 1;
+                }
+            }
+        }
+    }
+    
+    if closed_count > 0 {
+        Ok(format!("Closed {} window(s) matching '{}'", closed_count, title_pattern))
+    } else {
+        Err(JsErrorBox::new(
+            "Error",
+            format!("No windows found matching '{}'", title_pattern),
+        ))
     }
 }
 

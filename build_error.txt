@@ -1,0 +1,2 @@
+    Checking window v0.12.0 (F:\sapphillon-dev\Floorp-OS-Automator-Backend\plugins\window)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.47s
