@@ -58,6 +58,7 @@ pub async fn generate_workflow_async(
 /// Returns the fully formatted prompt string or an error when formatting fails.
 fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let language = "日本語";
     let prompt = format!(
         r#"
     ## System
@@ -146,7 +147,7 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ## User
     User Query(Task):
     - {user_query}
-    - 使用言語: ja-JP
+    - 使用言語: {language}
     "#
     );
     Ok(prompt)
