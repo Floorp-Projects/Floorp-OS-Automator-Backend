@@ -4,3 +4,4 @@
 [submodule "plugins/vscode"]
 	path = plugins/vscode
 	url = https://github.com/Floorp-Projects/VS-Code-Plugin.git
+	branch = main
