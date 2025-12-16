@@ -6,10 +6,25 @@ use std::env;
 use std::error::Error;
 
 use async_openai::{
-    Client,
     config::OpenAIConfig,
     types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs},
+    Client,
 };
+
+/// Minimal, prompt-friendly representation of a plugin and its callable functions.
+#[derive(Debug, Clone)]
+pub struct PromptPlugin {
+    pub package_name: String,
+    pub description: Option<String>,
+    pub functions: Vec<PromptPluginFunction>,
+}
+
+/// Minimal, prompt-friendly representation of a plugin function.
+#[derive(Debug, Clone)]
+pub struct PromptPluginFunction {
+    pub function_name: String,
+    pub description: Option<String>,
+}
 
 #[allow(dead_code)]
 /// Generates a JavaScript workflow synchronously by issuing a blocking LLM call.
@@ -17,12 +32,16 @@ use async_openai::{
 /// # Arguments
 ///
 /// * `user_query` - The natural-language prompt describing the desired workflow.
+/// * `available_plugins` - Structured plugin definitions the model may use.
 ///
 /// # Returns
 ///
 /// Returns the extracted JavaScript snippet on success, or an error when prompt building or LLM execution fails.
-pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let prompt = generate_prompt(user_query)?;
+pub fn generate_workflow(
+    user_query: &str,
+    available_plugins: &[PromptPlugin],
+) -> Result<String, Box<dyn std::error::Error>> {
+    let prompt = generate_prompt(user_query, available_plugins)?;
     let workflow_raw = llm_call(&prompt)?;
     let workflow_code = extract_first_code(&workflow_raw);
     workflow_code.ok_or_else(|| "No code section found in the response".into())
@@ -33,14 +52,16 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
 /// # Arguments
 ///
 /// * `user_query` - The natural-language prompt describing the desired workflow.
+/// * `available_plugins` - Structured plugin definitions the model may use.
 ///
 /// # Returns
 ///
 /// Returns the extracted JavaScript snippet on success, or an error when the LLM request fails.
 pub async fn generate_workflow_async(
     user_query: &str,
+    available_plugins: &[PromptPlugin],
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let prompt = generate_prompt(user_query)?;
+    let prompt = generate_prompt(user_query, available_plugins)?;
     let workflow_raw = _llm_call_async(&prompt).await?;
     let workflow_code = extract_first_code(&workflow_raw);
     workflow_code.ok_or_else(|| "No code section found in the response".into())
@@ -52,13 +73,51 @@ pub async fn generate_workflow_async(
 /// # Arguments
 ///
 /// * `user_query` - The user's task description incorporated into the prompt.
+/// * `available_plugins` - Structured plugin definitions the model may use.
 ///
 /// # Returns
 ///
 /// Returns the fully formatted prompt string or an error when formatting fails.
-fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn generate_prompt(
+    user_query: &str,
+    available_plugins: &[PromptPlugin],
+) -> Result<String, Box<dyn std::error::Error>> {
     let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let language = "日本語";
+    let plugin_section = if available_plugins.is_empty() {
+        "- (指定なし / 利用可能なプラグイン情報が提供されていません)".to_string()
+    } else {
+        available_plugins
+            .iter()
+            .filter(|p| !p.package_name.trim().is_empty())
+            .map(|p| {
+                let desc = p
+                    .description
+                    .as_ref()
+                    .map(|d| d.as_str())
+                    .unwrap_or("（説明なし）");
+                let functions = if p.functions.is_empty() {
+                    "    * functions: (none provided)".to_string()
+                } else {
+                    p.functions
+                        .iter()
+                        .filter(|f| !f.function_name.trim().is_empty())
+                        .map(|f| {
+                            let f_desc = f
+                                .description
+                                .as_ref()
+                                .map(|d| d.as_str())
+                                .unwrap_or("（説明なし）");
+                            format!("    * {}: {}", f.function_name, f_desc)
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                format!("- {}: {}\n{}", p.package_name, desc, functions)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     let prompt = format!(
         r#"
     ## System
@@ -105,6 +164,8 @@ fn generate_prompt(user_query: &str) -> Result<String, Box<dyn std::error::Error
     ### 利用可能なTool
     - `fetch(url: str) -> str`
     - `console.log(str) -> stdout`
+    - 以下のプラグインを必要に応じて活用してもよい:
+    {plugin_section}
     ---
 
     ### 出力例
@@ -248,6 +309,51 @@ fn test_extract_first_code() -> Result<(), Box<dyn Error>> {
     let result = extract_first_code("```javascript\nHello World\n```");
     assert_eq!(result, Some("Hello World".to_string()));
     println!("Extracted code: {result:?}");
+    Ok(())
+}
+
+#[test]
+fn generate_prompt_includes_plugin_details() -> Result<(), Box<dyn Error>> {
+    let plugins = vec![PromptPlugin {
+        package_name: "pkg.analytics".to_string(),
+        description: Some("analytics tools".to_string()),
+        functions: vec![
+            PromptPluginFunction {
+                function_name: "track".to_string(),
+                description: Some("send tracking event".to_string()),
+            },
+            PromptPluginFunction {
+                function_name: "report".to_string(),
+                description: None,
+            },
+        ],
+    }];
+
+    let prompt = generate_prompt("テストタスク", &plugins)?;
+
+    assert!(
+        prompt.contains("- pkg.analytics: analytics tools"),
+        "plugin package line should be present in prompt"
+    );
+    assert!(
+        prompt.contains("* track: send tracking event"),
+        "function description should be included"
+    );
+    assert!(
+        prompt.contains("* report: （説明なし）"),
+        "missing function description should be filled with placeholder"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn generate_prompt_handles_empty_plugins() -> Result<(), Box<dyn Error>> {
+    let prompt = generate_prompt("テストタスク", &[])?;
+    assert!(
+        prompt.contains("指定なし / 利用可能なプラグイン情報が提供されていません"),
+        "prompt should note when no plugins are provided"
+    );
     Ok(())
 }
 

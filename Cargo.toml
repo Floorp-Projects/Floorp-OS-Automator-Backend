@@ -12,7 +12,17 @@ homepage = "https://github.com/Walkmana-25/Sapphillon"
 
 [workspace]
 resolver = "3"
-members = ["plugins/*", "migration", "entity", "database"]
+members = [
+  "plugins/fetch",
+  "plugins/filesystem",
+  "plugins/window",
+  "plugins/exec",
+  "plugins/search",
+  "plugins/floorp",
+  "migration",
+  "entity",
+  "database",
+]
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -88,7 +98,6 @@ window = { path = "./plugins/window" }
 exec = { path = "./plugins/exec" }
 search = { path = "./plugins/search" }
 floorp = { path = "./plugins/floorp" }
-vscode = { path = "./plugins/vscode" }
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.12.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
