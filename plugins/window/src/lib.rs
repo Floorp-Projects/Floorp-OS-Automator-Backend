@@ -196,13 +196,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![core_window_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
@@ -226,13 +227,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![core_window_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
