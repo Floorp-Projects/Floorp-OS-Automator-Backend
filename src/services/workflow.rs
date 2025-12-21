@@ -683,7 +683,6 @@ impl WorkflowService for MyWorkflowService {
 
         let workflow_code_id = workflow_code.id.clone();
 
-        // TODO ワークフローの権限を関数毎に保持出来るように、Option<Vec<PluginFunctionPermissions>に変更する。
         let (required_permissions, allowed_permissions) =
             Self::build_core_permissions(workflow_code);
 
