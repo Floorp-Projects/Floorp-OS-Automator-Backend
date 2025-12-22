@@ -30,17 +30,17 @@ use uuid::Uuid;
 pub async fn create_workflow_code(
     db: &DatabaseConnection,
     code: String,
-    workflow_id: i32,
+    workflow_id: String,
     plugin_function_ids: Vec<String>,
     plugin_package_ids: Vec<String>,
 ) -> Result<WorkflowCode, DbErr> {
     // Build an entity model and delegate insertion to the CRUD helper.
-    // Note: workflow IDs are stored as strings in the entity model; convert the
-    // incoming integer id to string here. Start code_revision at 1 and set a
+    // Note: workflow IDs are stored as strings in the entity model.
+    // Start code_revision at 1 and set a
     // default language of 0 (WORKFLOW_LANGUAGE_UNSPECIFIED).
     let wc = entity::entity::workflow_code::Model {
         id: Uuid::new_v4().to_string(),
-        workflow_id: workflow_id.to_string(),
+        workflow_id,
         code_revision: 1,
         code,
         language: 0,
@@ -750,8 +750,14 @@ mod tests {
 
         // Call the function under test
         let code = "print('hi')".to_string();
-        let proto =
-            create_workflow_code(&db, code, 1, vec![func_id.clone()], vec![pkg_id.clone()]).await?;
+        let proto = create_workflow_code(
+            &db,
+            code,
+            wf_id.clone(),
+            vec![func_id.clone()],
+            vec![pkg_id.clone()],
+        )
+        .await?;
 
         // Verify workflow_code row exists
         let found_wc = entity::entity::workflow_code::Entity::find_by_id(proto.id.clone())
