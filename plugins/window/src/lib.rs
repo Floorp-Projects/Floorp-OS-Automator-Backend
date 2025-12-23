@@ -97,6 +97,11 @@ fn permission_check(state: &mut OpState) -> Result<(), JsErrorBox> {
         None => &vec![],
     };
 
+    // Check for wildcard permission first.
+    if allowed.iter().any(|p| p.plugin_function_id == "*") {
+        return Ok(());
+    }
+
     let required_permissions = sapphillon_core::permission::Permissions {
         permissions: window_plugin_permissions(),
     };
@@ -105,10 +110,7 @@ fn permission_check(state: &mut OpState) -> Result<(), JsErrorBox> {
         let permissions_vec = allowed.clone();
         permissions_vec
             .into_iter()
-            .find(|p| {
-                p.plugin_function_id == get_active_window_title_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
+            .find(|p| p.plugin_function_id == get_active_window_title_plugin_function().function_id)
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
                 permissions: vec![],
