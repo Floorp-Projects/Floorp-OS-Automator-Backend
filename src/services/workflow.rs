@@ -33,7 +33,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 // use crate::workflow::generate_workflow_async;
+// use crate::workflow::generate_workflow_async;
 use vscode;
+use iniad;
 
 /// Maximum number of characters to keep when deriving workflow display names from prompts.
 const MAX_DISPLAY_NAME_LEN: usize = 64;
@@ -656,104 +658,124 @@ function workflow() {
             prompt_len = req.prompt.len()
         );
 
-        // TEMPORARY: Hardcode verification workflow for VSCode plugin
-        // Ignoring AI generation for testing purposes as requested.
-        let generated = r#"
+        // Demo Workflow: VSCode to Floorp Form
+        // VSCodeのアクティブファイル内容を取得し、Floorpのフォームに入力
+        let generated = r##"
 /**
- * Demo Workflow: Verify VSCode Plugin Functions
+ * Demo Workflow 1: VSCode to Floorp Form
+ *
+ * このワークフローは以下の処理を行います:
+ * 1. VSCodeでアクティブに表示されているファイルの内容を取得
+ * 2. Floorpでアクティブなタブのフォームに内容を入力
+ *
+ * 使用する前提:
+ * - VSCodeでファイルが開かれている状態
+ * - Floorp OSサーバーが起動している
+ * - Floorpで入力先のフォームがあるページが開かれている
  */
-function workflow() {
-    console.log("Starting VSCode Plugin Verification...");
 
-    // Simplified workflow to avoid permission issues
-    const filePath = "/tmp/sapphillon_vscode_test.txt";
-    const testContent = "Hello from Floorp OS Automator!";
+function workflow() {
+  try {
+    // Step 1: VSCodeからアクティブファイルの内容を取得
+    console.log("Step 1: Getting content from VSCode active file...");
+    const content = vscode.get_active_file_content();
+    console.log(
+      "Got content from VSCode (first 100 chars): " + content.substring(0, 100)
+    );
+
+    // Step 2: Floorpのブラウザタブを取得
+    console.log("Step 2: Getting Floorp browser tabs...");
+    const tabsResponse = floorp.listBrowserTabs();
+    const tabs = JSON.parse(tabsResponse);
+
+    if (!tabs || tabs.length === 0) {
+      console.log(
+        JSON.stringify({ ok: false, reason: "No browser tabs found" })
+      );
+      return;
+    }
+
+    // Step 3: 特定のURLを持つタブを探してアタッチ
+    console.log("Step 3: Looking for GitHub compare tab...");
+    const targetUrl = "https://github.com/Floorp-Projects/Floorp/compare/main...Chrome-Extension";
+    let targetTab = null;
+    
+    for (const tab of tabs) {
+      console.log("Tab: " + tab.title + " - " + tab.url);
+      if (tab.url && tab.url.includes("github.com/Floorp-Projects/Floorp/compare")) {
+        targetTab = tab;
+        console.log("Found target tab: " + tab.title);
+        break;
+      }
+    }
+    
+    if (!targetTab) {
+      console.log(
+        JSON.stringify({ ok: false, reason: "GitHub compare tab not found", targetUrl: targetUrl })
+      );
+      return;
+    }
+    
+    const tabId = targetTab.browserId;
+    console.log("Using tab browserId: " + tabId);
+    const attachResult = floorp.attachToTab(tabId);
+    console.log("Attached to tab: " + attachResult);
+
+    // Step 4: GitHub PR画面のフォームに入力
+    console.log("Step 4: Filling GitHub PR form...");
 
     try {
-        // Skip directory creation, use /tmp directly
-        console.log("Using file path: " + filePath);
+      console.log("Generating PR title/body using INIAD AI...");
+      let aiResult;
+      try {
+        const aiJson = iniad.generatePrDescription(content);
+        aiResult = JSON.parse(aiJson);
+      } catch (aiError) {
+        console.log("AI generation failed: " + aiError);
+        console.log("AI generation failed, falling back to default.");
+        const lines = content.split(String.fromCharCode(10));
+        aiResult = {
+          title: lines[0].trim() || "PR from VSCode",
+          body: content
+        };
+      }
 
+      const prTitle = aiResult.title;
+      const prBody = aiResult.body;
+      
+      console.log("Setting PR title: " + prTitle);
+      floorp.tabFillForm(tabId, "#pull_request_title", prTitle);
+      
+      console.log("Setting PR body...");
+      floorp.tabFillForm(tabId, "#pull_request_body", prBody);
 
-        // 2. Test write_file
-        console.log("Testing vscode.write_file...");
-        const writeResult = vscode.write_file(filePath, testContent);
-        console.log("write_file result: " + writeResult);
-        
-        // Busy wait loop
-        const start1 = Date.now();
-        while (Date.now() - start1 < 2000) {}
-        // 3. Test open_file
-        console.log("Testing vscode.open_file...");
-        const openResult = vscode.open_file(filePath);
-        console.log("open_file result: " + openResult);
-        
-        const start2 = Date.now();
-        while (Date.now() - start2 < 1000) {}
-
-        // 4. Test get_active_file_content
-        console.log("Testing vscode.get_active_file_content...");
-        const content = vscode.get_active_file_content();
-        console.log("get_active_file_content result length: " + content.length);
-        
-        if (content.trim() === testContent.trim()) {
-            console.log("SUCCESS: Content matches!");
-        } else {
-            console.error("FAILURE: Content mismatch!");
-            console.error("Expected: " + testContent);
-            console.error("Actual: " + content);
-        }
-
-        // 5. Test open_folder
-        console.log("Testing vscode.open_folder...");
-        const folderResult = vscode.open_folder("/tmp");
-        console.log("open_folder result: " + folderResult);
-        
-        const start3 = Date.now();
-        while (Date.now() - start3 < 2000) {}
-
-        // 6. Test close_workspace
-        console.log("Testing vscode.close_workspace...");
-        const closeResult = vscode.close_workspace();
-        console.log("close_workspace result: " + closeResult);
-
-        console.log("Verification checks completed.");
-
-    } catch (e) {
-        console.error("Verification failed with error: " + e);
+      console.log(
+        JSON.stringify({
+          ok: true,
+          message: "GitHub PR form filled successfully",
+          title: prTitle,
+        })
+      );
+    } catch (fillError) {
+      console.log(
+        JSON.stringify({
+          ok: false,
+          reason: "Failed to fill GitHub PR form",
+          error: String(fillError),
+        })
+      );
     }
+  } catch (e) {
+    console.log(
+      JSON.stringify({
+        ok: false,
+        reason: "Workflow failed",
+        error: String(e),
+      })
+    );
+  }
 }
-"#;
-
-        // TEMPORARY: Hardcode verification workflow for VSCode plugin
-        // Ignoring AI generation for testing purposes as requested.
-        let generated = r#"
-/**
- * Demo Workflow: Test ONLY get_active_file_content
- */
-function workflow() {
-    console.log("Testing vscode.get_active_file_content ONLY...");
-
-    try {
-        if (typeof vscode === 'undefined') {
-            console.error("CRITICAL: vscode is undefined!");
-            return;
-        }
-
-        console.log("Calling vscode.get_active_file_content()...");
-        const content = vscode.get_active_file_content();
-        
-        console.log("=== ACTIVE FILE CONTENT ===");
-        console.log("Length: " + content.length + " characters");
-        console.log("First 500 chars:");
-        console.log(content.substring(0, 500));
-        console.log("=== END ===");
-        
-    } catch (e) {
-        console.error("Error: " + e.message);
-        if (e.stack) console.error("Stack: " + e.stack);
-    }
-}
-"#.to_string();
+"##.to_string();
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
         let now_ts = Self::now_timestamp();
@@ -773,32 +795,36 @@ function workflow() {
                 result: vec![],
                 plugin_packages: vec![],
                 plugin_function_ids: vec![
-                    "app.sapphillon.core.vscode.open_folder".to_string(),
-                    "app.sapphillon.core.vscode.open_file".to_string(),
-                    "app.sapphillon.core.vscode.write_file".to_string(),
-                    "app.sapphillon.core.vscode.close_workspace".to_string(),
+                    // VSCode plugin
                     "app.sapphillon.core.vscode.get_active_file_content".to_string(),
+                    // Floorp plugin (camelCase)
+                    "app.sapphillon.core.floorp.listBrowserTabs".to_string(),
+                    "app.sapphillon.core.floorp.attachToTab".to_string(),
+                    "app.sapphillon.core.floorp.tabFillForm".to_string(),
+                    "app.sapphillon.core.floorp.tabFillForm".to_string(),
+                    // INIAD plugin
+                    "app.sapphillon.core.iniad.generate_pr_description".to_string(),
                 ],
                 allowed_permissions: vec![
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.write_file".to_string(),
-                        permissions: vscode::vscode_write_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.open_file".to_string(),
-                        permissions: vscode::vscode_plugin_permissions(),
-                    },
                     AllowedPermission {
                         plugin_function_id: "app.sapphillon.core.vscode.get_active_file_content".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.open_folder".to_string(),
-                        permissions: vscode::vscode_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.floorp.listBrowserTabs".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.close_workspace".to_string(),
-                        permissions: vscode::vscode_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.floorp.attachToTab".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.floorp.tabFillForm".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.iniad.generate_pr_description".to_string(),
+                        permissions: iniad::iniad_plugin_permissions(),
                     },
                 ],
             }],

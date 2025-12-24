@@ -17,6 +17,7 @@ dependencies = [
  "fetch",
  "filesystem",
  "floorp",
+ "iniad",
  "log",
  "migration",
  "prost",
@@ -2805,6 +2806,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "iniad"
+version = "0.13.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "sapphillon_core",
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4543,12 +4558,14 @@ dependencies = [
  "tokio",
  "tokio-native-tls",
  "tokio-rustls 0.26.4",
+ "tokio-util",
  "tower 0.5.2",
  "tower-http 0.6.7",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.4",
 ]
