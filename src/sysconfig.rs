@@ -34,14 +34,23 @@ pub fn sysconfig() -> SysConfig {
             core_window_plugin_package(),
             core_exec_plugin_package(),
         ],
-        plugin_package: vec![
+        initial_plugins: vec![
             fetch_plugin_package(),
             filesystem_plugin_package(),
             search_plugin_package(),
             window_plugin_package(),
             exec_plugin_package(),
         ],
+
+        initial_workflows: vec![],
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct InitialWorkflow {
+    pub display_name: String,
+    pub description: Option<String>,
+    pub code: String,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +61,9 @@ pub struct SysConfig {
     pub copyright_year: u16,
 
     pub core_plugin_package: Vec<CorePluginPackage>,
-    pub plugin_package: Vec<PluginPackage>,
+    pub initial_plugins: Vec<PluginPackage>,
+
+    pub initial_workflows: Vec<InitialWorkflow>,
 }
 
 impl SysConfig {
