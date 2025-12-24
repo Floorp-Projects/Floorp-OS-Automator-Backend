@@ -118,11 +118,6 @@ fn _permission_check_backend_filesystem_write(
     allow: Vec<PluginFunctionPermissions>,
     path: String,
 ) -> Result<(), JsErrorBox> {
-    // Check for wildcard permission first.
-    if allow.iter().any(|p| p.plugin_function_id == "*") {
-        return Ok(());
-    }
-
     let mut perm = filesystem_write_plugin_permissions();
     perm[0].resource = vec![path.clone()];
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
@@ -130,9 +125,13 @@ fn _permission_check_backend_filesystem_write(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
-            .find(|p| p.plugin_function_id == filesystem_write_plugin_function().function_id)
+            .find(|p| {
+                p.plugin_function_id == filesystem_write_plugin_function().function_id
+                    || p.plugin_function_id == "*"
+            })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
                 permissions: vec![],
@@ -188,11 +187,6 @@ fn _permission_check_backend_filesystem_list_files(
     allow: Vec<PluginFunctionPermissions>,
     path: String,
 ) -> Result<(), JsErrorBox> {
-    // Check for wildcard permission first.
-    if allow.iter().any(|p| p.plugin_function_id == "*") {
-        return Ok(());
-    }
-
     let mut perm = filesystem_list_files_plugin_permissions();
     perm[0].resource = vec![path.clone()];
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
@@ -200,9 +194,13 @@ fn _permission_check_backend_filesystem_list_files(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
-            .find(|p| p.plugin_function_id == filesystem_list_files_plugin_function().function_id)
+            .find(|p| {
+                p.plugin_function_id == filesystem_list_files_plugin_function().function_id
+                    || p.plugin_function_id == "*"
+            })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
                 permissions: vec![],
@@ -288,11 +286,6 @@ fn _permission_check_backend_filesystem_read(
     allow: Vec<PluginFunctionPermissions>,
     path: String,
 ) -> Result<(), JsErrorBox> {
-    // Check for wildcard permission first.
-    if allow.iter().any(|p| p.plugin_function_id == "*") {
-        return Ok(());
-    }
-
     let mut perm = filesystem_read_plugin_permissions();
     perm[0].resource = vec![path.clone()];
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
@@ -300,9 +293,13 @@ fn _permission_check_backend_filesystem_read(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
-            .find(|p| p.plugin_function_id == filesystem_read_plugin_function().function_id)
+            .find(|p| {
+                p.plugin_function_id == filesystem_read_plugin_function().function_id
+                    || p.plugin_function_id == "*"
+            })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {
                 permissions: vec![],

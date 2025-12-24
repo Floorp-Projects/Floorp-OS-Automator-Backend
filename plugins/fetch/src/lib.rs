@@ -86,11 +86,6 @@ fn _permission_check_backend(
     allow: Vec<PluginFunctionPermissions>,
     url: String,
 ) -> Result<(), JsErrorBox> {
-    // Check for wildcard permission first.
-    if allow.iter().any(|p| p.plugin_function_id == "*") {
-        return Ok(());
-    }
-
     let mut perm = fetch_plugin_permissions();
     perm[0].resource = vec![url.clone()];
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
@@ -98,11 +93,13 @@ fn _permission_check_backend(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {
                 p.plugin_function_id == fetch_plugin_function().function_id
                     || p.plugin_function_id == post_plugin_function().function_id
+                    || p.plugin_function_id == "*"
             })
             .map(|p| p.permissions)
             .unwrap_or_else(|| sapphillon_core::permission::Permissions {

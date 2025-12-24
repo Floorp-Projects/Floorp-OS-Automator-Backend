@@ -11,7 +11,6 @@ use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
 use search::{core_search_plugin_package, search_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
-pub mod dummy_plugin;
 
 /// Builds the static system configuration used during application startup.
 ///

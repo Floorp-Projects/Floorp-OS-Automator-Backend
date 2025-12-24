@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
 mod args;
+mod dummy_plugin;
 mod init;
 mod server;
 mod services;
