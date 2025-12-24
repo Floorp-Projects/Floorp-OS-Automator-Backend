@@ -101,15 +101,13 @@ pub async fn create_workflow(
     db: &DatabaseConnection,
     display_name: String,
     description: Option<String>,
+    workflow_language: i32,
 ) -> Result<Workflow, DbErr> {
-    // TODO: Support different workflow languages.
-    const WORKFLOW_LANGUAGE: i32 = 0; // WORKFLOW_LANGUAGE_UNSPECIFIED
-
     let wm = entity::entity::workflow::Model {
         id: Uuid::new_v4().to_string(),
         display_name: display_name.clone(),
         description: description.clone(),
-        workflow_language: WORKFLOW_LANGUAGE,
+        workflow_language,
         created_at: Some(chrono::Utc::now()),
         updated_at: Some(chrono::Utc::now()),
     };
@@ -797,7 +795,7 @@ mod tests {
         let description = Some("A test workflow".to_string());
         let description_text = description.clone().expect("description seeded");
 
-        let proto = create_workflow(&db, display_name.clone(), description.clone()).await?;
+        let proto = create_workflow(&db, display_name.clone(), description.clone(), 0).await?;
 
         // Ensure a workflow row was inserted
         let found = entity::entity::workflow::Entity::find_by_id(proto.id.clone())
