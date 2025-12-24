@@ -5,6 +5,7 @@
 use sapphillon_core::plugin::CorePluginPackage;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage;
 
+use crate::dummy_plugin::dummy_plugin_package;
 use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
@@ -40,6 +41,7 @@ pub fn sysconfig() -> SysConfig {
             search_plugin_package(),
             window_plugin_package(),
             exec_plugin_package(),
+            dummy_plugin_package(),
         ],
 
         initial_workflows: vec![],

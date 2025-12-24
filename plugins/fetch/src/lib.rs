@@ -91,10 +91,9 @@ fn _permission_check_backend(
     let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
 
     let allowed_permissions = {
-        // Try to borrow workflow data from OpState; if it's not present (e.g. tests),
-        // treat as empty allowed permissions rather than panicking.
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {

@@ -140,6 +140,7 @@ fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
     };
 
     let allowed_permissions = {
+        // Match wildcard "*" as if it were the specific plugin function id
         allowed
             .into_iter()
             .find(|p| {

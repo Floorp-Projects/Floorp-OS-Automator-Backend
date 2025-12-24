@@ -70,6 +70,7 @@ fn _permission_check_backend(
 
     let allowed_permissions = {
         let permissions_vec = allow;
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {

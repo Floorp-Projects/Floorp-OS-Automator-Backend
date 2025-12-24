@@ -103,6 +103,7 @@ fn permission_check(state: &mut OpState) -> Result<(), JsErrorBox> {
 
     let allowed_permissions = {
         let permissions_vec = allowed.clone();
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {

@@ -125,6 +125,7 @@ fn _permission_check_backend_filesystem_write(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {
@@ -193,6 +194,7 @@ fn _permission_check_backend_filesystem_list_files(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {
@@ -291,6 +293,7 @@ fn _permission_check_backend_filesystem_read(
     let allowed_permissions = {
         let permissions_vec = allow;
 
+        // Match wildcard "*" as if it were the specific plugin function id
         permissions_vec
             .into_iter()
             .find(|p| {
