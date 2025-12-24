@@ -679,100 +679,127 @@ function workflow() {
     // Step 1: VSCodeからアクティブファイルの内容を取得
     console.log("Step 1: Getting content from VSCode active file...");
     const content = vscode.get_active_file_content();
-    console.log(
-      "Got content from VSCode (first 100 chars): " + content.substring(0, 100)
-    );
+    console.log("Got content from VSCode (first 100 chars): " + content.substring(0, 100));
 
-    // Step 2: Floorpのブラウザタブを取得
-    console.log("Step 2: Getting Floorp browser tabs...");
-    const tabsResponse = floorp.listBrowserTabs();
-    const tabs = JSON.parse(tabsResponse);
-
-    if (!tabs || tabs.length === 0) {
-      console.log(
-        JSON.stringify({ ok: false, reason: "No browser tabs found" })
-      );
-      return;
-    }
-
-    // Step 3: 特定のURLを持つタブを探してアタッチ
-    console.log("Step 3: Looking for GitHub compare tab...");
+    // Step 2: Floorpタブの準備 (検索 or 作成)
+    console.log("Step 2: Preparing Floorp tab...");
     const targetUrl = "https://github.com/Floorp-Projects/Floorp/compare/main...Chrome-Extension";
+    const tabsJson = floorp.listBrowserTabs();
+    const tabs = JSON.parse(tabsJson);
     let targetTab = null;
-    
-    for (const tab of tabs) {
-      console.log("Tab: " + tab.title + " - " + tab.url);
-      if (tab.url && tab.url.includes("github.com/Floorp-Projects/Floorp/compare")) {
-        targetTab = tab;
-        console.log("Found target tab: " + tab.title);
-        break;
-      }
-    }
-    
-    if (!targetTab) {
-      console.log(
-        JSON.stringify({ ok: false, reason: "GitHub compare tab not found", targetUrl: targetUrl })
-      );
-      return;
-    }
-    
-    const tabId = targetTab.browserId;
-    console.log("Using tab browserId: " + tabId);
-    const attachResult = floorp.attachToTab(tabId);
-    console.log("Attached to tab: " + attachResult);
 
-    // Step 4: GitHub PR画面のフォームに入力
-    console.log("Step 4: Filling GitHub PR form...");
+    // 既存のタブを探す
+    for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].url && tabs[i].url.includes("compare/main...Chrome-Extension")) {
+            targetTab = tabs[i];
+            break;
+        }
+    }
 
+    let instanceId = "";
+
+    if (targetTab) {
+        console.log("Found existing target tab: " + targetTab.title);
+        console.log("Attaching to tab browserId: " + targetTab.browserId);
+        const attachResultJson = floorp.attachToTab(targetTab.browserId);
+        const attachResult = JSON.parse(attachResultJson);
+        instanceId = attachResult.instanceId;
+        console.log("Attached to tab, instanceId: " + instanceId);
+    } else {
+        console.log("Target tab not found. Creating new tab...");
+        try {
+            // Pass explicitly "false" for in_background to ensure argument mapping works
+            // 00_floorp.js maps this to op_floorp_create_tab_instance
+            const createResultJson = floorp.createTab(targetUrl, false);
+            console.log("Create Tab Result JSON: " + createResultJson);
+            const createResult = JSON.parse(createResultJson);
+            instanceId = createResult.instanceId;
+            console.log("Created new tab, instanceId: " + instanceId);
+            
+            console.log("Waiting for page load...");
+            // Add a small manual wait just in case
+            // floorp.wait(2000); 
+        } catch (createError) {
+            console.log("Failed to create tab: " + createError);
+            throw createError;
+        }
+    }
+
+    // Step 3: フォームの表示を待機
+    console.log("Step 3: Waiting for PR form...");
+    // タイムアウト15秒
     try {
-      console.log("Generating PR title/body using INIAD AI...");
-      let aiResult;
-      try {
+        floorp.tabWaitForElement(instanceId, "#pull_request_title", "15000");
+    } catch (e) {
+        // もしcreateTabInstance直後で早すぎた場合などに備えて少し待つなどのロジックを入れるか、
+        // あるいはエラーをリスローするか。ここではログ出力して続行
+        console.log("Wait for element warning: " + e);
+    }
+
+    // Step 4: AIでPR内容を生成
+    console.log("Step 4: Generating PR title/body using INIAD AI...");
+    let aiResult;
+    try {
         const aiJson = iniad.generatePrDescription(content);
         aiResult = JSON.parse(aiJson);
-      } catch (aiError) {
+    } catch (aiError) {
         console.log("AI generation failed: " + aiError);
         console.log("AI generation failed, falling back to default.");
         const lines = content.split(String.fromCharCode(10));
         aiResult = {
-          title: lines[0].trim() || "PR from VSCode",
-          body: content
+            title: lines.length > 0 ? lines[0] : "Update",
+            body: content
         };
-      }
-
-      const prTitle = aiResult.title;
-      const prBody = aiResult.body;
-      
-      console.log("Setting PR title: " + prTitle);
-      floorp.tabFillForm(tabId, "#pull_request_title", prTitle);
-      
-      console.log("Setting PR body...");
-      floorp.tabFillForm(tabId, "#pull_request_body", prBody);
-
-      console.log(
-        JSON.stringify({
-          ok: true,
-          message: "GitHub PR form filled successfully",
-          title: prTitle,
-        })
-      );
-    } catch (fillError) {
-      console.log(
-        JSON.stringify({
-          ok: false,
-          reason: "Failed to fill GitHub PR form",
-          error: String(fillError),
-        })
-      );
     }
-  } catch (e) {
-    console.log(
-      JSON.stringify({
-        ok: false,
-        reason: "Workflow failed",
-        error: String(e),
-      })
-    );
+
+    // Step 5: フォーム入力
+    console.log("Step 5: Filling GitHub PR form...");
+    console.log("Setting PR title: " + aiResult.title);
+    
+    // フォームデータ作成
+    const formData = {
+        "#pull_request_title": aiResult.title,
+        "#pull_request_body": aiResult.body
+    };
+    
+    // 入力実行
+    try {
+        const fillResult = floorp.tabFillForm(instanceId, formData);
+        console.log("Form filled: " + fillResult);
+    } catch (e) {
+        console.log("Fill form warning: " + e);
+    }
+    
+    // Step 6: PR作成ボタンをクリック
+    console.log("Step 6: Clicking 'Create Pull Request' button...");
+    // ボタンのセレクタ: .hx_create-pr-button あるいは form の submit
+    const buttonSelector = ".hx_create-pr-button";
+    
+    try {
+        floorp.tabClick(instanceId, buttonSelector);
+        console.log("Clicked creation button.");
+    } catch (e) {
+        console.log("Failed to click button: " + e);
+        // 代替
+        try {
+             floorp.tabClick(instanceId, "button.btn-primary");
+             console.log("Clicked creation button (fallback).");
+        } catch (e2) {
+             console.log("Failed to click button (fallback): " + e2);
+        }
+    }
+
+    return {
+      ok: true,
+      message: "GitHub PR created successfully",
+      title: aiResult.title
+    };
+
+  } catch (error) {
+    return {
+      ok: false,
+      message: "Workflow failed: " + error,
+    };
   }
 }
 "##.to_string();
@@ -801,7 +828,9 @@ function workflow() {
                     "app.sapphillon.core.floorp.listBrowserTabs".to_string(),
                     "app.sapphillon.core.floorp.attachToTab".to_string(),
                     "app.sapphillon.core.floorp.tabFillForm".to_string(),
-                    "app.sapphillon.core.floorp.tabFillForm".to_string(),
+                    "app.sapphillon.core.floorp.createTabInstance".to_string(),
+                    "app.sapphillon.core.floorp.tabClickElement".to_string(),
+                    "app.sapphillon.core.floorp.tabWaitForElement".to_string(),
                     // INIAD plugin
                     "app.sapphillon.core.iniad.generate_pr_description".to_string(),
                 ],
@@ -820,6 +849,18 @@ function workflow() {
                     },
                     AllowedPermission {
                         plugin_function_id: "app.sapphillon.core.floorp.tabFillForm".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.floorp.createTabInstance".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.floorp.tabClickElement".to_string(),
+                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.floorp.tabWaitForElement".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
