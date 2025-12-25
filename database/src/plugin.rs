@@ -542,7 +542,8 @@ mod tests {
     #[tokio::test]
     async fn test_init_register_plugins_registers_data_once() -> Result<(), sea_orm::DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
-            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+            FunctionDefine, Permission, PermissionLevel, PermissionType, PluginFunction,
+            PluginPackage,
         };
 
         let db = setup_db().await?;
@@ -560,8 +561,10 @@ mod tests {
             function_name: "Fn".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
-            arguments: String::new(),
-            returns: String::new(),
+            function_define: Some(FunctionDefine {
+                parameters: vec![],
+                returns: vec![],
+            }),
         };
 
         let package_proto = PluginPackage {
@@ -642,7 +645,8 @@ mod tests {
     #[tokio::test]
     async fn test_init_register_plugins_updates_on_diff() -> Result<(), sea_orm::DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
-            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+            FunctionDefine, Permission, PermissionLevel, PermissionType, PluginFunction,
+            PluginPackage,
         };
 
         let db = setup_db().await?;
@@ -661,8 +665,10 @@ mod tests {
             function_name: "Fn".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
-            arguments: String::new(),
-            returns: String::new(),
+            function_define: Some(FunctionDefine {
+                parameters: vec![],
+                returns: vec![],
+            }),
         };
 
         let package_proto_initial = PluginPackage {

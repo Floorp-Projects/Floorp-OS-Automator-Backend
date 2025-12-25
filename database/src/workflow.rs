@@ -822,8 +822,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_workflow_from_proto_synchronizes_relations() -> Result<(), DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
-            AllowedPermission, Permission, PermissionLevel, PermissionType, PluginFunction,
-            PluginPackage as ProtoPluginPackage, WorkflowCode as ProtoWorkflowCode,
+            AllowedPermission, FunctionDefine, Permission, PermissionLevel, PermissionType,
+            PluginFunction, PluginPackage as ProtoPluginPackage, WorkflowCode as ProtoWorkflowCode,
             WorkflowResult as ProtoWorkflowResult, WorkflowResultType,
         };
 
@@ -860,8 +860,10 @@ mod tests {
                         function_name: "Fn".to_string(),
                         description: "Run function".to_string(),
                         permissions: Vec::new(),
-                        arguments: "{}".to_string(),
-                        returns: "{}".to_string(),
+                        function_define: Some(FunctionDefine {
+                            parameters: vec![],
+                            returns: vec![],
+                        }),
                     }],
                     plugin_store_url: "https://example.com".to_string(),
                     internal_plugin: Some(false),

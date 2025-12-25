@@ -10,8 +10,7 @@ pub fn dummy_plugin_function() -> PluginFunction {
         function_name: "Dummy Function".to_string(),
         description: "A dummy function for wildcard permission.".to_string(),
         permissions: vec![],
-        arguments: "".to_string(),
-        returns: "".to_string(),
+        function_define: None,
     }
 }
 

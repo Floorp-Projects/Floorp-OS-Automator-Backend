@@ -1492,6 +1492,7 @@ dependencies = [
  "chrono",
  "sapphillon_core",
  "sea-orm",
+ "serde",
  "serde_json",
 ]
 
@@ -4262,8 +4263,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.8.7"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.8.7#213e12e13d6e214a36adf51cf2c22d58017d28d4"
+version = "0.9.0"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.9.0#d1522062fd876f10343f11bd719465bd1d7a5b75"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -4,14 +4,13 @@
 
 use deno_core::{OpState, op2};
 use deno_error::JsErrorBox;
-use sapphillon_core::{
-    permission::{CheckPermissionResult, check_permission},
-    plugin::{CorePluginFunction, CorePluginPackage},
-    proto::sapphillon::v1::{
-        Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
-    },
-    runtime::OpStateWorkflowData,
+use sapphillon_core::permission::{CheckPermissionResult, Permissions, check_permission};
+use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
+use sapphillon_core::proto::sapphillon::v1::{
+    FunctionDefine, FunctionParameter, Permission, PermissionLevel, PermissionType, PluginFunction,
+    PluginPackage,
 };
+use sapphillon_core::runtime::OpStateWorkflowData;
 use std::sync::{Arc, Mutex};
 use x_win::{get_active_window, get_open_windows};
 
@@ -21,8 +20,14 @@ pub fn get_active_window_title_plugin_function() -> PluginFunction {
         function_name: "Get Active Window Title".to_string(),
         description: "Gets the title of the currently active window.".to_string(),
         permissions: window_plugin_permissions(),
-        arguments: "".to_string(),
-        returns: "String: title".to_string(),
+        function_define: Some(FunctionDefine {
+            parameters: vec![],
+            returns: vec![FunctionParameter {
+                name: "title".to_string(),
+                r#type: "string".to_string(),
+                description: "Active window title".to_string(),
+            }],
+        }),
     }
 }
 
@@ -32,8 +37,14 @@ pub fn get_inactive_window_titles_plugin_function() -> PluginFunction {
         function_name: "Get Inactive Window Titles".to_string(),
         description: "Gets the titles of all inactive windows.".to_string(),
         permissions: window_plugin_permissions(),
-        arguments: "".to_string(),
-        returns: "Array<String>: titles".to_string(),
+        function_define: Some(FunctionDefine {
+            parameters: vec![],
+            returns: vec![FunctionParameter {
+                name: "titles".to_string(),
+                r#type: "string[]".to_string(),
+                description: "List of inactive window titles".to_string(),
+            }],
+        }),
     }
 }
 
@@ -87,50 +98,15 @@ pub fn core_window_plugin_package() -> CorePluginPackage {
     )
 }
 
-fn permission_check(state: &mut OpState) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![],
-    };
-
-    let required_permissions = sapphillon_core::permission::Permissions {
-        permissions: window_plugin_permissions(),
-    };
-
-    let allowed_permissions = {
-        let permissions_vec = allowed.clone();
-        // Match wildcard "*" as if it were the specific plugin function id
-        permissions_vec
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == get_active_window_title_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
-
-    match permission_check_result {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
 #[op2]
 #[string]
 fn op2_get_active_window_title(state: &mut OpState) -> Result<String, JsErrorBox> {
-    permission_check(state)?;
+    ensure_permission(
+        state,
+        &get_active_window_title_plugin_function().function_id,
+        window_plugin_permissions(),
+        "",
+    )?;
     match get_active_window() {
         Ok(active_window) => Ok(active_window.title),
         Err(_) => Err(JsErrorBox::new(
@@ -143,7 +119,12 @@ fn op2_get_active_window_title(state: &mut OpState) -> Result<String, JsErrorBox
 #[op2]
 #[serde]
 fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, JsErrorBox> {
-    permission_check(state)?;
+    ensure_permission(
+        state,
+        &get_inactive_window_titles_plugin_function().function_id,
+        window_plugin_permissions(),
+        "",
+    )?;
     match get_open_windows() {
         Ok(windows) => {
             let active_window = get_active_window().ok();
@@ -163,6 +144,45 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
         Err(_) => Err(JsErrorBox::new(
             "Error",
             "Could not get inactive window titles".to_string(),
+        )),
+    }
+}
+
+fn ensure_permission(
+    state: &mut OpState,
+    plugin_function_id: &str,
+    required_permissions: Vec<Permission>,
+    resource: &str,
+) -> Result<(), JsErrorBox> {
+    let data = state
+        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
+        .lock()
+        .unwrap();
+    let allowed = data.get_allowed_permissions().clone().unwrap_or_default();
+
+    let required_permissions = Permissions::new(
+        required_permissions
+            .into_iter()
+            .map(|mut p| {
+                if !resource.is_empty() && p.resource.is_empty() {
+                    p.resource = vec![resource.to_string()];
+                }
+                p
+            })
+            .collect(),
+    );
+
+    let allowed_permissions = allowed
+        .into_iter()
+        .find(|p| p.plugin_function_id == plugin_function_id || p.plugin_function_id == "*")
+        .map(|p| p.permissions)
+        .unwrap_or_else(|| Permissions::new(vec![]));
+
+    match check_permission(&allowed_permissions, &required_permissions) {
+        CheckPermissionResult::Ok => Ok(()),
+        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
+            "PermissionDenied. Missing Permissions:",
+            perm.to_string(),
         )),
     }
 }

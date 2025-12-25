@@ -12,9 +12,12 @@ use crate::entity::plugin_package::Model as EntityPluginPackage;
 use chrono::{TimeZone, Utc};
 use sea_orm::prelude::DateTimeUtc;
 
+use sapphillon_core::proto::sapphillon::v1::FunctionDefine;
+use sapphillon_core::proto::sapphillon::v1::FunctionParameter;
 use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
+use serde::{Deserialize, Serialize};
 
 /// Convert a protobuf `PluginPackage` into the entity model.
 ///
@@ -120,13 +123,14 @@ impl From<ProtoPluginPackage> for EntityPluginPackage {
 
 impl From<(&ProtoPluginFunction, String)> for EntityPluginFunction {
     fn from((proto, package_id): (&ProtoPluginFunction, String)) -> Self {
+        let (arguments, returns) = serialize_function_define(proto.function_define.as_ref());
         EntityPluginFunction {
             function_id: proto.function_id.clone(),
             package_id,
             function_name: proto.function_name.clone(),
             description: proto_string_to_option(&proto.description),
-            arguments: proto_string_to_option(&proto.arguments),
-            returns: proto_string_to_option(&proto.returns),
+            arguments,
+            returns,
         }
     }
 }
@@ -170,6 +174,48 @@ pub fn proto_timestamp_to_datetime(
     Utc.timestamp_opt(seconds, nanos as u32).single()
 }
 
+fn serialize_function_define(
+    function_define: Option<&FunctionDefine>,
+) -> (Option<String>, Option<String>) {
+    match function_define {
+        Some(fd) => {
+            let params = serde_json::to_string(
+                &fd.parameters
+                    .iter()
+                    .map(FunctionParameterSerde::from)
+                    .collect::<Vec<_>>(),
+            )
+            .ok();
+            let returns = serde_json::to_string(
+                &fd.returns
+                    .iter()
+                    .map(FunctionParameterSerde::from)
+                    .collect::<Vec<_>>(),
+            )
+            .ok();
+            (params, returns)
+        }
+        None => (None, None),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FunctionParameterSerde {
+    name: String,
+    r#type: String,
+    description: String,
+}
+
+impl From<&FunctionParameter> for FunctionParameterSerde {
+    fn from(value: &FunctionParameter) -> Self {
+        FunctionParameterSerde {
+            name: value.name.clone(),
+            r#type: value.r#type.clone(),
+            description: value.description.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,8 +256,22 @@ mod tests {
             package_id: "pkg1".to_string(),
             function_name: "Fn".to_string(),
             description: Some("do it".to_string()),
-            arguments: Some("{}".to_string()),
-            returns: Some("{}".to_string()),
+            arguments: Some(
+                serde_json::to_string(&vec![FunctionParameterSerde {
+                    name: "path".to_string(),
+                    r#type: "string".to_string(),
+                    description: "file path".to_string(),
+                }])
+                .unwrap(),
+            ),
+            returns: Some(
+                serde_json::to_string(&vec![FunctionParameterSerde {
+                    name: "result".to_string(),
+                    r#type: "string".to_string(),
+                    description: "result".to_string(),
+                }])
+                .unwrap(),
+            ),
         };
 
         let perm_entity = EntityPermission {
@@ -233,6 +293,7 @@ mod tests {
         let proto_fn = plugin_function_to_proto(&f, Some(std::slice::from_ref(&proto_perm)));
         assert_eq!(proto_fn.function_id, f.function_id);
         assert_eq!(proto_fn.permissions.len(), 1);
+        assert!(proto_fn.function_define.is_some());
     }
 
     #[test]
@@ -293,8 +354,18 @@ mod tests {
             function_name: "Fn".to_string(),
             description: "do it".to_string(),
             permissions: Vec::new(),
-            arguments: "{}".to_string(),
-            returns: "{}".to_string(),
+            function_define: Some(FunctionDefine {
+                parameters: vec![FunctionParameter {
+                    name: "path".to_string(),
+                    r#type: "string".to_string(),
+                    description: "file path".to_string(),
+                }],
+                returns: vec![FunctionParameter {
+                    name: "result".to_string(),
+                    r#type: "string".to_string(),
+                    description: "result".to_string(),
+                }],
+            }),
         };
 
         let entity = proto_to_plugin_function(&proto, "pkg1");
@@ -303,8 +374,8 @@ mod tests {
         assert_eq!(entity.function_name, proto.function_name);
         assert_eq!(entity.package_id, "pkg1");
         assert_eq!(entity.description.as_deref(), Some("do it"));
-        assert_eq!(entity.arguments.as_deref(), Some("{}"));
-        assert_eq!(entity.returns.as_deref(), Some("{}"));
+        assert!(entity.arguments.is_some());
+        assert!(entity.returns.is_some());
 
         let entity_from_tuple: EntityPluginFunction = (&proto, "pkg1").into();
         assert_eq!(entity_from_tuple, entity);
