@@ -102,12 +102,7 @@ impl MyWorkflowService {
         name
     }
 
-    fn make_plugin_permission(permission: &AllowedPermission) -> PluginFunctionPermissions {
-        PluginFunctionPermissions {
-            plugin_function_id: permission.plugin_function_id.clone(),
-            permissions: Permissions::new(permission.permissions.clone()),
-        }
-    }
+
 
     fn apply_update_mask(
         existing: &Workflow,

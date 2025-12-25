@@ -37,6 +37,7 @@ pub fn generate_workflow(user_query: &str) -> Result<String, Box<dyn std::error:
 /// # Returns
 ///
 /// Returns the extracted JavaScript snippet on success, or an error when the LLM request fails.
+#[allow(dead_code)]
 pub async fn generate_workflow_async(
     user_query: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
