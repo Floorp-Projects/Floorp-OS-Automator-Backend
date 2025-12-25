@@ -247,7 +247,7 @@ fn op2_close_window(
             #[cfg(not(target_os = "windows"))]
             {
                 let result = std::process::Command::new("kill")
-                    .arg(&window.info.process_id.to_string())
+                    .arg(window.info.process_id.to_string())
                     .output();
 
                 if result.is_ok() {
