@@ -35,7 +35,6 @@ use tonic::{Request, Response, Status};
 // use crate::workflow::generate_workflow_async;
 // use crate::workflow::generate_workflow_async;
 
-
 /// Maximum number of characters to keep when deriving workflow display names from prompts.
 const MAX_DISPLAY_NAME_LEN: usize = 64;
 const DEFAULT_PAGE_SIZE: u64 = 100;
