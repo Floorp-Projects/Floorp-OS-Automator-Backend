@@ -12,6 +12,9 @@ mod workflow;
 #[allow(unused)]
 mod global;
 
+#[cfg(test)]
+mod test_support;
+
 /// System Configuration
 #[allow(unused)]
 mod sysconfig;
