@@ -102,8 +102,6 @@ impl MyWorkflowService {
         name
     }
 
-
-
     fn apply_update_mask(
         existing: &Workflow,
         incoming: &Workflow,
