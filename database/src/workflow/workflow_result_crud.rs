@@ -158,7 +158,7 @@ pub(crate) async fn delete_workflow_result(db: &DatabaseConnection, id: &str) ->
 mod tests {
     use super::*;
     use entity::entity::{workflow as entity_wf, workflow_code as entity_wc};
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Creates an in-memory SQLite database with the tables required for the tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {

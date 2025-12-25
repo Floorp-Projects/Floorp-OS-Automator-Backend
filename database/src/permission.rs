@@ -150,7 +150,7 @@ pub async fn delete_permission(db: &DatabaseConnection, id: i32) -> Result<(), D
 mod tests {
     use super::*;
     use entity::entity::plugin_function;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Creates a temporary SQLite database with the tables required for permission tests.
     ///

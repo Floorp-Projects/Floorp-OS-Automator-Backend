@@ -208,7 +208,7 @@ pub(crate) async fn delete_workflow_code_allowed_permission(
 mod tests {
     use super::*;
     use entity::entity::{permission as entity_permission, workflow_code as entity_wc};
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Sets up in-memory tables required for workflow code permission tests.
     ///

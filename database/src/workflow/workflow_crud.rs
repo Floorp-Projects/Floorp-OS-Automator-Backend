@@ -160,7 +160,7 @@ pub(crate) async fn delete_workflow(db: &DatabaseConnection, id: &str) -> Result
 mod tests {
     use super::*;
     use entity::entity::workflow as entity_wf;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Creates an in-memory workflow table used by the unit tests.
     ///

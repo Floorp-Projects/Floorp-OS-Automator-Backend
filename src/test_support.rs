@@ -24,9 +24,7 @@ impl TestState {
 
 #[macro_export]
 macro_rules! global_state_for_tests {
-    () => {{
-        $crate::test_support::TestState::new_in_memory()
-    }};
+    () => {{ $crate::test_support::TestState::new_in_memory() }};
 }
 
 #[cfg(test)]

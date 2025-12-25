@@ -163,7 +163,7 @@ pub(crate) async fn delete_workflow_code(db: &DatabaseConnection, id: &str) -> R
 mod tests {
     use super::*;
     use entity::entity::workflow as entity_wf;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Sets up an in-memory database with workflow and workflow_code tables for tests.
     ///

@@ -198,7 +198,7 @@ pub(crate) async fn delete_plugin_package(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Configures an in-memory database with plugin package and function tables for testing.
     ///

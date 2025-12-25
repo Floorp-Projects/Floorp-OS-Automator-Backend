@@ -59,7 +59,7 @@ pub async fn delete_model(db: &DatabaseConnection, name: &str) -> Result<bool, D
 mod tests {
     use super::*;
     use sea_orm::{
-        ActiveModelTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement,
+        ActiveModelTrait, ConnectionTrait, DatabaseConnection, DbBackend, Statement,
     };
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {

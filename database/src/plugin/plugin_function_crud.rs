@@ -200,7 +200,7 @@ pub(crate) async fn delete_plugin_function(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Sets up an in-memory SQLite database with plugin tables for testing.
     ///
