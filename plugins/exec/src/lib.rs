@@ -2,11 +2,9 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
-use deno_core::{OpState, op2};
+use deno_core::{op2, OpState};
 use deno_error::JsErrorBox;
-use sapphillon_core::permission::{
-    CheckPermissionResult, PluginFunctionPermissions, check_permission,
-};
+use sapphillon_core::permission::{permission_check, PluginFunctionPermissions};
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 use sapphillon_core::proto::sapphillon::v1::{
     Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
@@ -60,65 +58,18 @@ pub fn core_exec_plugin_package() -> CorePluginPackage {
     )
 }
 
-fn _permission_check_backend(
-    allow: Vec<PluginFunctionPermissions>,
-    command: String,
-) -> Result<(), JsErrorBox> {
-    let mut perm = exec_plugin_permissions();
-    perm[0].resource = vec![command.clone()];
-    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
-
-    let allowed_permissions = {
-        let permissions_vec = allow;
-        // Match wildcard "*" as if it were the specific plugin function id
-        permissions_vec
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == exec_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
-
-    match permission_check_result {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
-fn permission_check(state: &mut OpState, command: String) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![PluginFunctionPermissions {
-            plugin_function_id: exec_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: exec_plugin_permissions(),
-            },
-        }],
-    };
-    _permission_check_backend(allowed.clone(), command)?;
-    Ok(())
-}
-
 #[op2]
 #[string]
 fn op2_exec(
     state: &mut OpState,
     #[string] command: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    permission_check(state, command.clone())?;
+    permission_check(
+        state,
+        &exec_plugin_function().function_id,
+        exec_plugin_permissions(),
+        &command,
+    )?;
 
     match exec(&command) {
         Ok(output) => Ok(output),

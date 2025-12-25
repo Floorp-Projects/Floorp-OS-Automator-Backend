@@ -3,11 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
 // Filesystem plugin - provides simple text file IO (read) with permission checks
-use deno_core::{OpState, op2};
+use deno_core::{op2, OpState};
 use deno_error::JsErrorBox;
-use sapphillon_core::permission::{
-    CheckPermissionResult, PluginFunctionPermissions, check_permission,
-};
+use sapphillon_core::permission::{permission_check, PluginFunctionPermissions};
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 use sapphillon_core::proto::sapphillon::v1::{
     Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
@@ -114,59 +112,6 @@ pub fn core_filesystem_write_plugin() -> CorePluginFunction {
     )
 }
 
-fn _permission_check_backend_filesystem_write(
-    allow: Vec<PluginFunctionPermissions>,
-    path: String,
-) -> Result<(), JsErrorBox> {
-    let mut perm = filesystem_write_plugin_permissions();
-    perm[0].resource = vec![path.clone()];
-    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
-
-    let allowed_permissions = {
-        let permissions_vec = allow;
-
-        // Match wildcard "*" as if it were the specific plugin function id
-        permissions_vec
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == filesystem_write_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
-
-    match permission_check_result {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
-fn permission_check_filesystem_write(state: &mut OpState, path: String) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![PluginFunctionPermissions {
-            plugin_function_id: filesystem_write_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: filesystem_write_plugin_permissions(),
-            },
-        }],
-    };
-    _permission_check_backend_filesystem_write(allowed.clone(), path)?;
-    Ok(())
-}
-
 #[op2]
 #[string]
 fn op2_filesystem_write(
@@ -175,63 +120,17 @@ fn op2_filesystem_write(
     #[string] content: String,
 ) -> std::result::Result<String, JsErrorBox> {
     // Permission check
-    permission_check_filesystem_write(state, path.clone())?;
+    permission_check(
+        state,
+        &filesystem_write_plugin_function().function_id,
+        filesystem_write_plugin_permissions(),
+        &path,
+    )?;
 
     match write_file_text_filesystem_write(&path, &content) {
         Ok(_) => Ok("ok".to_string()),
         Err(e) => Err(JsErrorBox::new("Error", e.to_string())),
     }
-}
-
-fn _permission_check_backend_filesystem_list_files(
-    allow: Vec<PluginFunctionPermissions>,
-    path: String,
-) -> Result<(), JsErrorBox> {
-    let mut perm = filesystem_list_files_plugin_permissions();
-    perm[0].resource = vec![path.clone()];
-    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
-
-    let allowed_permissions = {
-        let permissions_vec = allow;
-
-        // Match wildcard "*" as if it were the specific plugin function id
-        permissions_vec
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == filesystem_list_files_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
-
-    match permission_check_result {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
-fn permission_check_filesystem_list_files(
-    state: &mut OpState,
-    path: String,
-) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![],
-    };
-    _permission_check_backend_filesystem_list_files(allowed.clone(), path)?;
-    Ok(())
 }
 
 #[op2]
@@ -241,7 +140,12 @@ fn op2_filesystem_list_files(
     #[string] path: String,
 ) -> std::result::Result<String, JsErrorBox> {
     // Permission check
-    permission_check_filesystem_list_files(state, path.clone())?;
+    permission_check(
+        state,
+        &filesystem_list_files_plugin_function().function_id,
+        filesystem_list_files_plugin_permissions(),
+        &path,
+    )?;
 
     match list_files_in_directory(&path) {
         Ok(s) => Ok(s),
@@ -282,59 +186,6 @@ fn filesystem_list_files_plugin_permissions() -> Vec<Permission> {
     }]
 }
 
-fn _permission_check_backend_filesystem_read(
-    allow: Vec<PluginFunctionPermissions>,
-    path: String,
-) -> Result<(), JsErrorBox> {
-    let mut perm = filesystem_read_plugin_permissions();
-    perm[0].resource = vec![path.clone()];
-    let required_permissions = sapphillon_core::permission::Permissions { permissions: perm };
-
-    let allowed_permissions = {
-        let permissions_vec = allow;
-
-        // Match wildcard "*" as if it were the specific plugin function id
-        permissions_vec
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == filesystem_read_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    let permission_check_result = check_permission(&allowed_permissions, &required_permissions);
-
-    match permission_check_result {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
-fn permission_check_filesystem_read(state: &mut OpState, path: String) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![PluginFunctionPermissions {
-            plugin_function_id: filesystem_read_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: filesystem_read_plugin_permissions(),
-            },
-        }],
-    };
-    _permission_check_backend_filesystem_read(allowed.clone(), path)?;
-    Ok(())
-}
-
 #[op2]
 #[string]
 fn op2_filesystem_read(
@@ -342,7 +193,12 @@ fn op2_filesystem_read(
     #[string] path: String,
 ) -> std::result::Result<String, JsErrorBox> {
     // Permission check
-    permission_check_filesystem_read(state, path.clone())?;
+    permission_check(
+        state,
+        &filesystem_read_plugin_function().function_id,
+        filesystem_read_plugin_permissions(),
+        &path,
+    )?;
 
     match read_file_text_filesystem_read(&path) {
         Ok(s) => Ok(s),
@@ -376,24 +232,6 @@ mod tests {
     // Tests below use std::env::temp_dir() to construct temporary file paths so
     // they work both on Unix-like systems and Windows (avoids hard-coded paths
     // like /tmp/... and handles backslashes in JS string literals).
-
-    #[test]
-    #[serial]
-    fn test_permission_check_backend_filesystem_list_files_empty_permissions() {
-        // Test that empty permissions triggers permission denied error
-        let perm = PluginFunctionPermissions {
-            plugin_function_id: filesystem_list_files_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            },
-        };
-
-        let result =
-            _permission_check_backend_filesystem_list_files(vec![perm], "/some/path".to_string());
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("FILESYSTEM_READ"));
-    }
 
     #[test]
     #[serial]
