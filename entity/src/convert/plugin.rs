@@ -9,12 +9,12 @@ use crate::entity::permission::Model as EntityPermission;
 use crate::entity::plugin_function::Model as EntityPluginFunction;
 use crate::entity::plugin_package::Model as EntityPluginPackage;
 
-use serde::{Deserialize, Serialize};
-use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::FunctionDefine;
 use sapphillon_core::proto::sapphillon::v1::FunctionParameter;
+use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
+use serde::{Deserialize, Serialize};
 
 /// Convert an entity `plugin_package::Model` into the proto `PluginPackage`.
 /// This does not attach related `functions` by default; use the "with_relations"

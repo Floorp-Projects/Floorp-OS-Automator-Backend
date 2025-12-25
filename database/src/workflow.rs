@@ -823,9 +823,8 @@ mod tests {
     async fn test_update_workflow_from_proto_synchronizes_relations() -> Result<(), DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
             AllowedPermission, FunctionDefine, Permission, PermissionLevel, PermissionType,
-            PluginFunction, PluginPackage as ProtoPluginPackage,
-            WorkflowCode as ProtoWorkflowCode, WorkflowResult as ProtoWorkflowResult,
-            WorkflowResultType,
+            PluginFunction, PluginPackage as ProtoPluginPackage, WorkflowCode as ProtoWorkflowCode,
+            WorkflowResult as ProtoWorkflowResult, WorkflowResultType,
         };
 
         let db = setup_full_db().await?;

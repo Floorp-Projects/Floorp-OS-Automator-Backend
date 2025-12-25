@@ -12,12 +12,12 @@ use crate::entity::plugin_package::Model as EntityPluginPackage;
 use chrono::{TimeZone, Utc};
 use sea_orm::prelude::DateTimeUtc;
 
-use serde::{Deserialize, Serialize};
-use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::FunctionDefine;
 use sapphillon_core::proto::sapphillon::v1::FunctionParameter;
+use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
+use serde::{Deserialize, Serialize};
 
 /// Convert a protobuf `PluginPackage` into the entity model.
 ///
@@ -179,8 +179,20 @@ fn serialize_function_define(
 ) -> (Option<String>, Option<String>) {
     match function_define {
         Some(fd) => {
-            let params = serde_json::to_string(&fd.parameters.iter().map(FunctionParameterSerde::from).collect::<Vec<_>>()).ok();
-            let returns = serde_json::to_string(&fd.returns.iter().map(FunctionParameterSerde::from).collect::<Vec<_>>()).ok();
+            let params = serde_json::to_string(
+                &fd.parameters
+                    .iter()
+                    .map(FunctionParameterSerde::from)
+                    .collect::<Vec<_>>(),
+            )
+            .ok();
+            let returns = serde_json::to_string(
+                &fd.returns
+                    .iter()
+                    .map(FunctionParameterSerde::from)
+                    .collect::<Vec<_>>(),
+            )
+            .ok();
             (params, returns)
         }
         None => (None, None),
