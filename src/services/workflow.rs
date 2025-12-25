@@ -658,244 +658,202 @@ function workflow() {
             prompt_len = req.prompt.len()
         );
 
-        // Demo Workflow: VSCode to Floorp Form
-        // VSCodeのアクティブファイル内容を取得し、Floorpのフォームに入力
+        // Workspace to VSCode Workflow
+        // ブラウザタブからGitHub URLを抽出し、対応するVSCodeプロジェクトを開く
         let generated = r##"
 /**
- * Demo Workflow 1: VSCode to Floorp Form
+ * Workspace to VSCode Workflow
  *
  * このワークフローは以下の処理を行います:
- * 1. VSCodeでアクティブに表示されているファイルの内容を取得
- * 2. Floorpでアクティブなタブのフォームに内容を入力
- *
- * 使用する前提:
- * - VSCodeでファイルが開かれている状態
- * - Floorp OSサーバーが起動している
- * - Floorpで入力先のフォームがあるページが開かれている
+ * 1. Floorpで開いているタブを取得
+ * 2. タブのURLからGitHub/GitLabリポジトリ名を抽出
+ * 3. 対応するローカルフォルダをVSCodeで開く
+ * 4. 不要なVSCodeウィンドウを閉じる
  */
 
+// 設定: リポジトリのベースディレクトリ
+const REPO_BASE_DIRS = [
+    "/Users/user/dev-source/floorp-dev",
+    "/Users/user/dev-source/sapphillon-dev",
+    "/Users/user/dev-source"
+];
+
+// GitHub owner to local directory mapping
+const OWNER_MAPPING = {
+    "floorp-projects": "floorp-dev",
+    "sapphillon": "sapphillon-dev"
+};
+
 function workflow() {
-  try {
-    // Step 1: VSCodeからワークスペースパスを取得
-    console.log("Step 1: Getting workspace path and current branch...");
-    let repoPath = "";
     try {
-        repoPath = vscode.get_workspace_path();
-        console.log("DEBUG: Raw workspace path returned: [" + repoPath + "]");
-        console.log("DEBUG: Path length: " + repoPath.length);
-    } catch (e) {
-        console.log("Failed to get workspace path: " + e);
-        throw new Error("Could not determine repository path from VSCode");
-    }
-    
-    let currentBranch = "main";
-    try {
-        const branchJson = git.getBranch(repoPath);
-        console.log("DEBUG: Raw branchJson: " + branchJson);
-        const branchInfo = JSON.parse(branchJson);
-        currentBranch = branchInfo.branch;
-        console.log("DEBUG: Parsed branch: [" + currentBranch + "]");
-    } catch (gitError) {
-        console.log("Failed to get branch: " + gitError);
-    }
-    
-    console.log("Final values - repoPath: [" + repoPath + "], branch: [" + currentBranch + "]");
+        // Step 1: ブラウザタブを取得
+        console.log("Step 1: Getting browser tabs...");
+        const tabsResponse = floorp.browserTabs();
+        const tabsData = JSON.parse(tabsResponse);
+        const tabs = tabsData.tabs || tabsData;
+        console.log("Found " + tabs.length + " tabs");
 
-    // Step 2: Get git diff for AI analysis
-    console.log("Step 2: Getting git diff...");
-    let diffContent = "";
-    try {
-        const diffJson = git.getDiff(repoPath);
-        const diffInfo = JSON.parse(diffJson);
-        diffContent = diffInfo.combined || "";
-        console.log("Diff length: " + diffContent.length + " chars");
-    } catch (e) {
-        console.log("Failed to get diff: " + e);
-    }
+        // Step 2: タブのURLからプロジェクトパスを推測
+        console.log("Step 2: Analyzing tab URLs...");
+        const projectPaths = [];
 
-    // Step 3: Generate commit message using AI
-    console.log("Step 3: Generating commit message with AI...");
-    let commitMessage = "chore: automated commit";
-    if (diffContent.length > 0) {
+        for (const tab of tabs) {
+            const url = tab.url || "";
+            const projectPath = extractProjectPath(url);
+            if (projectPath && !projectPaths.includes(projectPath)) {
+                projectPaths.push(projectPath);
+                console.log("Found project path: " + projectPath);
+            }
+        }
+
+        if (projectPaths.length === 0) {
+            return {
+                ok: false,
+                message: "No project paths could be extracted from tabs"
+            };
+        }
+
+        // Step 3: VSCodeでプロジェクトを開く
+        console.log("Step 3: Opening projects in VSCode...");
+        const opened = [];
+        const failed = [];
+
+        for (const path of projectPaths) {
+            try {
+                const result = vscode.open_folder(path);
+                console.log("Opened: " + path + " - " + result);
+                opened.push(path);
+            } catch (e) {
+                console.log("Failed to open: " + path + " - " + String(e));
+                failed.push(path);
+            }
+        }
+
+        // Step 4: AIを使って不要なウィンドウを閉じる
+        console.log("Step 4: Analyzing windows with AI...");
+        let closedCount = 0;
+
         try {
-            commitMessage = iniad.generateCommitMessage(diffContent);
-            console.log("AI generated commit message: " + commitMessage);
+            const allTitles = get_inactive_window_titles();
+            console.log("Found " + allTitles.length + " inactive windows");
+
+            if (allTitles.length > 0) {
+                // デバッグ: 全ウィンドウをログ
+                console.log("=== All window titles ===");
+                for (let i = 0; i < allTitles.length; i++) {
+                    console.log("[" + i + "] " + allTitles[i]);
+                }
+                console.log("=========================");
+                
+                // AIにウィンドウを分析してもらう
+                const windowsJson = JSON.stringify(allTitles);
+                console.log("Sending to AI for analysis...");
+                const toCloseJson = iniad.analyzeWindows(windowsJson);
+                console.log("AI response: " + toCloseJson);
+
+                try {
+                    const windowsToClose = JSON.parse(toCloseJson);
+                    console.log("=== Windows AI wants to close ===");
+                    
+                    // 保護するアプリのリスト
+                    const protectedApps = [
+                        "floorp", "firefox", "chrome", "safari", "edge",
+                        "code", "vscode", "visual studio", "cursor",
+                        "terminal", "iterm", "warp", "alacritty",
+                        "antigravity",
+                        "windowmanager", "dock", "finder", "systemuiserver",
+                        "spotlight", "controlcenter"
+                    ];
+                    
+                    for (const titleToClose of windowsToClose) {
+                        const lowerTitle = titleToClose.toLowerCase();
+                        
+                        // 保護対象かチェック
+                        let isProtected = false;
+                        for (const app of protectedApps) {
+                            if (lowerTitle.includes(app)) {
+                                isProtected = true;
+                                console.log("[SKIP] Protected: " + titleToClose);
+                                break;
+                            }
+                        }
+                        
+                        if (!isProtected) {
+                            console.log("[CLOSING] " + titleToClose);
+                            try {
+                                close_window(titleToClose);
+                                closedCount++;
+                            } catch (e) {
+                                console.log("Failed to close: " + titleToClose + " - " + String(e));
+                            }
+                        }
+                    }
+                    console.log("=================================");
+                } catch (parseError) {
+                    console.log("Failed to parse AI response: " + parseError);
+                }
+            }
         } catch (e) {
-            console.log("AI commit message failed: " + e + ", using default.");
+            console.log("Could not get window list: " + String(e));
         }
-    }
 
-    // Step 4: Stage, commit, and push
-    console.log("Step 4: Git add, commit, push...");
-    try {
-        const addResult = git.add(repoPath);
-        console.log("Git add: " + addResult);
-    } catch (e) {
-        console.log("Git add failed: " + e);
-    }
+        console.log("Closed " + closedCount + " non-development windows");
 
-    try {
-        const commitResult = git.commit(repoPath, commitMessage);
-        console.log("Git commit: " + commitResult);
-    } catch (e) {
-        console.log("Git commit failed (may be nothing to commit): " + e);
-    }
-
-    try {
-        const pushResult = git.push(repoPath);
-        console.log("Git push: " + pushResult);
-    } catch (e) {
-        console.log("Git push failed: " + e);
-    }
-
-    // Step 5: Prepare Floorp tab for PR creation
-    console.log("Step 5: Preparing Floorp tab for PR...");
-    // Use ?expand=1 to automatically expand the PR form without clicking "Create pull request" button
-    const targetUrl = "https://github.com/Floorp-Projects/Floorp/compare/main..." + currentBranch + "?expand=1";
-    console.log("Target URL: " + targetUrl);
-    const tabsJson = floorp.listBrowserTabs();
-    const tabs = JSON.parse(tabsJson);
-    let targetTab = null;
-
-    // Look for existing compare tab (with or without expand param)
-    for (var i = 0; i < tabs.length; i++) {
-        if (tabs[i].url && tabs[i].url.includes("compare/main..." + currentBranch)) {
-            targetTab = tabs[i];
-            break;
-        }
-    }
-
-    let instanceId = "";
-    if (targetTab) {
-        console.log("Found existing target tab: " + targetTab.title);
-        const attachResultJson = floorp.attachToTab(targetTab.browserId);
-        const attachResult = JSON.parse(attachResultJson);
-        instanceId = attachResult.instanceId;
-        
-        // Navigate to ?expand=1 URL to ensure form is expanded
-        console.log("Navigating existing tab to expanded URL...");
-        try {
-            floorp.tabNavigate(instanceId, targetUrl);
-            console.log("Navigation initiated to: " + targetUrl);
-        } catch (navError) {
-            console.log("Navigation warning: " + navError);
-        }
-    } else {
-        console.log("Creating new tab...");
-        try {
-            const createResultJson = floorp.createTab(targetUrl, false);
-            const createResult = JSON.parse(createResultJson);
-            instanceId = createResult.instanceId;
-            console.log("Created new tab, instanceId: " + instanceId);
-        } catch (createError) {
-            console.log("Failed to create tab: " + createError);
-            throw createError;
-        }
-    }
-
-    // Step 6: Wait for PR form (with extended waiting)
-    console.log("Step 6: Waiting for PR form...");
-    try {
-        floorp.tabWaitForElement(instanceId, "#pull_request_title", "20000");
-        console.log("PR form found!");
-    } catch (e) {
-        console.log("Wait for element warning (first attempt): " + e);
-        // Try waiting again
-        try {
-            floorp.tabWaitForElement(instanceId, "#pull_request_title", "10000");
-            console.log("PR form found on second attempt!");
-        } catch (e2) {
-            console.log("Wait for element warning (second attempt): " + e2);
-        }
-    }
-
-    // Step 7: Generate PR title/body with AI
-    console.log("Step 7: Generating PR title/body using AI...");
-    let aiResult;
-    try {
-        const aiJson = iniad.generatePrDescription(diffContent);
-        console.log("DEBUG: AI response JSON: " + aiJson);
-        aiResult = JSON.parse(aiJson);
-        console.log("DEBUG: Parsed aiResult.title: " + aiResult.title);
-        console.log("DEBUG: Parsed aiResult.body length: " + (aiResult.body ? aiResult.body.length : 0));
-    } catch (aiError) {
-        console.log("AI generation failed: " + aiError);
-        aiResult = {
-            title: commitMessage,
-            body: "Automated PR" + String.fromCharCode(10,10) + diffContent.substring(0, 1000)
+        return {
+            ok: true,
+            message: "Workflow completed",
+            openedProjects: opened,
+            failedProjects: failed,
+            closedWindows: closedCount
         };
-        console.log("DEBUG: Using fallback title: " + aiResult.title);
-    }
 
-    // Step 8: Fill PR form
-    console.log("Step 8: Filling PR form...");
-    console.log("DEBUG: About to fill title with: [" + aiResult.title + "]");
-    
-    let titleFillSuccess = false;
-    let bodyFillSuccess = false;
-    
-    try {
-        const titleResultJson = floorp.tabFillForm(instanceId, "#pull_request_title", aiResult.title);
-        console.log("Title fill result: " + titleResultJson);
-        const titleResult = JSON.parse(titleResultJson);
-        titleFillSuccess = titleResult.ok === true;
     } catch (e) {
-        console.log("Fill title error: " + e);
-    }
-
-    console.log("DEBUG: About to fill body...");
-    try {
-        const bodyResultJson = floorp.tabFillForm(instanceId, "#pull_request_body", aiResult.body);
-        console.log("Body fill result: " + bodyResultJson);
-        const bodyResult = JSON.parse(bodyResultJson);
-        bodyFillSuccess = bodyResult.ok === true;
-    } catch (e) {
-        console.log("Fill body error: " + e);
-    }
-
-    // Abort if form fill failed
-    if (!titleFillSuccess || !bodyFillSuccess) {
-        console.log("ERROR: Form fill failed! Title: " + titleFillSuccess + ", Body: " + bodyFillSuccess);
-        console.log("Aborting PR creation to prevent incomplete PR.");
         return {
             ok: false,
-            message: "Form fill failed. Title filled: " + titleFillSuccess + ", Body filled: " + bodyFillSuccess,
-            error: "フォーム入力に失敗しました。ページが正しく読み込まれていない可能性があります。"
+            message: "Workflow failed",
+            error: String(e)
         };
     }
-
-    console.log("Form fill successful! Proceeding to create PR...");
-
-    // Step 9: Click Create PR button
-    console.log("Step 9: Clicking Create PR button...");
-    try {
-        floorp.tabClick(instanceId, ".hx_create-pr-button");
-        console.log("Clicked creation button.");
-    } catch (e) {
-        console.log("Failed to click button: " + e);
-        try {
-            floorp.tabClick(instanceId, "button.btn-primary");
-            console.log("Clicked fallback button.");
-        } catch (e2) {
-            console.log("Failed to click fallback: " + e2);
-        }
-    }
-
-    return {
-      ok: true,
-      message: "Full automation complete: commit, push, PR created",
-      commitMessage: commitMessage,
-      prTitle: aiResult.title
-    };
-
-  } catch (error) {
-    return {
-      ok: false,
-      message: "Workflow failed: " + error,
-    };
-  }
 }
+
+function extractProjectPath(url) {
+    try {
+        // GitHub URL: https://github.com/owner/repo
+        if (url.includes("github.com")) {
+            const match = url.match(/github\.com\/([^\/]+)\/([^\/?#]+)/);
+            if (match) {
+                const owner = match[1].toLowerCase();
+                const repo = match[2];
+
+                const localDir = OWNER_MAPPING[owner];
+                if (localDir) {
+                    return "/Users/user/dev-source/" + localDir + "/" + repo;
+                }
+
+                for (const baseDir of REPO_BASE_DIRS) {
+                    return baseDir + "/" + repo;
+                }
+            }
+        }
+
+        // GitLab URL: https://gitlab.com/owner/repo
+        if (url.includes("gitlab.com")) {
+            const match = url.match(/gitlab\.com\/([^\/]+)\/([^\/?#]+)/);
+            if (match) {
+                const repo = match[2];
+                return REPO_BASE_DIRS[0] + "/" + repo;
+            }
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+workflow();
 "##.to_string();
+
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
         let now_ts = Self::now_timestamp();
@@ -915,86 +873,36 @@ function workflow() {
                 result: vec![],
                 plugin_packages: vec![],
                 plugin_function_ids: vec![
+                    // Floorp plugin
+                    "app.sapphillon.core.floorp.browserTabs".to_string(),
                     // VSCode plugin
-                    "app.sapphillon.core.vscode.get_active_file_content".to_string(),
-                    "app.sapphillon.core.vscode.get_workspace_path".to_string(),
-                    // Floorp plugin (camelCase)
-                    "app.sapphillon.core.floorp.listBrowserTabs".to_string(),
-                    "app.sapphillon.core.floorp.attachToTab".to_string(),
-                    "app.sapphillon.core.floorp.tabFillForm".to_string(),
-                    "app.sapphillon.core.floorp.createTabInstance".to_string(),
-                    "app.sapphillon.core.floorp.tabClickElement".to_string(),
-                    "app.sapphillon.core.floorp.tabWaitForElement".to_string(),
-                    // INIAD plugin
-                    "app.sapphillon.core.iniad.generate_pr_description".to_string(),
-                    "app.sapphillon.core.iniad.generate_commit_message".to_string(),
-                    // Git plugin
-                    "app.sapphillon.core.git.getBranch".to_string(),
-                    "app.sapphillon.core.git.getDiff".to_string(),
-                    "app.sapphillon.core.git.add".to_string(),
-                    "app.sapphillon.core.git.commit".to_string(),
-                    "app.sapphillon.core.git.push".to_string(),
+                    "app.sapphillon.core.vscode.open_folder".to_string(),
+                    // Window plugin
+                    "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
+                    "app.sapphillon.core.window.close_window".to_string(),
+                    // INIAD AI plugin
+                    "app.sapphillon.core.iniad.analyze_windows".to_string(),
                 ],
                 allowed_permissions: vec![
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.get_active_file_content".to_string(),
+                        plugin_function_id: "app.sapphillon.core.floorp.browserTabs".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.get_workspace_path".to_string(),
+                        plugin_function_id: "app.sapphillon.core.vscode.open_folder".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.listBrowserTabs".to_string(),
+                        plugin_function_id: "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.attachToTab".to_string(),
+                        plugin_function_id: "app.sapphillon.core.window.close_window".to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.tabFillForm".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.createTabInstance".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.tabClickElement".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.tabWaitForElement".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.iniad.generate_pr_description".to_string(),
+                        plugin_function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
                         permissions: iniad::iniad_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.iniad.generate_commit_message".to_string(),
-                        permissions: iniad::iniad_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.git.getBranch".to_string(),
-                        permissions: git::git_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.git.getDiff".to_string(),
-                        permissions: git::git_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.git.add".to_string(),
-                        permissions: git::git_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.git.commit".to_string(),
-                        permissions: git::git_plugin_permissions(),
-                    },
-                    AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.git.push".to_string(),
-                        permissions: git::git_plugin_permissions(),
                     },
                 ],
             }],

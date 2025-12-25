@@ -11,8 +11,13 @@
     return core.ops.op2_iniad_generate_commit_message(diff);
   }
 
+  function analyzeWindows(windowTitlesJson) {
+    return core.ops.op2_iniad_analyze_windows(windowTitlesJson);
+  }
+
   globalThis.iniad = {
     generatePrDescription,
     generateCommitMessage,
+    analyzeWindows,
   };
 })();

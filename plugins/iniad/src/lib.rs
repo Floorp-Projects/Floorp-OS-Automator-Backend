@@ -41,6 +41,17 @@ pub fn iniad_generate_commit_message_plugin_function() -> PluginFunction {
     }
 }
 
+pub fn iniad_analyze_windows_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
+        function_name: "iniad.analyzeWindows".to_string(),
+        description: "Analyzes window titles and returns which ones to close (non-development related).".to_string(),
+        permissions: iniad_plugin_permissions(),
+        arguments: "String: JSON array of window titles".to_string(),
+        returns: "String: JSON array of window titles to close".to_string(),
+    }
+}
+
 pub fn iniad_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.iniad".to_string(),
@@ -49,6 +60,7 @@ pub fn iniad_plugin_package() -> PluginPackage {
         functions: vec![
             iniad_generate_pr_description_plugin_function(),
             iniad_generate_commit_message_plugin_function(),
+            iniad_analyze_windows_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -84,6 +96,16 @@ pub fn core_iniad_generate_commit_message_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_iniad_analyze_windows_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.iniad.analyze_windows".to_string(),
+        "iniad.analyzeWindows".to_string(),
+        "Analyzes window titles and returns which ones to close.".to_string(),
+        op2_iniad_analyze_windows(),
+        None,
+    )
+}
+
 pub fn core_iniad_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.iniad".to_string(),
@@ -91,6 +113,7 @@ pub fn core_iniad_plugin_package() -> CorePluginPackage {
         vec![
             core_iniad_generate_pr_description_plugin(),
             core_iniad_generate_commit_message_plugin(),
+            core_iniad_analyze_windows_plugin(),
         ],
     )
 }
@@ -275,6 +298,90 @@ pub fn op2_iniad_generate_commit_message(
             {
                 "role": "system",
                 "content": "You are a helpful assistant that generates concise git commit messages following Conventional Commits format."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    let mut res = agent
+        .post("https://api.openai.iniad.org/api/v1/chat/completions")
+        .header("Authorization", &format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&request_body).unwrap())
+        .map_err(|e| JsErrorBox::new("Error", format!("API request failed: {}", e)))?;
+
+    if res.status() != 200 {
+        let status = res.status();
+        let text = res.body_mut().read_to_string().unwrap_or_default();
+        return Err(JsErrorBox::new("Error", format!("API returned error {}: {}", status, text)));
+    }
+
+    let response_text = res
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read response body: {}", e)))?;
+
+    let response_body: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to parse response JSON: {}", e)))?;
+
+    let content = response_body["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or_else(|| JsErrorBox::new("Error", "Invalid API response format"))?;
+
+    Ok(content.trim().to_string())
+}
+
+#[op2]
+#[string]
+pub fn op2_iniad_analyze_windows(
+    state: &mut OpState,
+    #[string] window_titles_json: String,
+) -> std::result::Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        &iniad_analyze_windows_plugin_function().function_id,
+        iniad_plugin_permissions(),
+    )?;
+
+    let api_key = std::env::var("INIAD_API_KEY").map_err(|_| {
+        JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set")
+    })?;
+
+    let agent = ureq::Agent::new_with_defaults();
+    let prompt = format!(
+        "I have a list of open window titles on my computer. Analyze each window and determine which ones should be CLOSED to focus on development work.\n\n\
+        KEEP OPEN (never close):\n\
+        - Floorp, Firefox, Chrome, Safari, Edge (browsers)\n\
+        - Visual Studio Code, VSCode, Code, Cursor (code editors)\n\
+        - Terminal, iTerm, Warp, Alacritty (terminals)\n\
+        - IntelliJ, PyCharm, WebStorm, Xcode (IDEs)\n\
+        - GitHub, GitLab, Stack Overflow (dev sites in browser)\n\n\
+        CLOSE (these distract from development):\n\
+        - Spotify, Apple Music, Music, YouTube Music, MacTube (music/video apps)\n\
+        - Discord, Slack, LINE, Messages, WhatsApp (chat apps)\n\
+        - X, Twitter, Facebook, Instagram, TikTok (social media apps)\n\
+        - Finder windows (unless actively used)\n\
+        - Preview, Photos, QuickTime (media viewers)\n\
+        - Notes, Reminders, Calendar (unless work-related)\n\
+        - System Preferences, Settings\n\
+        - Any game or entertainment app\n\n\
+        Window titles:\n{}\n\n\
+        Be decisive. If unsure, lean towards closing non-essential windows.\n\
+        Return a JSON array of EXACT window titles to close.\n\
+        Example: [\"Spotify\", \"Discord\", \"Finder\"]\n\
+        Return ONLY the JSON array, no explanation.",
+        window_titles_json
+    );
+
+    let request_body = json!({
+        "model": "gpt-5-nano",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that analyzes window titles and determines which ones to close to help focus on development work. Always keep development tools and browsers open."
             },
             {
                 "role": "user",

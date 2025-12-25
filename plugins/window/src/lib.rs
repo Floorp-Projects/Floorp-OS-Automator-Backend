@@ -74,7 +74,7 @@ pub fn core_get_active_window_title_plugin() -> CorePluginFunction {
         "Get Active Window Title".to_string(),
         "Gets the title of the currently active window.".to_string(),
         op2_get_active_window_title(),
-        None,
+        Some(include_str!("00_window.js").to_string()),
     )
 }
 
@@ -169,7 +169,18 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
     match get_open_windows() {
         Ok(windows) => {
             let active_window = get_active_window().ok();
-            let inactive_titles = windows
+            
+            // Debug: Log all window info
+            for w in &windows {
+                eprintln!("Window: id={}, title='{}', app='{}', process_id={}", 
+                    w.id, 
+                    w.title, 
+                    w.info.name,
+                    w.info.process_id
+                );
+            }
+            
+            let inactive_titles: Vec<String> = windows
                 .into_iter()
                 .filter(|w| {
                     if let Some(active) = &active_window {
@@ -178,7 +189,25 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
                         true
                     }
                 })
-                .map(|w| w.title)
+                // Filter out system processes
+                .filter(|w| {
+                    let name = w.info.name.to_lowercase();
+                    !name.contains("windowmanager") &&
+                    !name.contains("dock") &&
+                    !name.contains("systemuiserver") &&
+                    !name.contains("spotlight") &&
+                    !name.contains("controlcenter") &&
+                    !name.contains("notificationcenter")
+                })
+                .map(|w| {
+                    // Use app name if title is empty
+                    if w.title.is_empty() {
+                        w.info.name.clone()
+                    } else {
+                        w.title
+                    }
+                })
+                .filter(|t| !t.is_empty())
                 .collect();
             Ok(inactive_titles)
         }
