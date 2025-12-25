@@ -107,7 +107,8 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         let sql_provider = r#"
             CREATE TABLE provider (

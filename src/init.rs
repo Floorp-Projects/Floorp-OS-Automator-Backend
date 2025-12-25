@@ -39,9 +39,9 @@ async fn setup_database() -> Result<()> {
             // Extract the path after "sqlite://"
             Some(url.trim_start_matches("sqlite://").to_string())
         }
-        url if url == "sqlite::memory:" => {
+        url if url == "sqlite:file::memory:?mode=memory&cache=shared" => {
             // In-memory database
-            Some(":memory:".to_string())
+            Some(":memory:".to-string())
         }
 
         _ => {

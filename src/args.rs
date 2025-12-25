@@ -13,7 +13,7 @@ pub struct Args {
     pub loglevel: LogLevel,
 
     /// SQLite Database URL
-    #[arg(long, default_value_t = String::from("sqlite::memory:"))]
+    #[arg(long, default_value_t = String::from("sqlite:file::memory:?mode=memory&cache=shared"))]
     pub db_url: String,
 
     #[command(subcommand)]
@@ -25,7 +25,7 @@ pub enum LogLevel {
     Trace,
     Debug,
     Info,
-    Warn,
+    Warn,.
     Error,
 }
 

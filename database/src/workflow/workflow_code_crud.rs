@@ -175,7 +175,8 @@ mod tests {
     ///
     /// Returns a [`DatabaseConnection`] ready for workflow code tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         // workflow table (referenced)
         let sql_wf = r#"
