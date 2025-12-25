@@ -9,11 +9,11 @@ use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
 use floorp::{core_floorp_plugin_package, floorp_plugin_package};
+use git::{core_git_plugin_package, git_plugin_package};
+use iniad::{core_iniad_plugin_package, iniad_plugin_package};
 use search::{core_search_plugin_package, search_plugin_package};
 use vscode::{core_vscode_plugin_package, vscode_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
-use iniad::{core_iniad_plugin_package, iniad_plugin_package};
-use git::{core_git_plugin_package, git_plugin_package};
 
 /// Builds the static system configuration used during application startup.
 ///

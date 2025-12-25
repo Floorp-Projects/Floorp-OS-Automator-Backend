@@ -34,8 +34,8 @@ use tonic::{Request, Response, Status};
 
 // use crate::workflow::generate_workflow_async;
 // use crate::workflow::generate_workflow_async;
-use vscode;
 use iniad;
+use vscode;
 
 /// Maximum number of characters to keep when deriving workflow display names from prompts.
 const MAX_DISPLAY_NAME_LEN: usize = 64;
@@ -232,8 +232,8 @@ impl MyWorkflowService {
         Option<PluginFunctionPermissions>,
     ) {
         if workflow_code.allowed_permissions.is_empty() {
-             // Fallback for migration/compatibility: if no explicit permissions, try to use first plugin ID
-             if let Some(first_id) = workflow_code.plugin_function_ids.first() {
+            // Fallback for migration/compatibility: if no explicit permissions, try to use first plugin ID
+            if let Some(first_id) = workflow_code.plugin_function_ids.first() {
                 let perms = PluginFunctionPermissions {
                     plugin_function_id: first_id.clone(),
                     permissions: Permissions::new(vec![]),
@@ -246,9 +246,9 @@ impl MyWorkflowService {
             // Aggregate ALL permissions from all AllowedPermission entries into a single list
             let mut all_perms_vec = Vec::new();
             for ap in &workflow_code.allowed_permissions {
-                 // Deep clone the inner permissions from the proto definition
-                 // We assume `ap.permissions` corresponds to a list of Permission objects
-                 all_perms_vec.extend(ap.permissions.clone());
+                // Deep clone the inner permissions from the proto definition
+                // We assume `ap.permissions` corresponds to a list of Permission objects
+                all_perms_vec.extend(ap.permissions.clone());
             }
 
             // Create a wildcard permission set that applies to ANY function ID ("*")
@@ -538,7 +538,8 @@ function workflow() {
         console.error("Verification failed with error: " + e);
     }
 }
-"#.to_string();
+"#
+        .to_string();
 
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
@@ -573,7 +574,8 @@ function workflow() {
                         permissions: vscode::vscode_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.get_active_file_content".to_string(),
+                        plugin_function_id: "app.sapphillon.core.vscode.get_active_file_content"
+                            .to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
@@ -581,7 +583,8 @@ function workflow() {
                         permissions: vscode::vscode_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.close_workspace".to_string(),
+                        plugin_function_id: "app.sapphillon.core.vscode.close_workspace"
+                            .to_string(),
                         permissions: vscode::vscode_plugin_permissions(),
                     },
                 ],
@@ -852,7 +855,8 @@ function extractProjectPath(url) {
 }
 
 workflow();
-"##.to_string();
+"##
+        .to_string();
 
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
@@ -893,7 +897,8 @@ workflow();
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
+                        plugin_function_id: "app.sapphillon.core.window.get_inactive_window_titles"
+                            .to_string(),
                         permissions: vscode::vscode_get_content_plugin_permissions(),
                     },
                     AllowedPermission {

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Floorp Projects
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
-use deno_core::{op2, OpState};
+use deno_core::{OpState, op2};
 use deno_error::JsErrorBox;
 use sapphillon_core::permission::{
     CheckPermissionResult, PluginFunctionPermissions, check_permission,
@@ -318,13 +318,13 @@ pub fn op_git_get_diff(
     // Get staged and unstaged diff
     let diff_staged = run_git_command(&repo_path, &["diff", "--cached"])?;
     let diff_unstaged = run_git_command(&repo_path, &["diff"])?;
-    
+
     let result = serde_json::json!({
         "staged": diff_staged,
         "unstaged": diff_unstaged,
         "combined": format!("{}\n{}", diff_staged, diff_unstaged),
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
@@ -341,11 +341,11 @@ pub fn op_git_get_status(
     )?;
 
     let status = run_git_command(&repo_path, &["status", "--porcelain"])?;
-    
+
     let result = serde_json::json!({
         "status": status,
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
@@ -362,11 +362,11 @@ pub fn op_git_get_branch(
     )?;
 
     let branch = run_git_command(&repo_path, &["rev-parse", "--abbrev-ref", "HEAD"])?;
-    
+
     let result = serde_json::json!({
         "branch": branch.trim(),
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
@@ -388,11 +388,11 @@ pub fn op_git_get_commit_log(
         &repo_path,
         &["log", "--oneline", &format!("-{}", count_str)],
     )?;
-    
+
     let result = serde_json::json!({
         "log": log,
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
@@ -412,12 +412,12 @@ pub fn op_git_add(
     // Default to adding all files if none specified
     let files_arg = files.unwrap_or_else(|| ".".to_string());
     let output = run_git_command(&repo_path, &["add", &files_arg])?;
-    
+
     let result = serde_json::json!({
         "success": true,
         "output": output,
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
@@ -435,21 +435,18 @@ pub fn op_git_commit(
     )?;
 
     let output = run_git_command(&repo_path, &["commit", "-m", &message])?;
-    
+
     let result = serde_json::json!({
         "success": true,
         "output": output,
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }
 
 #[op2]
 #[string]
-pub fn op_git_push(
-    state: &mut OpState,
-    #[string] repo_path: String,
-) -> Result<String, JsErrorBox> {
+pub fn op_git_push(state: &mut OpState, #[string] repo_path: String) -> Result<String, JsErrorBox> {
     permission_check(
         state,
         "app.sapphillon.core.git.push",
@@ -457,11 +454,11 @@ pub fn op_git_push(
     )?;
 
     let output = run_git_command(&repo_path, &["push"])?;
-    
+
     let result = serde_json::json!({
         "success": true,
         "output": output,
     });
-    
+
     Ok(serde_json::to_string(&result).unwrap())
 }

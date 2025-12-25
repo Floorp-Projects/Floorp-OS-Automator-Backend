@@ -12,8 +12,8 @@ use sapphillon_core::proto::sapphillon::v1::{
     Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
 };
 use sapphillon_core::runtime::OpStateWorkflowData;
-use std::sync::{Arc, Mutex};
 use serde_json::json;
+use std::sync::{Arc, Mutex};
 
 // ============================================================================
 // Plugin Function Definitions
@@ -23,7 +23,8 @@ pub fn iniad_generate_pr_description_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.iniad.generate_pr_description".to_string(),
         function_name: "iniad.generate_pr_description".to_string(),
-        description: "Generates a PR title and body from file content using INIAD OpenAI API.".to_string(),
+        description: "Generates a PR title and body from file content using INIAD OpenAI API."
+            .to_string(),
         permissions: iniad_plugin_permissions(),
         arguments: "String: content".to_string(),
         returns: "String: JSON string { title: string, body: string }".to_string(),
@@ -45,7 +46,9 @@ pub fn iniad_analyze_windows_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
         function_name: "iniad.analyzeWindows".to_string(),
-        description: "Analyzes window titles and returns which ones to close (non-development related).".to_string(),
+        description:
+            "Analyzes window titles and returns which ones to close (non-development related)."
+                .to_string(),
         permissions: iniad_plugin_permissions(),
         arguments: "String: JSON array of window titles".to_string(),
         returns: "String: JSON array of window titles to close".to_string(),
@@ -200,9 +203,8 @@ pub fn op2_iniad_generate_pr_description(
         iniad_plugin_permissions(),
     )?;
 
-    let api_key = std::env::var("INIAD_API_KEY").map_err(|_| {
-        JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set")
-    })?;
+    let api_key = std::env::var("INIAD_API_KEY")
+        .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
 
     let agent = ureq::Agent::new_with_defaults();
     let prompt = format!(
@@ -239,7 +241,10 @@ pub fn op2_iniad_generate_pr_description(
     if res.status() != 200 {
         let status = res.status();
         let text = res.body_mut().read_to_string().unwrap_or_default();
-        return Err(JsErrorBox::new("Error", format!("API returned error {}: {}", status, text)));
+        return Err(JsErrorBox::new(
+            "Error",
+            format!("API returned error {}: {}", status, text),
+        ));
     }
 
     let response_text = res
@@ -277,9 +282,8 @@ pub fn op2_iniad_generate_commit_message(
         iniad_plugin_permissions(),
     )?;
 
-    let api_key = std::env::var("INIAD_API_KEY").map_err(|_| {
-        JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set")
-    })?;
+    let api_key = std::env::var("INIAD_API_KEY")
+        .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
 
     let agent = ureq::Agent::new_with_defaults();
     let prompt = format!(
@@ -316,7 +320,10 @@ pub fn op2_iniad_generate_commit_message(
     if res.status() != 200 {
         let status = res.status();
         let text = res.body_mut().read_to_string().unwrap_or_default();
-        return Err(JsErrorBox::new("Error", format!("API returned error {}: {}", status, text)));
+        return Err(JsErrorBox::new(
+            "Error",
+            format!("API returned error {}: {}", status, text),
+        ));
     }
 
     let response_text = res
@@ -346,9 +353,8 @@ pub fn op2_iniad_analyze_windows(
         iniad_plugin_permissions(),
     )?;
 
-    let api_key = std::env::var("INIAD_API_KEY").map_err(|_| {
-        JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set")
-    })?;
+    let api_key = std::env::var("INIAD_API_KEY")
+        .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
 
     let agent = ureq::Agent::new_with_defaults();
     let prompt = format!(
@@ -400,7 +406,10 @@ pub fn op2_iniad_analyze_windows(
     if res.status() != 200 {
         let status = res.status();
         let text = res.body_mut().read_to_string().unwrap_or_default();
-        return Err(JsErrorBox::new("Error", format!("API returned error {}: {}", status, text)));
+        return Err(JsErrorBox::new(
+            "Error",
+            format!("API returned error {}: {}", status, text),
+        ));
     }
 
     let response_text = res

@@ -169,17 +169,15 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
     match get_open_windows() {
         Ok(windows) => {
             let active_window = get_active_window().ok();
-            
+
             // Debug: Log all window info
             for w in &windows {
-                eprintln!("Window: id={}, title='{}', app='{}', process_id={}", 
-                    w.id, 
-                    w.title, 
-                    w.info.name,
-                    w.info.process_id
+                eprintln!(
+                    "Window: id={}, title='{}', app='{}', process_id={}",
+                    w.id, w.title, w.info.name, w.info.process_id
                 );
             }
-            
+
             let inactive_titles: Vec<String> = windows
                 .into_iter()
                 .filter(|w| {
@@ -192,12 +190,12 @@ fn op2_get_inactive_window_titles(state: &mut OpState) -> Result<Vec<String>, Js
                 // Filter out system processes
                 .filter(|w| {
                     let name = w.info.name.to_lowercase();
-                    !name.contains("windowmanager") &&
-                    !name.contains("dock") &&
-                    !name.contains("systemuiserver") &&
-                    !name.contains("spotlight") &&
-                    !name.contains("controlcenter") &&
-                    !name.contains("notificationcenter")
+                    !name.contains("windowmanager")
+                        && !name.contains("dock")
+                        && !name.contains("systemuiserver")
+                        && !name.contains("spotlight")
+                        && !name.contains("controlcenter")
+                        && !name.contains("notificationcenter")
                 })
                 .map(|w| {
                     // Use app name if title is empty
@@ -225,13 +223,12 @@ fn op2_close_window(
     #[string] title_pattern: String,
 ) -> Result<String, JsErrorBox> {
     permission_check(state)?;
-    
-    let windows = get_open_windows().map_err(|_| {
-        JsErrorBox::new("Error", "Could not get open windows".to_string())
-    })?;
-    
+
+    let windows = get_open_windows()
+        .map_err(|_| JsErrorBox::new("Error", "Could not get open windows".to_string()))?;
+
     let mut closed_count = 0;
-    
+
     for window in windows {
         if window.title.contains(&title_pattern) {
             // On Windows, use taskkill to close the window by process ID
@@ -240,28 +237,31 @@ fn op2_close_window(
                 let result = std::process::Command::new("taskkill")
                     .args(["/PID", &window.info.process_id.to_string(), "/F"])
                     .output();
-                
+
                 if result.is_ok() {
                     closed_count += 1;
                 }
             }
-            
+
             // On Unix-like systems, send SIGTERM
             #[cfg(not(target_os = "windows"))]
             {
                 let result = std::process::Command::new("kill")
                     .arg(&window.info.process_id.to_string())
                     .output();
-                
+
                 if result.is_ok() {
                     closed_count += 1;
                 }
             }
         }
     }
-    
+
     if closed_count > 0 {
-        Ok(format!("Closed {} window(s) matching '{}'", closed_count, title_pattern))
+        Ok(format!(
+            "Closed {} window(s) matching '{}'",
+            closed_count, title_pattern
+        ))
     } else {
         Err(JsErrorBox::new(
             "Error",
