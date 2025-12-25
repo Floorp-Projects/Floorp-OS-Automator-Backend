@@ -12,6 +12,9 @@ mod workflow;
 #[allow(unused)]
 mod global;
 
+#[cfg(test)]
+mod test_support;
+
 /// System Configuration
 #[allow(unused)]
 mod sysconfig;
@@ -63,7 +66,7 @@ async fn main() -> Result<()> {
 
     // Check db_url
     info!("Using database URL: {}", args.db_url);
-    if args.db_url == "sqlite:memory:" {
+    if args.db_url == "sqlite:file::memory:?mode=memory&cache=shared" {
         warn!("Using in-memory SQLite database. Data will not be persisted.");
     }
     // Initialize Database Connection

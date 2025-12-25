@@ -198,7 +198,7 @@ pub(crate) async fn delete_plugin_package(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     /// Configures an in-memory database with plugin package and function tables for testing.
     ///
@@ -210,7 +210,8 @@ mod tests {
     ///
     /// Returns a [`DatabaseConnection`] prepared for package CRUD tests.
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         // plugin_package table
         let sql_pkg = r#"

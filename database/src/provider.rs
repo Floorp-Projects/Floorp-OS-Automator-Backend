@@ -64,10 +64,11 @@ pub async fn delete_provider(db: &DatabaseConnection, name: &str) -> Result<bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
         let sql = r#"
             CREATE TABLE provider (
                 name TEXT PRIMARY KEY,

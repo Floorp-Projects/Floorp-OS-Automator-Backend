@@ -33,44 +33,56 @@ async fn setup_database() -> Result<()> {
     // is ready before the server starts accepting requests.
     info!("Running database migrations...");
 
-    let db_path = match GLOBAL_STATE.async_get_db_url().await {
-        // String starts with "sqlite://"
-        url if url.starts_with("sqlite://") => {
-            // Extract the path after "sqlite://"
-            Some(url.trim_start_matches("sqlite://").to_string())
-        }
-        url if url == "sqlite::memory:" => {
-            // In-memory database
-            Some(":memory:".to_string())
-        }
+    let mut db_url = GLOBAL_STATE.async_get_db_url().await;
 
-        _ => {
-            error!("Database migrations are only supported for SQLite databases in this version.");
-            None
-        }
-    };
-
-    if db_path.is_none() {
+    if !db_url.starts_with("sqlite:") {
+        error!("Database migrations are only supported for SQLite databases in this version.");
         return Err(anyhow::anyhow!("Unsupported database type for migrations"));
     }
 
-    // If DB path is no db files, create the db file
-    match db_path.as_deref() {
-        Some(path) if path != ":memory:" && !std::path::Path::new(path).exists() => {
-            info!("Database file does not exist. Creating new database at: {path}");
-            match std::fs::File::create(path) {
-                Ok(_) => info!("Database file created successfully."),
-                Err(e) => {
-                    error!("Failed to create database file: {e:#?}");
-                    return Err(Error::new(e));
-                }
-            }
-        }
-        _ => {}
+    // Normalize the sqlite path portion for path checks while tolerating common forms
+    // such as `sqlite::memory:`, `sqlite://:memory:`, and `sqlite:file::memory:?mode=memory&cache=shared`.
+    let path_part = db_url
+        .trim_start_matches("sqlite:")
+        // Handle the optional `//` after the scheme (sqlite://<path>). We remove exactly
+        // two slashes so absolute paths keep a single leading slash.
+        .strip_prefix("//")
+        .unwrap_or_else(|| db_url.trim_start_matches("sqlite:"));
+
+    let is_memory = path_part.starts_with(":memory:")
+        || path_part.starts_with("file::memory:")
+        || db_url.contains("mode=memory");
+
+    // Ensure all in-memory URLs use a shared cache so migrations and subsequent connections
+    // see the same schema. This rewrites common short forms like `sqlite::memory:` into the
+    // canonical shared-cache URL.
+    if is_memory && !(db_url.contains("mode=memory") && db_url.contains("cache=shared")) {
+        let normalized_memory_url = "sqlite:file:sapphillon?mode=memory&cache=shared".to_string();
+        warn!(
+            "Detected in-memory SQLite URL without shared cache; normalizing to {normalized_memory_url}"
+        );
+        db_url = normalized_memory_url.clone();
+        GLOBAL_STATE.async_set_db_url(normalized_memory_url).await;
     }
 
-    let database_connection =
-        sea_orm::Database::connect(GLOBAL_STATE.async_get_db_url().await.as_str()).await;
+    let path_part = db_url
+        .trim_start_matches("sqlite:")
+        .strip_prefix("//")
+        .unwrap_or_else(|| db_url.trim_start_matches("sqlite:"));
+
+    // If using a file-backed SQLite database, create the file when it does not yet exist.
+    if !is_memory && !path_part.is_empty() && !std::path::Path::new(path_part).exists() {
+        info!("Database file does not exist. Creating new database at: {path_part}");
+        match std::fs::File::create(path_part) {
+            Ok(_) => info!("Database file created successfully."),
+            Err(e) => {
+                error!("Failed to create database file: {e:#?}");
+                return Err(Error::new(e));
+            }
+        }
+    }
+
+    let database_connection = sea_orm::Database::connect(db_url.as_str()).await;
     match database_connection {
         Ok(conn) => {
             // Attempt to run migrations from the `migration` crate.
