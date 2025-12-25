@@ -30,6 +30,17 @@ pub fn iniad_generate_pr_description_plugin_function() -> PluginFunction {
     }
 }
 
+pub fn iniad_generate_commit_message_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.iniad.generate_commit_message".to_string(),
+        function_name: "iniad.generate_commit_message".to_string(),
+        description: "Generates a commit message from git diff using INIAD OpenAI API.".to_string(),
+        permissions: iniad_plugin_permissions(),
+        arguments: "String: diff".to_string(),
+        returns: "String: commit message".to_string(),
+    }
+}
+
 pub fn iniad_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.iniad".to_string(),
@@ -37,6 +48,7 @@ pub fn iniad_plugin_package() -> PluginPackage {
         description: "A plugin to interact with INIAD OpenAI API.".to_string(),
         functions: vec![
             iniad_generate_pr_description_plugin_function(),
+            iniad_generate_commit_message_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -62,12 +74,23 @@ pub fn core_iniad_generate_pr_description_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_iniad_generate_commit_message_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.iniad.generate_commit_message".to_string(),
+        "iniad.generate_commit_message".to_string(),
+        "Generates a commit message from git diff using INIAD OpenAI API.".to_string(),
+        op2_iniad_generate_commit_message(),
+        None,
+    )
+}
+
 pub fn core_iniad_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.iniad".to_string(),
         "INIAD AI".to_string(),
         vec![
             core_iniad_generate_pr_description_plugin(),
+            core_iniad_generate_commit_message_plugin(),
         ],
     )
 }
@@ -170,7 +193,7 @@ pub fn op2_iniad_generate_pr_description(
     );
 
     let request_body = json!({
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-5-nano",
         "messages": [
             {
                 "role": "system",
@@ -217,4 +240,73 @@ pub fn op2_iniad_generate_pr_description(
         .trim();
 
     Ok(clean_content.to_string())
+}
+
+#[op2]
+#[string]
+pub fn op2_iniad_generate_commit_message(
+    state: &mut OpState,
+    #[string] diff: String,
+) -> std::result::Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        &iniad_generate_commit_message_plugin_function().function_id,
+        iniad_plugin_permissions(),
+    )?;
+
+    let api_key = std::env::var("INIAD_API_KEY").map_err(|_| {
+        JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set")
+    })?;
+
+    let agent = ureq::Agent::new_with_defaults();
+    let prompt = format!(
+        "Based on the following git diff, generate a concise and descriptive commit message.\n\
+        Follow the Conventional Commits format (e.g., 'feat:', 'fix:', 'docs:', 'refactor:', etc.).\n\
+        Return ONLY the commit message text, nothing else.\n\
+        \n\
+        Git Diff:\n\
+        {}",
+        diff
+    );
+
+    let request_body = json!({
+        "model": "gpt-5-nano",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that generates concise git commit messages following Conventional Commits format."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    });
+
+    let mut res = agent
+        .post("https://api.openai.iniad.org/api/v1/chat/completions")
+        .header("Authorization", &format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .send(serde_json::to_string(&request_body).unwrap())
+        .map_err(|e| JsErrorBox::new("Error", format!("API request failed: {}", e)))?;
+
+    if res.status() != 200 {
+        let status = res.status();
+        let text = res.body_mut().read_to_string().unwrap_or_default();
+        return Err(JsErrorBox::new("Error", format!("API returned error {}: {}", status, text)));
+    }
+
+    let response_text = res
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read response body: {}", e)))?;
+
+    let response_body: serde_json::Value = serde_json::from_str(&response_text)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to parse response JSON: {}", e)))?;
+
+    let content = response_body["choices"][0]["message"]["content"]
+        .as_str()
+        .ok_or_else(|| JsErrorBox::new("Error", "Invalid API response format"))?;
+
+    Ok(content.trim().to_string())
 }

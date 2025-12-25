@@ -7,7 +7,12 @@
     return core.ops.op2_iniad_generate_pr_description(fileContent);
   }
 
+  function generateCommitMessage(diff) {
+    return core.ops.op2_iniad_generate_commit_message(diff);
+  }
+
   globalThis.iniad = {
     generatePrDescription,
+    generateCommitMessage,
   };
 })();

@@ -17,6 +17,7 @@ dependencies = [
  "fetch",
  "filesystem",
  "floorp",
+ "git",
  "iniad",
  "log",
  "migration",
@@ -2185,6 +2186,18 @@ checksum = "f5df2ba84018d80c213569363bdcd0c64e6933c67fe4c1d60ecf822971a3c35e"
 dependencies = [
  "color_quant",
  "weezl",
+]
+
+[[package]]
+name = "git"
+version = "0.13.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "sapphillon_core",
+ "serde_json",
 ]
 
 [[package]]
