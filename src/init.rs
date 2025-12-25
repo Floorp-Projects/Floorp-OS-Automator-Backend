@@ -111,8 +111,13 @@ async fn register_initial_workflows() -> Result<()> {
 
         if exists.is_none() {
             info!("Registering initial workflow: {}", wf_def.display_name);
-            let wf = create_workflow(&db, wf_def.display_name.clone(), wf_def.description.clone())
-                .await?;
+            let wf = create_workflow(
+                &db,
+                wf_def.display_name.clone(),
+                wf_def.description.clone(),
+                0, // WORKFLOW_LANGUAGE_UNSPECIFIED
+            )
+            .await?;
 
             create_workflow_code(
                 &db,
