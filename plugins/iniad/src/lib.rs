@@ -44,8 +44,8 @@ pub fn iniad_generate_commit_message_plugin_function() -> PluginFunction {
 pub fn iniad_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.iniad".to_string(),
-        package_name: "INIAD AI".to_string(),
-        description: "A plugin to interact with INIAD OpenAI API.".to_string(),
+        package_name: "OpenAI API | GPT 5 nano".to_string(),
+        description: "A plugin to interact with OpenAI API.".to_string(),
         functions: vec![
             iniad_generate_pr_description_plugin_function(),
             iniad_generate_commit_message_plugin_function(),
@@ -87,7 +87,7 @@ pub fn core_iniad_generate_commit_message_plugin() -> CorePluginFunction {
 pub fn core_iniad_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.iniad".to_string(),
-        "INIAD AI".to_string(),
+        "OPENAI API | GPT 5 nano".to_string(),
         vec![
             core_iniad_generate_pr_description_plugin(),
             core_iniad_generate_commit_message_plugin(),
