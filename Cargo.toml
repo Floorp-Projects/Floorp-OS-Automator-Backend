@@ -1,7 +1,7 @@
 [workspace.package]
 
 # name = "Sapphillon"
-version = "0.13.1"
+version = "0.13.2"
 edition = "2024"
 authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
 license = "MPL-2.0 OR GPL-3.0-or-later"
