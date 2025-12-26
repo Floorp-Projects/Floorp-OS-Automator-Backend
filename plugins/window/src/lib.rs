@@ -227,10 +227,24 @@ fn op2_close_window(
     let windows = get_open_windows()
         .map_err(|_| JsErrorBox::new("Error", "Could not get open windows".to_string()))?;
 
+    let pattern_lower = title_pattern.to_lowercase();
+    let mut found_count = 0;
     let mut closed_count = 0;
+    let mut last_error = None;
 
     for window in windows {
-        if window.title.contains(&title_pattern) {
+        let title_lower = window.title.to_lowercase();
+        let name_lower = window.info.name.to_lowercase();
+
+        // Debug log all windows to stderr (visible in terminal)
+        eprintln!(
+            "[Sapphillon] Checking window: title='{}', app='{}', pattern='{}'",
+            window.title, window.info.name, title_pattern
+        );
+
+        if title_lower.contains(&pattern_lower) || name_lower.contains(&pattern_lower) {
+            found_count += 1;
+
             // On Windows, use taskkill to close the window by process ID
             #[cfg(target_os = "windows")]
             {
@@ -238,8 +252,16 @@ fn op2_close_window(
                     .args(["/PID", &window.info.process_id.to_string(), "/F"])
                     .output();
 
-                if result.is_ok() {
-                    closed_count += 1;
+                match result {
+                    Ok(output) if output.status.success() => {
+                        closed_count += 1;
+                    }
+                    Ok(output) => {
+                        last_error = Some(format!("taskkill failed (exit {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
+                    }
+                    Err(e) => {
+                        last_error = Some(format!("Failed to run taskkill: {}", e));
+                    }
                 }
             }
 
@@ -250,8 +272,16 @@ fn op2_close_window(
                     .arg(window.info.process_id.to_string())
                     .output();
 
-                if result.is_ok() {
-                    closed_count += 1;
+                match result {
+                    Ok(output) if output.status.success() => {
+                        closed_count += 1;
+                    }
+                    Ok(output) => {
+                        last_error = Some(format!("kill failed (exit {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
+                    }
+                    Err(e) => {
+                        last_error = Some(format!("Failed to run kill: {}", e));
+                    }
                 }
             }
         }
@@ -259,8 +289,18 @@ fn op2_close_window(
 
     if closed_count > 0 {
         Ok(format!(
-            "Closed {} window(s) matching '{}'",
-            closed_count, title_pattern
+            "Successfully closed {} window(s) matching '{}' (Found: {})",
+            closed_count, title_pattern, found_count
+        ))
+    } else if found_count > 0 {
+        Err(JsErrorBox::new(
+            "Error",
+            format!(
+                "Found {} window(s) matching '{}', but failed to close any. Last error: {}",
+                found_count,
+                title_pattern,
+                last_error.unwrap_or_else(|| "Unknown error".to_string())
+            ),
         ))
     } else {
         Err(JsErrorBox::new(
