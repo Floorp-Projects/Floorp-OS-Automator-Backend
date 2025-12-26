@@ -257,7 +257,11 @@ fn op2_close_window(
                         closed_count += 1;
                     }
                     Ok(output) => {
-                        last_error = Some(format!("taskkill failed (exit {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
+                        last_error = Some(format!(
+                            "taskkill failed (exit {}): {}",
+                            output.status,
+                            String::from_utf8_lossy(&output.stderr)
+                        ));
                     }
                     Err(e) => {
                         last_error = Some(format!("Failed to run taskkill: {}", e));
@@ -277,7 +281,11 @@ fn op2_close_window(
                         closed_count += 1;
                     }
                     Ok(output) => {
-                        last_error = Some(format!("kill failed (exit {}): {}", output.status, String::from_utf8_lossy(&output.stderr)));
+                        last_error = Some(format!(
+                            "kill failed (exit {}): {}",
+                            output.status,
+                            String::from_utf8_lossy(&output.stderr)
+                        ));
                     }
                     Err(e) => {
                         last_error = Some(format!("Failed to run kill: {}", e));
