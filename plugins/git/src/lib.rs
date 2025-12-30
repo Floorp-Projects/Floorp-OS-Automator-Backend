@@ -19,6 +19,8 @@ use std::sync::{Arc, Mutex};
 // Plugin Function Definitions
 // ============================================================================
 
+// --- Basic Operations ---
+
 pub fn git_get_diff_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.git.getDiff".to_string(),
@@ -96,12 +98,230 @@ pub fn git_push_plugin_function() -> PluginFunction {
     }
 }
 
+// --- Branch Operations ---
+
+pub fn git_checkout_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.checkout".to_string(),
+        function_name: "Checkout".to_string(),
+        description: "Switch to a different branch".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, branch: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_create_branch_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.createBranch".to_string(),
+        function_name: "Create Branch".to_string(),
+        description: "Create a new branch".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, branchName: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_delete_branch_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.deleteBranch".to_string(),
+        function_name: "Delete Branch".to_string(),
+        description: "Delete a branch".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, branchName: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_list_branches_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.listBranches".to_string(),
+        function_name: "List Branches".to_string(),
+        description: "List all branches".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_merge_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.merge".to_string(),
+        function_name: "Merge".to_string(),
+        description: "Merge a branch into current branch".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, branch: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+// --- Remote Operations ---
+
+pub fn git_pull_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.pull".to_string(),
+        function_name: "Pull".to_string(),
+        description: "Pull changes from remote".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_fetch_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.fetch".to_string(),
+        function_name: "Fetch".to_string(),
+        description: "Fetch changes from remote without merging".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_get_remotes_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.getRemotes".to_string(),
+        function_name: "Get Remotes".to_string(),
+        description: "List all remote repositories".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_set_remote_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.setRemote".to_string(),
+        function_name: "Set Remote".to_string(),
+        description: "Add or update a remote repository".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, name: string, url: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+// --- Information Retrieval ---
+
+pub fn git_get_last_commit_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.getLastCommit".to_string(),
+        function_name: "Get Last Commit".to_string(),
+        description: "Get details of the last commit".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_get_file_history_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.getFileHistory".to_string(),
+        function_name: "Get File History".to_string(),
+        description: "Get commit history for a specific file".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, filePath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_blame_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.blame".to_string(),
+        function_name: "Blame".to_string(),
+        description: "Show who last modified each line of a file".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, filePath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_show_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.show".to_string(),
+        function_name: "Show".to_string(),
+        description: "Show details of a specific commit".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, commitHash: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_get_tags_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.getTags".to_string(),
+        function_name: "Get Tags".to_string(),
+        description: "List all tags".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+// --- Workflow Utilities ---
+
+pub fn git_stash_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.stash".to_string(),
+        function_name: "Stash".to_string(),
+        description: "Stash current changes".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_stash_pop_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.stashPop".to_string(),
+        function_name: "Stash Pop".to_string(),
+        description: "Apply and remove the latest stash".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_reset_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.reset".to_string(),
+        function_name: "Reset".to_string(),
+        description: "Reset current HEAD to a specific state".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, mode: string, ref?: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_revert_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.revert".to_string(),
+        function_name: "Revert".to_string(),
+        description: "Revert a specific commit".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, commitHash: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
+pub fn git_cherry_pick_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.git.cherryPick".to_string(),
+        function_name: "Cherry Pick".to_string(),
+        description: "Apply a specific commit to current branch".to_string(),
+        permissions: vec![],
+        arguments: "repoPath: string, commitHash: string".to_string(),
+        returns: "string".to_string(),
+    }
+}
+
 pub fn git_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.git".to_string(),
         package_name: "Git".to_string(),
         description: "Git repository operations for workflow automation.".to_string(),
         functions: vec![
+            // Basic operations
             git_get_diff_plugin_function(),
             git_get_status_plugin_function(),
             git_get_branch_plugin_function(),
@@ -109,6 +329,29 @@ pub fn git_plugin_package() -> PluginPackage {
             git_add_plugin_function(),
             git_commit_plugin_function(),
             git_push_plugin_function(),
+            // Branch operations
+            git_checkout_plugin_function(),
+            git_create_branch_plugin_function(),
+            git_delete_branch_plugin_function(),
+            git_list_branches_plugin_function(),
+            git_merge_plugin_function(),
+            // Remote operations
+            git_pull_plugin_function(),
+            git_fetch_plugin_function(),
+            git_get_remotes_plugin_function(),
+            git_set_remote_plugin_function(),
+            // Information retrieval
+            git_get_last_commit_plugin_function(),
+            git_get_file_history_plugin_function(),
+            git_blame_plugin_function(),
+            git_show_plugin_function(),
+            git_get_tags_plugin_function(),
+            // Workflow utilities
+            git_stash_plugin_function(),
+            git_stash_pop_plugin_function(),
+            git_reset_plugin_function(),
+            git_revert_plugin_function(),
+            git_cherry_pick_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -123,6 +366,8 @@ pub fn git_plugin_package() -> PluginPackage {
 // ============================================================================
 // Core Plugin Functions (for Deno runtime integration)
 // ============================================================================
+
+// --- Basic Operations ---
 
 pub fn core_git_get_diff_plugin() -> CorePluginFunction {
     CorePluginFunction::new(
@@ -194,11 +439,210 @@ pub fn core_git_push_plugin() -> CorePluginFunction {
     )
 }
 
+// --- Branch Operations ---
+
+pub fn core_git_checkout_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.checkout".to_string(),
+        "Checkout".to_string(),
+        "Switch to a different branch".to_string(),
+        op_git_checkout(),
+        None,
+    )
+}
+
+pub fn core_git_create_branch_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.createBranch".to_string(),
+        "Create Branch".to_string(),
+        "Create a new branch".to_string(),
+        op_git_create_branch(),
+        None,
+    )
+}
+
+pub fn core_git_delete_branch_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.deleteBranch".to_string(),
+        "Delete Branch".to_string(),
+        "Delete a branch".to_string(),
+        op_git_delete_branch(),
+        None,
+    )
+}
+
+pub fn core_git_list_branches_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.listBranches".to_string(),
+        "List Branches".to_string(),
+        "List all branches".to_string(),
+        op_git_list_branches(),
+        None,
+    )
+}
+
+pub fn core_git_merge_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.merge".to_string(),
+        "Merge".to_string(),
+        "Merge a branch into current branch".to_string(),
+        op_git_merge(),
+        None,
+    )
+}
+
+// --- Remote Operations ---
+
+pub fn core_git_pull_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.pull".to_string(),
+        "Pull".to_string(),
+        "Pull changes from remote".to_string(),
+        op_git_pull(),
+        None,
+    )
+}
+
+pub fn core_git_fetch_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.fetch".to_string(),
+        "Fetch".to_string(),
+        "Fetch changes from remote without merging".to_string(),
+        op_git_fetch(),
+        None,
+    )
+}
+
+pub fn core_git_get_remotes_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.getRemotes".to_string(),
+        "Get Remotes".to_string(),
+        "List all remote repositories".to_string(),
+        op_git_get_remotes(),
+        None,
+    )
+}
+
+pub fn core_git_set_remote_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.setRemote".to_string(),
+        "Set Remote".to_string(),
+        "Add or update a remote repository".to_string(),
+        op_git_set_remote(),
+        None,
+    )
+}
+
+// --- Information Retrieval ---
+
+pub fn core_git_get_last_commit_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.getLastCommit".to_string(),
+        "Get Last Commit".to_string(),
+        "Get details of the last commit".to_string(),
+        op_git_get_last_commit(),
+        None,
+    )
+}
+
+pub fn core_git_get_file_history_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.getFileHistory".to_string(),
+        "Get File History".to_string(),
+        "Get commit history for a specific file".to_string(),
+        op_git_get_file_history(),
+        None,
+    )
+}
+
+pub fn core_git_blame_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.blame".to_string(),
+        "Blame".to_string(),
+        "Show who last modified each line of a file".to_string(),
+        op_git_blame(),
+        None,
+    )
+}
+
+pub fn core_git_show_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.show".to_string(),
+        "Show".to_string(),
+        "Show details of a specific commit".to_string(),
+        op_git_show(),
+        None,
+    )
+}
+
+pub fn core_git_get_tags_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.getTags".to_string(),
+        "Get Tags".to_string(),
+        "List all tags".to_string(),
+        op_git_get_tags(),
+        None,
+    )
+}
+
+// --- Workflow Utilities ---
+
+pub fn core_git_stash_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.stash".to_string(),
+        "Stash".to_string(),
+        "Stash current changes".to_string(),
+        op_git_stash(),
+        None,
+    )
+}
+
+pub fn core_git_stash_pop_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.stashPop".to_string(),
+        "Stash Pop".to_string(),
+        "Apply and remove the latest stash".to_string(),
+        op_git_stash_pop(),
+        None,
+    )
+}
+
+pub fn core_git_reset_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.reset".to_string(),
+        "Reset".to_string(),
+        "Reset current HEAD to a specific state".to_string(),
+        op_git_reset(),
+        None,
+    )
+}
+
+pub fn core_git_revert_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.revert".to_string(),
+        "Revert".to_string(),
+        "Revert a specific commit".to_string(),
+        op_git_revert(),
+        None,
+    )
+}
+
+pub fn core_git_cherry_pick_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.git.cherryPick".to_string(),
+        "Cherry Pick".to_string(),
+        "Apply a specific commit to current branch".to_string(),
+        op_git_cherry_pick(),
+        None,
+    )
+}
+
 pub fn core_git_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.git".to_string(),
         "Git".to_string(),
         vec![
+            // Basic operations
             core_git_get_diff_plugin(),
             core_git_get_status_plugin(),
             core_git_get_branch_plugin(),
@@ -206,6 +650,29 @@ pub fn core_git_plugin_package() -> CorePluginPackage {
             core_git_add_plugin(),
             core_git_commit_plugin(),
             core_git_push_plugin(),
+            // Branch operations
+            core_git_checkout_plugin(),
+            core_git_create_branch_plugin(),
+            core_git_delete_branch_plugin(),
+            core_git_list_branches_plugin(),
+            core_git_merge_plugin(),
+            // Remote operations
+            core_git_pull_plugin(),
+            core_git_fetch_plugin(),
+            core_git_get_remotes_plugin(),
+            core_git_set_remote_plugin(),
+            // Information retrieval
+            core_git_get_last_commit_plugin(),
+            core_git_get_file_history_plugin(),
+            core_git_blame_plugin(),
+            core_git_show_plugin(),
+            core_git_get_tags_plugin(),
+            // Workflow utilities
+            core_git_stash_plugin(),
+            core_git_stash_pop_plugin(),
+            core_git_reset_plugin(),
+            core_git_revert_plugin(),
+            core_git_cherry_pick_plugin(),
         ],
     )
 }
@@ -303,6 +770,8 @@ fn run_git_command(repo_path: &str, args: &[&str]) -> Result<String, JsErrorBox>
 // Op2 Functions (Deno Runtime Operations)
 // ============================================================================
 
+// --- Basic Operations ---
+
 #[op2]
 #[string]
 pub fn op_git_get_diff(
@@ -315,7 +784,6 @@ pub fn op_git_get_diff(
         git_plugin_permissions(),
     )?;
 
-    // Get staged and unstaged diff
     let diff_staged = run_git_command(&repo_path, &["diff", "--cached"])?;
     let diff_unstaged = run_git_command(&repo_path, &["diff"])?;
 
@@ -409,7 +877,6 @@ pub fn op_git_add(
         git_plugin_permissions(),
     )?;
 
-    // Default to adding all files if none specified
     let files_arg = files.unwrap_or_else(|| ".".to_string());
     let output = run_git_command(&repo_path, &["add", &files_arg])?;
 
@@ -454,6 +921,453 @@ pub fn op_git_push(state: &mut OpState, #[string] repo_path: String) -> Result<S
     )?;
 
     let output = run_git_command(&repo_path, &["push"])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+// --- Branch Operations ---
+
+#[op2]
+#[string]
+pub fn op_git_checkout(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] branch: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.checkout",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["checkout", &branch])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_create_branch(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] branch_name: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.createBranch",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["checkout", "-b", &branch_name])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_delete_branch(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] branch_name: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.deleteBranch",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["branch", "-d", &branch_name])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_list_branches(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.listBranches",
+        git_plugin_permissions(),
+    )?;
+
+    let local = run_git_command(&repo_path, &["branch", "--list"])?;
+    let remote = run_git_command(&repo_path, &["branch", "-r"])?;
+
+    let result = serde_json::json!({
+        "local": local,
+        "remote": remote,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_merge(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] branch: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.merge",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["merge", &branch])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+// --- Remote Operations ---
+
+#[op2]
+#[string]
+pub fn op_git_pull(state: &mut OpState, #[string] repo_path: String) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.pull",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["pull"])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_fetch(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.fetch",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["fetch", "--all"])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_get_remotes(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.getRemotes",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["remote", "-v"])?;
+
+    let result = serde_json::json!({
+        "remotes": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_set_remote(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] name: String,
+    #[string] url: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.setRemote",
+        git_plugin_permissions(),
+    )?;
+
+    // Try to add, if it fails, try set-url
+    let result = run_git_command(&repo_path, &["remote", "add", &name, &url]);
+    let output = match result {
+        Ok(o) => o,
+        Err(_) => run_git_command(&repo_path, &["remote", "set-url", &name, &url])?,
+    };
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+// --- Information Retrieval ---
+
+#[op2]
+#[string]
+pub fn op_git_get_last_commit(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.getLastCommit",
+        git_plugin_permissions(),
+    )?;
+
+    let hash = run_git_command(&repo_path, &["rev-parse", "HEAD"])?;
+    let message = run_git_command(&repo_path, &["log", "-1", "--format=%s"])?;
+    let author = run_git_command(&repo_path, &["log", "-1", "--format=%an"])?;
+    let date = run_git_command(&repo_path, &["log", "-1", "--format=%ci"])?;
+
+    let result = serde_json::json!({
+        "hash": hash.trim(),
+        "message": message.trim(),
+        "author": author.trim(),
+        "date": date.trim(),
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_get_file_history(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] file_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.getFileHistory",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["log", "--oneline", "--follow", "--", &file_path])?;
+
+    let result = serde_json::json!({
+        "history": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_blame(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] file_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.blame",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["blame", &file_path])?;
+
+    let result = serde_json::json!({
+        "blame": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_show(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] commit_hash: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.show",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["show", &commit_hash])?;
+
+    let result = serde_json::json!({
+        "show": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_get_tags(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.getTags",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["tag", "-l"])?;
+
+    let result = serde_json::json!({
+        "tags": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+// --- Workflow Utilities ---
+
+#[op2]
+#[string]
+pub fn op_git_stash(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.stash",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["stash"])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_stash_pop(
+    state: &mut OpState,
+    #[string] repo_path: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.stashPop",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["stash", "pop"])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_reset(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] mode: String,
+    #[string] git_ref: Option<String>,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.reset",
+        git_plugin_permissions(),
+    )?;
+
+    let mode_flag = format!("--{}", mode);
+    let output = if let Some(r) = git_ref {
+        run_git_command(&repo_path, &["reset", &mode_flag, &r])?
+    } else {
+        run_git_command(&repo_path, &["reset", &mode_flag])?
+    };
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_revert(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] commit_hash: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.revert",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["revert", "--no-edit", &commit_hash])?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "output": output,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_git_cherry_pick(
+    state: &mut OpState,
+    #[string] repo_path: String,
+    #[string] commit_hash: String,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.git.cherryPick",
+        git_plugin_permissions(),
+    )?;
+
+    let output = run_git_command(&repo_path, &["cherry-pick", &commit_hash])?;
 
     let result = serde_json::json!({
         "success": true,

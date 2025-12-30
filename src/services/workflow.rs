@@ -898,7 +898,7 @@ workflow();
                     },
                     AllowedPermission {
                         plugin_function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
-                        permissions: iniad::iniad_plugin_permissions(),
+                        permissions: iniad::iniad_ai_mop_plugin_permissions(),
                     },
                 ],
             }],
