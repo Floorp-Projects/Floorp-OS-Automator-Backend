@@ -463,74 +463,9 @@ impl WorkflowService for MyWorkflowService {
             description_len = description.len()
         );
 
-        // TEMPORARY: Hardcode verification workflow for VSCode plugin
-        // Ignoring AI generation for testing purposes as requested.
-        let generated = r#"
-/**
- * Demo Workflow: Verify VSCode Plugin Functions
- */
-function workflow() {
-    console.log("Starting VSCode Plugin Verification (v2)...");
-
-    // Simplified workflow to avoid permission issues
-    const filePath = "/tmp/sapphillon_vscode_test.txt";
-    const testContent = "Hello from Floorp OS Automator!";
-
-    try {
-        // Skip directory creation, use /tmp directly
-        console.log("Using file path: " + filePath);
-
-
-        // 2. Test write_file
-        console.log("Testing vscode.write_file...");
-        const writeResult = vscode.write_file(filePath, testContent);
-        console.log("write_file result: " + writeResult);
-        
-        // Busy wait loop
-        const start1 = Date.now();
-        while (Date.now() - start1 < 2000) {}
-        // 3. Test open_file
-        console.log("Testing vscode.open_file...");
-        const openResult = vscode.open_file(filePath);
-        console.log("open_file result: " + openResult);
-        
-        const start2 = Date.now();
-        while (Date.now() - start2 < 1000) {}
-
-        // 4. Test get_active_file_content
-        console.log("Testing vscode.get_active_file_content...");
-        const content = vscode.get_active_file_content();
-        console.log("get_active_file_content result length: " + content.length);
-        
-        if (content.trim() === testContent.trim()) {
-            console.log("SUCCESS: Content matches!");
-        } else {
-            console.error("FAILURE: Content mismatch!");
-            console.error("Expected: " + testContent);
-            console.error("Actual: " + content);
-        }
-
-        // 5. Test open_folder
-        console.log("Testing vscode.open_folder...");
-        const folderResult = vscode.open_folder("/tmp");
-        console.log("open_folder result: " + folderResult);
-        
-        const start3 = Date.now();
-        while (Date.now() - start3 < 2000) {}
-
-        // 6. Test close_workspace
-        console.log("Testing vscode.close_workspace...");
-        const closeResult = vscode.close_workspace();
-        console.log("close_workspace result: " + closeResult);
-
-        console.log("Verification checks completed.");
-
-    } catch (e) {
-        console.error("Verification failed with error: " + e);
-    }
-}
-"#
-        .to_string();
+        // Load workflow from demo_workflows/workflow.js file
+        let generated = std::fs::read_to_string("demo_workflows/workflow.js")
+            .map_err(|e| Status::internal(format!("Failed to read workflow.js: {}", e)))?;
 
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
@@ -577,6 +512,43 @@ function workflow() {
                         plugin_function_id: "app.sapphillon.core.vscode.close_workspace"
                             .to_string(),
                         permissions: vscode::vscode_plugin_permissions(),
+                    },
+                    // Excel plugin functions
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.createWorkbook".to_string(),
+                        permissions: excel::excel_write_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.writeCell".to_string(),
+                        permissions: excel::excel_write_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.writeRange".to_string(),
+                        permissions: excel::excel_write_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.addSheet".to_string(),
+                        permissions: excel::excel_write_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.getSheetNames".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.readCell".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.readRange".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.openInApp".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.getOpenWorkbooks".to_string(),
+                        permissions: excel::excel_read_permissions(),
                     },
                 ],
             }],
@@ -652,202 +624,9 @@ function workflow() {
             prompt_len = req.prompt.len()
         );
 
-        // Workspace to VSCode Workflow
-        // ブラウザタブからGitHub URLを抽出し、対応するVSCodeプロジェクトを開く
-        let generated = r##"
-/**
- * Workspace to VSCode Workflow
- *
- * このワークフローは以下の処理を行います:
- * 1. Floorpで開いているタブを取得
- * 2. タブのURLからGitHub/GitLabリポジトリ名を抽出
- * 3. 対応するローカルフォルダをVSCodeで開く
- * 4. 不要なVSCodeウィンドウを閉じる
- */
-
-// 設定: リポジトリのベースディレクトリ
-const REPO_BASE_DIRS = [
-    "/Users/user/dev-source/floorp-dev",
-    "/Users/user/dev-source/sapphillon-dev",
-    "/Users/user/dev-source"
-];
-
-// GitHub owner to local directory mapping
-const OWNER_MAPPING = {
-    "floorp-projects": "floorp-dev",
-    "sapphillon": "sapphillon-dev"
-};
-
-function workflow() {
-    try {
-        // Step 1: ブラウザタブを取得
-        console.log("Step 1: Getting browser tabs...");
-        const tabsResponse = floorp.browserTabs();
-        const tabsData = JSON.parse(tabsResponse);
-        const tabs = tabsData.tabs || tabsData;
-        console.log("Found " + tabs.length + " tabs");
-
-        // Step 2: タブのURLからプロジェクトパスを推測
-        console.log("Step 2: Analyzing tab URLs...");
-        const projectPaths = [];
-
-        for (const tab of tabs) {
-            const url = tab.url || "";
-            const projectPath = extractProjectPath(url);
-            if (projectPath && !projectPaths.includes(projectPath)) {
-                projectPaths.push(projectPath);
-                console.log("Found project path: " + projectPath);
-            }
-        }
-
-        if (projectPaths.length === 0) {
-            return {
-                ok: false,
-                message: "No project paths could be extracted from tabs"
-            };
-        }
-
-        // Step 3: VSCodeでプロジェクトを開く
-        console.log("Step 3: Opening projects in VSCode...");
-        const opened = [];
-        const failed = [];
-
-        for (const path of projectPaths) {
-            try {
-                const result = vscode.open_folder(path);
-                console.log("Opened: " + path + " - " + result);
-                opened.push(path);
-            } catch (e) {
-                console.log("Failed to open: " + path + " - " + String(e));
-                failed.push(path);
-            }
-        }
-
-        // Step 4: AIを使って不要なウィンドウを閉じる
-        console.log("Step 4: Analyzing windows with AI...");
-        let closedCount = 0;
-
-        try {
-            const allTitles = get_inactive_window_titles();
-            console.log("Found " + allTitles.length + " inactive windows");
-
-            if (allTitles.length > 0) {
-                // デバッグ: 全ウィンドウをログ
-                console.log("=== All window titles ===");
-                for (let i = 0; i < allTitles.length; i++) {
-                    console.log("[" + i + "] " + allTitles[i]);
-                }
-                console.log("=========================");
-                
-                // AIにウィンドウを分析してもらう
-                const windowsJson = JSON.stringify(allTitles);
-                console.log("Sending to AI for analysis...");
-                const toCloseJson = iniad.analyzeWindows(windowsJson);
-                console.log("AI response: " + toCloseJson);
-
-                try {
-                    const windowsToClose = JSON.parse(toCloseJson);
-                    console.log("=== Windows AI wants to close ===");
-                    
-                    // 保護するアプリのリスト
-                    const protectedApps = [
-                        "floorp", "firefox", "chrome", "safari", "edge",
-                        "code", "vscode", "visual studio", "cursor",
-                        "terminal", "iterm", "warp", "alacritty",
-                        "antigravity",
-                        "windowmanager", "dock", "finder", "systemuiserver",
-                        "spotlight", "controlcenter"
-                    ];
-                    
-                    for (const titleToClose of windowsToClose) {
-                        const lowerTitle = titleToClose.toLowerCase();
-                        
-                        // 保護対象かチェック
-                        let isProtected = false;
-                        for (const app of protectedApps) {
-                            if (lowerTitle.includes(app)) {
-                                isProtected = true;
-                                console.log("[SKIP] Protected: " + titleToClose);
-                                break;
-                            }
-                        }
-                        
-                        if (!isProtected) {
-                            console.log("[CLOSING] " + titleToClose);
-                            try {
-                                close_window(titleToClose);
-                                closedCount++;
-                            } catch (e) {
-                                console.log("Failed to close: " + titleToClose + " - " + String(e));
-                            }
-                        }
-                    }
-                    console.log("=================================");
-                } catch (parseError) {
-                    console.log("Failed to parse AI response: " + parseError);
-                }
-            }
-        } catch (e) {
-            console.log("Could not get window list: " + String(e));
-        }
-
-        console.log("Closed " + closedCount + " non-development windows");
-
-        return {
-            ok: true,
-            message: "Workflow completed",
-            openedProjects: opened,
-            failedProjects: failed,
-            closedWindows: closedCount
-        };
-
-    } catch (e) {
-        return {
-            ok: false,
-            message: "Workflow failed",
-            error: String(e)
-        };
-    }
-}
-
-function extractProjectPath(url) {
-    try {
-        // GitHub URL: https://github.com/owner/repo
-        if (url.includes("github.com")) {
-            const match = url.match(/github\.com\/([^\/]+)\/([^\/?#]+)/);
-            if (match) {
-                const owner = match[1].toLowerCase();
-                const repo = match[2];
-
-                const localDir = OWNER_MAPPING[owner];
-                if (localDir) {
-                    return "/Users/user/dev-source/" + localDir + "/" + repo;
-                }
-
-                for (const baseDir of REPO_BASE_DIRS) {
-                    return baseDir + "/" + repo;
-                }
-            }
-        }
-
-        // GitLab URL: https://gitlab.com/owner/repo
-        if (url.includes("gitlab.com")) {
-            const match = url.match(/gitlab\.com\/([^\/]+)\/([^\/?#]+)/);
-            if (match) {
-                const repo = match[2];
-                return REPO_BASE_DIRS[0] + "/" + repo;
-            }
-        }
-
-        return null;
-    } catch (e) {
-        return null;
-    }
-}
-
-workflow();
-"##
-        .to_string();
+        // Load workflow from demo_workflows/workflow.js file
+        let generated = std::fs::read_to_string("demo_workflows/workflow.js")
+            .map_err(|e| Status::internal(format!("Failed to read workflow.js: {}", e)))?;
 
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
@@ -868,37 +647,54 @@ workflow();
                 result: vec![],
                 plugin_packages: vec![],
                 plugin_function_ids: vec![
-                    // Floorp plugin
-                    "app.sapphillon.core.floorp.browserTabs".to_string(),
-                    // VSCode plugin
-                    "app.sapphillon.core.vscode.open_folder".to_string(),
-                    // Window plugin
-                    "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
-                    "app.sapphillon.core.window.close_window".to_string(),
-                    // INIAD AI plugin
-                    "app.sapphillon.core.iniad.analyze_windows".to_string(),
+                    // Excel plugin functions
+                    "app.sapphillon.core.excel.createWorkbook".to_string(),
+                    "app.sapphillon.core.excel.writeCell".to_string(),
+                    "app.sapphillon.core.excel.writeRange".to_string(),
+                    "app.sapphillon.core.excel.addSheet".to_string(),
+                    "app.sapphillon.core.excel.getSheetNames".to_string(),
+                    "app.sapphillon.core.excel.readCell".to_string(),
+                    "app.sapphillon.core.excel.readRange".to_string(),
+                    "app.sapphillon.core.excel.openInApp".to_string(),
+                    "app.sapphillon.core.excel.getOpenWorkbooks".to_string(),
                 ],
                 allowed_permissions: vec![
+                    // Excel plugin functions
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.floorp.browserTabs".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.excel.createWorkbook".to_string(),
+                        permissions: excel::excel_write_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.vscode.open_folder".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.excel.writeCell".to_string(),
+                        permissions: excel::excel_write_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.window.get_inactive_window_titles"
-                            .to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.excel.writeRange".to_string(),
+                        permissions: excel::excel_write_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.window.close_window".to_string(),
-                        permissions: vscode::vscode_get_content_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.excel.addSheet".to_string(),
+                        permissions: excel::excel_write_permissions(),
                     },
                     AllowedPermission {
-                        plugin_function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
-                        permissions: iniad::iniad_ai_mop_plugin_permissions(),
+                        plugin_function_id: "app.sapphillon.core.excel.getSheetNames".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.readCell".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.readRange".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.openInApp".to_string(),
+                        permissions: excel::excel_read_permissions(),
+                    },
+                    AllowedPermission {
+                        plugin_function_id: "app.sapphillon.core.excel.getOpenWorkbooks".to_string(),
+                        permissions: excel::excel_read_permissions(),
                     },
                 ],
             }],

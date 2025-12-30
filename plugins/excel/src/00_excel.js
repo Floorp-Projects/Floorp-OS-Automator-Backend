@@ -50,6 +50,10 @@ function excelOpenInApp(filePath) {
   return Deno.core.ops.op_excel_open_in_app(filePath);
 }
 
+function excelGetOpenWorkbooks() {
+  return Deno.core.ops.op_excel_get_open_workbooks();
+}
+
 // --- Export ---
 
 globalThis.excel = {
@@ -64,4 +68,5 @@ globalThis.excel = {
   addSheet: excelAddSheet,
   // Utility operations
   openInApp: excelOpenInApp,
+  getOpenWorkbooks: excelGetOpenWorkbooks,
 };

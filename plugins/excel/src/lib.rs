@@ -114,6 +114,17 @@ pub fn excel_open_in_app_plugin_function() -> PluginFunction {
     }
 }
 
+pub fn excel_get_open_workbooks_plugin_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.core.excel.getOpenWorkbooks".to_string(),
+        function_name: "Get Open Workbooks".to_string(),
+        description: "Get file paths of all workbooks currently open in Excel (Mac only)".to_string(),
+        permissions: excel_read_permissions(),
+        arguments: "".to_string(),
+        returns: "string: JSON array of file paths".to_string(),
+    }
+}
+
 pub fn excel_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.excel".to_string(),
@@ -131,6 +142,7 @@ pub fn excel_plugin_package() -> PluginPackage {
             excel_add_sheet_plugin_function(),
             // Utility operations
             excel_open_in_app_plugin_function(),
+            excel_get_open_workbooks_plugin_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -226,6 +238,16 @@ pub fn core_excel_open_in_app_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_excel_get_open_workbooks_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.getOpenWorkbooks".to_string(),
+        "Get Open Workbooks".to_string(),
+        "Get file paths of workbooks open in Excel (Mac only)".to_string(),
+        op_excel_get_open_workbooks(),
+        None,
+    )
+}
+
 pub fn core_excel_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.excel".to_string(),
@@ -239,6 +261,7 @@ pub fn core_excel_plugin_package() -> CorePluginPackage {
             core_excel_write_range_plugin(),
             core_excel_add_sheet_plugin(),
             core_excel_open_in_app_plugin(),
+            core_excel_get_open_workbooks_plugin(),
         ],
     )
 }
@@ -687,4 +710,70 @@ pub fn op_excel_open_in_app(
     });
 
     Ok(serde_json::to_string(&result).unwrap())
+}
+
+#[op2]
+#[string]
+pub fn op_excel_get_open_workbooks(
+    state: &mut OpState,
+) -> Result<String, JsErrorBox> {
+    permission_check(
+        state,
+        "app.sapphillon.core.excel.getOpenWorkbooks",
+        excel_read_permissions(),
+    )?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let script = r#"
+            tell application "Microsoft Excel"
+                set wbPaths to {}
+                set wbCount to count of workbooks
+                repeat with i from 1 to wbCount
+                    set wb to workbook i
+                    set wbName to name of wb
+                    set wbPath to path of wb
+                    set end of wbPaths to wbPath & "/" & wbName
+                end repeat
+                return wbPaths
+            end tell
+        "#;
+
+        let output = std::process::Command::new("osascript")
+            .args(["-e", script])
+            .output()
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to execute AppleScript: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(JsErrorBox::new(
+                "Error",
+                format!("AppleScript failed: {}. Is Excel running?", stderr),
+            ));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // AppleScript returns comma-separated list: "path1, path2, path3"
+        let paths: Vec<String> = if stdout.is_empty() {
+            vec![]
+        } else {
+            stdout.split(", ").map(|s| s.trim().to_string()).collect()
+        };
+
+        let result = serde_json::json!({
+            "workbooks": paths,
+            "count": paths.len(),
+        });
+
+        Ok(serde_json::to_string(&result).unwrap())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(JsErrorBox::new(
+            "Error",
+            "getOpenWorkbooks is only supported on macOS",
+        ))
+    }
 }
