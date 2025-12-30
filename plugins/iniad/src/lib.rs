@@ -1,4 +1,4 @@
-// INIAD Plugin for Sapphillon
+// INIAD-AI-MOP Plugin for Sapphillon
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
@@ -19,52 +19,24 @@ use std::sync::{Arc, Mutex};
 // Plugin Function Definitions
 // ============================================================================
 
-pub fn iniad_generate_pr_description_plugin_function() -> PluginFunction {
+pub fn iniad_ai_mop_chat_plugin_function() -> PluginFunction {
     PluginFunction {
-        function_id: "app.sapphillon.core.iniad.generate_pr_description".to_string(),
-        function_name: "iniad.generate_pr_description".to_string(),
-        description: "Generates a PR title and body from file content using INIAD OpenAI API."
+        function_id: "app.sapphillon.core.iniad_ai_mop.chat".to_string(),
+        function_name: "iniad_ai_mop.chat".to_string(),
+        description: "Sends a chat request to INIAD-AI-MOP OpenAI API with custom system and user prompts."
             .to_string(),
-        permissions: iniad_plugin_permissions(),
-        arguments: "String: content".to_string(),
-        returns: "String: JSON string { title: string, body: string }".to_string(),
+        permissions: iniad_ai_mop_plugin_permissions(),
+        arguments: "String: systemPrompt, String: userPrompt".to_string(),
+        returns: "String: AI response content".to_string(),
     }
 }
 
-pub fn iniad_generate_commit_message_plugin_function() -> PluginFunction {
-    PluginFunction {
-        function_id: "app.sapphillon.core.iniad.generate_commit_message".to_string(),
-        function_name: "iniad.generate_commit_message".to_string(),
-        description: "Generates a commit message from git diff using INIAD OpenAI API.".to_string(),
-        permissions: iniad_plugin_permissions(),
-        arguments: "String: diff".to_string(),
-        returns: "String: commit message".to_string(),
-    }
-}
-
-pub fn iniad_analyze_windows_plugin_function() -> PluginFunction {
-    PluginFunction {
-        function_id: "app.sapphillon.core.iniad.analyze_windows".to_string(),
-        function_name: "iniad.analyzeWindows".to_string(),
-        description:
-            "Analyzes window titles and returns which ones to close (non-development related)."
-                .to_string(),
-        permissions: iniad_plugin_permissions(),
-        arguments: "String: JSON array of window titles".to_string(),
-        returns: "String: JSON array of window titles to close".to_string(),
-    }
-}
-
-pub fn iniad_plugin_package() -> PluginPackage {
+pub fn iniad_ai_mop_plugin_package() -> PluginPackage {
     PluginPackage {
-        package_id: "app.sapphillon.core.iniad".to_string(),
-        package_name: "OpenAI API | GPT 5 nano".to_string(),
-        description: "A plugin to interact with OpenAI API.".to_string(),
-        functions: vec![
-            iniad_generate_pr_description_plugin_function(),
-            iniad_generate_commit_message_plugin_function(),
-            iniad_analyze_windows_plugin_function(),
-        ],
+        package_id: "app.sapphillon.core.iniad_ai_mop".to_string(),
+        package_name: "INIAD-AI-MOP | GPT 5 nano".to_string(),
+        description: "A plugin to interact with INIAD-AI-MOP OpenAI API.".to_string(),
+        functions: vec![iniad_ai_mop_chat_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
         plugin_store_url: "BUILTIN".to_string(),
@@ -79,45 +51,21 @@ pub fn iniad_plugin_package() -> PluginPackage {
 // Core Plugin Functions (for Deno runtime integration)
 // ============================================================================
 
-pub fn core_iniad_generate_pr_description_plugin() -> CorePluginFunction {
+pub fn core_iniad_ai_mop_chat_plugin() -> CorePluginFunction {
     CorePluginFunction::new(
-        "app.sapphillon.core.iniad.generate_pr_description".to_string(),
-        "iniad.generate_pr_description".to_string(),
-        "Generates a PR title and body from file content using INIAD OpenAI API.".to_string(),
-        op2_iniad_generate_pr_description(),
+        "app.sapphillon.core.iniad_ai_mop.chat".to_string(),
+        "iniad_ai_mop.chat".to_string(),
+        "Sends a chat request to INIAD-AI-MOP OpenAI API with custom system and user prompts.".to_string(),
+        op2_iniad_ai_mop_chat(),
         Some(include_str!("00_iniad.js").to_string()),
     )
 }
 
-pub fn core_iniad_generate_commit_message_plugin() -> CorePluginFunction {
-    CorePluginFunction::new(
-        "app.sapphillon.core.iniad.generate_commit_message".to_string(),
-        "iniad.generate_commit_message".to_string(),
-        "Generates a commit message from git diff using INIAD OpenAI API.".to_string(),
-        op2_iniad_generate_commit_message(),
-        None,
-    )
-}
-
-pub fn core_iniad_analyze_windows_plugin() -> CorePluginFunction {
-    CorePluginFunction::new(
-        "app.sapphillon.core.iniad.analyze_windows".to_string(),
-        "iniad.analyzeWindows".to_string(),
-        "Analyzes window titles and returns which ones to close.".to_string(),
-        op2_iniad_analyze_windows(),
-        None,
-    )
-}
-
-pub fn core_iniad_plugin_package() -> CorePluginPackage {
+pub fn core_iniad_ai_mop_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
-        "app.sapphillon.core.iniad".to_string(),
-        "OPENAI API | GPT 5 nano".to_string(),
-        vec![
-            core_iniad_generate_pr_description_plugin(),
-            core_iniad_generate_commit_message_plugin(),
-            core_iniad_analyze_windows_plugin(),
-        ],
+        "app.sapphillon.core.iniad_ai_mop".to_string(),
+        "INIAD-AI-MOP | GPT 5 nano".to_string(),
+        vec![core_iniad_ai_mop_chat_plugin()],
     )
 }
 
@@ -125,10 +73,10 @@ pub fn core_iniad_plugin_package() -> CorePluginPackage {
 // Permission Definitions
 // ============================================================================
 
-pub fn iniad_plugin_permissions() -> Vec<Permission> {
+pub fn iniad_ai_mop_plugin_permissions() -> Vec<Permission> {
     vec![Permission {
         display_name: "AI Access".to_string(),
-        description: "Allows the plugin to access INIAD OpenAI API.".to_string(),
+        description: "Allows the plugin to access INIAD-AI-MOP OpenAI API.".to_string(),
         permission_type: PermissionType::NetAccess as i32,
         permission_level: PermissionLevel::Unspecified as i32,
         resource: vec![],
@@ -193,205 +141,32 @@ fn permission_check(
 
 #[op2]
 #[string]
-pub fn op2_iniad_generate_pr_description(
+pub fn op2_iniad_ai_mop_chat(
     state: &mut OpState,
-    #[string] content: String,
+    #[string] system_prompt: String,
+    #[string] user_prompt: String,
 ) -> std::result::Result<String, JsErrorBox> {
     permission_check(
         state,
-        &iniad_generate_pr_description_plugin_function().function_id,
-        iniad_plugin_permissions(),
+        &iniad_ai_mop_chat_plugin_function().function_id,
+        iniad_ai_mop_plugin_permissions(),
     )?;
 
     let api_key = std::env::var("INIAD_API_KEY")
         .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
 
     let agent = ureq::Agent::new_with_defaults();
-    let prompt = format!(
-        "Please generate a PR title and a detailed PR body description based on the following code changes.\n\
-        The output must be in JSON format with keys 'title' and 'body'.\n\
-        Do not include markdown formatting (like ```vjson) in the response, just the raw JSON object.\n\
-        \n\
-        Code Content:\n\
-        {}",
-        content
-    );
 
     let request_body = json!({
         "model": "gpt-5-nano",
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that writes Pull Request descriptions."
+                "content": system_prompt
             },
             {
                 "role": "user",
-                "content": prompt
-            }
-        ]
-    });
-
-    let mut res = agent
-        .post("https://api.openai.iniad.org/api/v1/chat/completions")
-        .header("Authorization", &format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
-        .send(serde_json::to_string(&request_body).unwrap())
-        .map_err(|e| JsErrorBox::new("Error", format!("API request failed: {}", e)))?;
-
-    if res.status() != 200 {
-        let status = res.status();
-        let text = res.body_mut().read_to_string().unwrap_or_default();
-        return Err(JsErrorBox::new(
-            "Error",
-            format!("API returned error {}: {}", status, text),
-        ));
-    }
-
-    let response_text = res
-        .body_mut()
-        .read_to_string()
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read response body: {}", e)))?;
-
-    let response_body: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to parse response JSON: {}", e)))?;
-
-    let content = response_body["choices"][0]["message"]["content"]
-        .as_str()
-        .ok_or_else(|| JsErrorBox::new("Error", "Invalid API response format"))?;
-
-    // Attempt to clean up if the model wrapped it in code blocks despite instructions
-    let clean_content = content
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
-        .trim();
-
-    Ok(clean_content.to_string())
-}
-
-#[op2]
-#[string]
-pub fn op2_iniad_generate_commit_message(
-    state: &mut OpState,
-    #[string] diff: String,
-) -> std::result::Result<String, JsErrorBox> {
-    permission_check(
-        state,
-        &iniad_generate_commit_message_plugin_function().function_id,
-        iniad_plugin_permissions(),
-    )?;
-
-    let api_key = std::env::var("INIAD_API_KEY")
-        .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
-
-    let agent = ureq::Agent::new_with_defaults();
-    let prompt = format!(
-        "Based on the following git diff, generate a concise and descriptive commit message.\n\
-        Follow the Conventional Commits format (e.g., 'feat:', 'fix:', 'docs:', 'refactor:', etc.).\n\
-        Return ONLY the commit message text, nothing else.\n\
-        \n\
-        Git Diff:\n\
-        {}",
-        diff
-    );
-
-    let request_body = json!({
-        "model": "gpt-5-nano",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that generates concise git commit messages following Conventional Commits format."
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    });
-
-    let mut res = agent
-        .post("https://api.openai.iniad.org/api/v1/chat/completions")
-        .header("Authorization", &format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
-        .send(serde_json::to_string(&request_body).unwrap())
-        .map_err(|e| JsErrorBox::new("Error", format!("API request failed: {}", e)))?;
-
-    if res.status() != 200 {
-        let status = res.status();
-        let text = res.body_mut().read_to_string().unwrap_or_default();
-        return Err(JsErrorBox::new(
-            "Error",
-            format!("API returned error {}: {}", status, text),
-        ));
-    }
-
-    let response_text = res
-        .body_mut()
-        .read_to_string()
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read response body: {}", e)))?;
-
-    let response_body: serde_json::Value = serde_json::from_str(&response_text)
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to parse response JSON: {}", e)))?;
-
-    let content = response_body["choices"][0]["message"]["content"]
-        .as_str()
-        .ok_or_else(|| JsErrorBox::new("Error", "Invalid API response format"))?;
-
-    Ok(content.trim().to_string())
-}
-
-#[op2]
-#[string]
-pub fn op2_iniad_analyze_windows(
-    state: &mut OpState,
-    #[string] window_titles_json: String,
-) -> std::result::Result<String, JsErrorBox> {
-    permission_check(
-        state,
-        &iniad_analyze_windows_plugin_function().function_id,
-        iniad_plugin_permissions(),
-    )?;
-
-    let api_key = std::env::var("INIAD_API_KEY")
-        .map_err(|_| JsErrorBox::new("Error", "INIAD_API_KEY environment variable not set"))?;
-
-    let agent = ureq::Agent::new_with_defaults();
-    let prompt = format!(
-        "I have a list of open window titles on my computer. Analyze each window and determine which ones should be CLOSED to focus on development work.\n\n\
-        KEEP OPEN (never close):\n\
-        - Floorp, Firefox, Chrome, Safari, Edge (browsers)\n\
-        - Visual Studio Code, VSCode, Code, Cursor (code editors)\n\
-        - Terminal, iTerm, Warp, Alacritty (terminals)\n\
-        - IntelliJ, PyCharm, WebStorm, Xcode (IDEs)\n\
-        - GitHub, GitLab, Stack Overflow (dev sites in browser)\n\n\
-        CLOSE (these distract from development):\n\
-        - Spotify, Apple Music, Music, YouTube Music, MacTube (music/video apps)\n\
-        - Discord, Slack, LINE, Messages, WhatsApp (chat apps)\n\
-        - X, Twitter, Facebook, Instagram, TikTok (social media apps)\n\
-        - Finder windows (unless actively used)\n\
-        - Preview, Photos, QuickTime (media viewers)\n\
-        - Notes, Reminders, Calendar (unless work-related)\n\
-        - System Preferences, Settings\n\
-        - Any game or entertainment app\n\n\
-        Window titles:\n{}\n\n\
-        Be decisive. If unsure, lean towards closing non-essential windows.\n\
-        Return a JSON array of EXACT window titles to close.\n\
-        Example: [\"Spotify\", \"Discord\", \"Finder\"]\n\
-        Return ONLY the JSON array, no explanation.",
-        window_titles_json
-    );
-
-    let request_body = json!({
-        "model": "gpt-5-nano",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that analyzes window titles and determines which ones to close to help focus on development work. Always keep development tools and browsers open."
-            },
-            {
-                "role": "user",
-                "content": prompt
+                "content": user_prompt
             }
         ]
     });
