@@ -73,7 +73,7 @@ pub fn core_get_active_window_title_plugin() -> CorePluginFunction {
         "Get Active Window Title".to_string(),
         "Gets the title of the currently active window.".to_string(),
         op2_get_active_window_title(),
-        None,
+        Some(include_str!("00_window.js").to_string()),
     )
 }
 
@@ -83,7 +83,7 @@ pub fn core_get_inactive_window_titles_plugin() -> CorePluginFunction {
         "Get Inactive Window Titles".to_string(),
         "Gets the titles of all inactive windows.".to_string(),
         op2_get_inactive_window_titles(),
-        None,
+        Some(include_str!("00_window.js").to_string()),
     )
 }
 
@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn test_get_active_window_title_in_workflow() {
         let code = r#"
-            const title = get_active_window_title();
+            const title = app.sapphillon.core.window.getActiveWindowTitle();
             console.log(title);
         "#;
 
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn test_get_inactive_window_titles_in_workflow() {
         let code = r#"
-            const titles = get_inactive_window_titles();
+            const titles = app.sapphillon.core.window.getInactiveWindowTitles();
             console.log(JSON.stringify(titles));
         "#;
 

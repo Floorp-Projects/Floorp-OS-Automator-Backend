@@ -248,7 +248,7 @@ mod tests {
     fn test_permission_error() {
         let code = r#"
             const url = "https://dummyjson.com/test";
-            const response = fetch(url);
+            const response = app.sapphillon.core.fetch.fetch(url);
             console.log(response);
         "#;
 
@@ -291,7 +291,7 @@ mod tests {
     fn test_fetch_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/test";
-            const response = fetch(url);
+            const response = app.sapphillon.core.fetch.fetch(url);
             console.log(response);
         "#;
 
@@ -334,7 +334,7 @@ mod tests {
     fn test_post_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/products/add";
-            const response = post(url, '{"title":"test"}');
+            const response = app.sapphillon.core.fetch.post(url, '{"title":"test"}');
             console.log(response);
         "#;
 

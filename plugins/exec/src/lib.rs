@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn test_exec_in_workflow() {
         let code = r#"
-            const output = exec("echo test_workflow");
+            const output = app.sapphillon.core.exec.exec("echo test_workflow");
             console.log(output);
         "#;
 
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_permission_error_in_workflow() {
         let code = r#"
-            exec("echo should_fail");
+            app.sapphillon.core.exec.exec("echo should_fail");
         "#;
 
         // Use empty permissions list to trigger permission denial
