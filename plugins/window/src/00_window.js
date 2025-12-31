@@ -11,5 +11,5 @@ globalThis.app.sapphillon = globalThis.app.sapphillon || {};
 globalThis.app.sapphillon.core = globalThis.app.sapphillon.core || {};
 globalThis.app.sapphillon.core.window = globalThis.app.sapphillon.core.window || {};
 
-globalThis.app.sapphillon.core.window.get_active_window_title = getActiveWindowTitle;
-globalThis.app.sapphillon.core.window.get_inactive_window_titles = getInactiveWindowTitles;
+globalThis.app.sapphillon.core.window.getActiveWindowTitle = getActiveWindowTitle;
+globalThis.app.sapphillon.core.window.getInactiveWindowTitles = getInactiveWindowTitles;

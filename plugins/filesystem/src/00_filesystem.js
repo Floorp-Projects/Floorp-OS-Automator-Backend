@@ -17,4 +17,4 @@ globalThis.app.sapphillon.core.filesystem = globalThis.app.sapphillon.core.files
 
 globalThis.app.sapphillon.core.filesystem.read = readFile;
 globalThis.app.sapphillon.core.filesystem.write = writeFile;
-globalThis.app.sapphillon.core.filesystem.list_files = listFiles;
+globalThis.app.sapphillon.core.filesystem.listFiles = listFiles;

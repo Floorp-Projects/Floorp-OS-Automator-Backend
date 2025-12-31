@@ -474,7 +474,7 @@ mod tests {
         // Build JS code with the properly-escaped path string so backslashes on Windows
         // don't create invalid escape sequences in the JS literal.
         let code = format!(
-            "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.list_files(path); console.log(content);"
+            "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.listFiles(path); console.log(content);"
         );
 
         let perm: PluginFunctionPermissions = PluginFunctionPermissions {
@@ -534,7 +534,7 @@ mod tests {
         // Build JS code with the properly-escaped path string so backslashes on Windows
         // don't create invalid escape sequences in the JS literal.
         let code = format!(
-            "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.list_files(path); console.log(content);"
+            "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.listFiles(path); console.log(content);"
         );
 
         // Create a permission with an empty permissions list to trigger permission denial
