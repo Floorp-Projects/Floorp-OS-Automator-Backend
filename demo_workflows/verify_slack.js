@@ -37,7 +37,7 @@ function workflow() {
     if (!slackTab) {
       console.log("No Slack tab found. Opening Slack...");
       // Slack を新しいタブで開く
-      const createResult = floorp.createTab(SLACK_URL,false );
+      const createResult = floorp.createTab(SLACK_URL, false);
       const createData = JSON.parse(createResult);
       const tabId = createData.instance_id || createData.id;
 
@@ -65,10 +65,7 @@ function workflow() {
     // ワークスペース名を取得
     let workspaceName = "Unknown";
     try {
-      const wsResult = floorp.tabElementText(
-        tabId,
-        ".p-ia4_home_header_menu__team_name"
-      );
+      const wsResult = floorp.tabElementText(tabId, "[data-qa='team-name']");
       workspaceName = JSON.parse(wsResult).text || workspaceName;
     } catch (e) {
       console.log("Could not get workspace name: " + e);
@@ -80,7 +77,7 @@ function workflow() {
     try {
       const chResult = floorp.tabElementText(
         tabId,
-        ".p-view_header__channel_title"
+        "[data-qa='channel_header_info']"
       );
       currentChannel = JSON.parse(chResult).text || currentChannel;
     } catch (e) {
@@ -88,7 +85,7 @@ function workflow() {
         // 別のセレクタを試す
         const chResult2 = floorp.tabElementText(
           tabId,
-          ".p-view_header__channel_title"
+          ".p-channel_sidebar__channel--selected"
         );
         currentChannel = JSON.parse(chResult2).text || currentChannel;
       } catch (e2) {
