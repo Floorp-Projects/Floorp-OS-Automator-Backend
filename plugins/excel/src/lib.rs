@@ -275,7 +275,7 @@ pub fn excel_read_permissions() -> Vec<Permission> {
         display_name: "File Read Access".to_string(),
         description: "Allows reading Excel files.".to_string(),
         permission_type: PermissionType::FilesystemRead as i32,
-        permission_level: PermissionLevel::Unspecified as i32,
+        permission_level: PermissionLevel::Medium as i32,
         resource: vec![],
     }]
 }
@@ -285,7 +285,7 @@ pub fn excel_write_permissions() -> Vec<Permission> {
         display_name: "File Write Access".to_string(),
         description: "Allows writing Excel files.".to_string(),
         permission_type: PermissionType::FilesystemWrite as i32,
-        permission_level: PermissionLevel::Unspecified as i32,
+        permission_level: PermissionLevel::High as i32,
         resource: vec![],
     }]
 }

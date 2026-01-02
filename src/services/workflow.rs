@@ -482,7 +482,7 @@ impl WorkflowService for MyWorkflowService {
                 language: WORKFLOW_LANGUAGE_JS,
                 created_at: Some(timestamp),
                 result: vec![],
-                plugin_packages: vec![],
+                plugin_packages: vec![excel::excel_plugin_package()],
                 plugin_function_ids: vec![
                     "app.sapphillon.core.vscode.open_folder".to_string(),
                     "app.sapphillon.core.vscode.open_file".to_string(),
@@ -645,7 +645,7 @@ impl WorkflowService for MyWorkflowService {
                 language: WORKFLOW_LANGUAGE_JS,
                 created_at: Some(now_ts),
                 result: vec![],
-                plugin_packages: vec![],
+                plugin_packages: vec![excel::excel_plugin_package()],
                 plugin_function_ids: vec![
                     // Excel plugin functions
                     "app.sapphillon.core.excel.createWorkbook".to_string(),

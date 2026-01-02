@@ -202,10 +202,56 @@ pub async fn get_workflow_by_id(
             .all(db)
             .await?;
 
-        let plugin_packages: Vec<entity::entity::plugin_package::Model> = wcpp
+        let plugin_package_entities: Vec<entity::entity::plugin_package::Model> = wcpp
             .into_iter()
             .filter_map(|(_link, pkg_opt)| pkg_opt)
             .collect();
+
+        // Load plugin functions for each package and convert to proto with functions
+        let mut plugin_packages_proto: Vec<sapphillon_core::proto::sapphillon::v1::PluginPackage> = Vec::new();
+        for pkg in &plugin_package_entities {
+            // Load plugin functions for this package
+            let funcs = entity::entity::plugin_function::Entity::find()
+                .filter(entity::entity::plugin_function::Column::PackageId.eq(pkg.package_id.clone()))
+                .all(db)
+                .await?;
+
+            // Collect function IDs for batch loading permissions
+            let func_ids: Vec<String> = funcs.iter().map(|f| f.function_id.clone()).collect();
+
+            // Batch load permissions for all functions in this package
+            let perm_relations = crate::plugin::plugin_function_permission_crud::list_plugin_function_permissions_for_function_ids(
+                db,
+                &func_ids,
+            ).await?;
+
+            // Build a map: function_id -> Vec<Permission proto>
+            let mut perms_by_function: std::collections::HashMap<String, Vec<sapphillon_core::proto::sapphillon::v1::Permission>> =
+                std::collections::HashMap::new();
+            for (_rel, perm_opt, _func_opt) in perm_relations.into_iter() {
+                if let Some(perm) = perm_opt {
+                    let proto_perm = entity::convert::plugin::permission_to_proto(&perm);
+                    perms_by_function
+                        .entry(perm.plugin_function_id.clone())
+                        .or_default()
+                        .push(proto_perm);
+                }
+            }
+
+            // Convert functions to proto with permissions attached
+            let funcs_proto: Vec<sapphillon_core::proto::sapphillon::v1::PluginFunction> = funcs
+                .iter()
+                .map(|f| {
+                    let perms = perms_by_function.get(&f.function_id).map(|v| v.as_slice());
+                    entity::convert::plugin::plugin_function_to_proto(f, perms)
+                })
+                .collect();
+
+            // Convert package to proto with functions attached
+            let pkg_proto = entity::convert::plugin::plugin_package_to_proto_with_functions(pkg, Some(&funcs_proto));
+            plugin_packages_proto.push(pkg_proto);
+        }
+
 
         // Load plugin function ids attached to this workflow_code
         let wcpf = entity::entity::workflow_code_plugin_function::Entity::find()
@@ -235,13 +281,11 @@ pub async fn get_workflow_by_id(
         )> = allowed.into_iter().collect();
 
         // Convert the workflow_code entity into proto, attaching relations where available
-        let wc_proto = entity::convert::workflow_code::workflow_code_to_proto_with_relations(
-            wc,
-            Some(&proto_results),
-            Some(&plugin_packages),
-            Some(&plugin_function_ids),
-            Some(&allowed_tuples),
-        );
+        let mut wc_proto = entity::convert::workflow_code::workflow_code_to_proto(wc);
+        wc_proto.result = proto_results.clone();
+        wc_proto.plugin_packages = plugin_packages_proto.clone();
+        wc_proto.plugin_function_ids = plugin_function_ids.clone();
+        wc_proto.allowed_permissions = entity::convert::workflow_code::allowed_permissions_to_proto(&allowed_tuples);
 
         proto_wcs.push(wc_proto);
     }
