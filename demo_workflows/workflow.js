@@ -58,13 +58,6 @@ function workflow() {
     // Step 2: 既存の Slack タブにアタッチ
     console.log("[Step 2] Attaching to Slack tab...");
     const tabId = String(slackTab.instance_id || slackTab.id);
-
-    // ページが読み込まれていない場合は待機
-    if (slackTab.status !== "complete") {
-      console.log("Tab is loading. Waiting for network idle...");
-      floorp.tabWaitForNetworkIdle(tabId, "10000");
-    }
-
     const attachResult = floorp.attachToTab(tabId);
     console.log("Attached to tab: " + attachResult);
 
@@ -74,8 +67,12 @@ function workflow() {
     // ワークスペース名を取得
     let workspaceName = "Unknown";
     try {
-      const wsResult = floorp.tabElementText(tabId, "[data-qa='team-name']");
-      workspaceName = JSON.parse(wsResult).text || workspaceName;
+      const wsResult = floorp.tabAttribute(
+        tabId,
+        ".p-client_workspace_wrapper",
+        "aria-label"
+      );
+      workspaceName = wsResult || workspaceName;
     } catch (e) {
       console.log("Could not get workspace name: " + e);
     }
@@ -86,9 +83,9 @@ function workflow() {
     try {
       const chResult = floorp.tabElementText(
         tabId,
-        "[data-qa='channel_header_info']"
+        ".p-view_header__channel_title"
       );
-      currentChannel = JSON.parse(chResult).text || currentChannel;
+      currentChannel = chResult || currentChannel;
     } catch (e) {
       try {
         // 別のセレクタを試す
@@ -134,19 +131,35 @@ function workflow() {
     const channels = [];
 
     try {
-      // サイドバーのチャンネル要素を取得
-      const html = floorp.tabHtml(tabId);
-      // HTMLからチャンネル名を抽出（簡易的なパース）
-      const channelMatches = html.match(
-        /data-qa-channel-sidebar-channel-id="[^"]*"[^>]*>([^<]+)</g
+      // サイドバーのチャンネル名を持つspan要素を取得
+      // .p-channel_sidebar__channel_icon_prefix の隣にある span を取得する
+      const selector = ".p-channel_sidebar__channel_icon_prefix + span";
+      console.log(
+        `[Debug] Executing tabGetElements with selector: "${selector}"`
       );
-      if (channelMatches) {
-        for (let i = 0; i < Math.min(channelMatches.length, 10); i++) {
-          const match = channelMatches[i].match(/>([^<]+)</);
-          if (match) {
-            channels.push(match[1]);
-          }
+
+      const resultJson = floorp.tabGetElements(tabId, selector);
+      console.log(`[Debug] Raw result JSON length: ${resultJson.length}`);
+
+      const result = JSON.parse(resultJson); // { elements: string[] }
+
+      const elementStrings = result.elements || [];
+      console.log(`[Debug] Found ${elementStrings.length} matching elements.`);
+
+      const attrRegex = /data-qa="channel_sidebar_name_([^"]+)"/;
+
+      for (let i = 0; i < elementStrings.length; i++) {
+        const html = elementStrings[i];
+        const match = html.match(attrRegex);
+        if (match) {
+          channels.push(match[1]);
+        } else {
+          if (i < 3)
+            console.log(
+              `[Debug] No regex match for element: ${html.substring(0, 100)}...`
+            );
         }
+        if (channels.length >= 20) break;
       }
       console.log("Found " + channels.length + " channels");
     } catch (e) {
