@@ -12,6 +12,9 @@ use floorp::{core_floorp_plugin_package, floorp_plugin_package};
 use search::{core_search_plugin_package, search_plugin_package};
 use vscode::{core_vscode_plugin_package, vscode_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
+use git::{core_git_plugin_package, git_plugin_package};
+use iniad::{core_iniad_ai_mop_plugin_package, iniad_ai_mop_plugin_package};
+use excel::{core_excel_plugin_package, excel_plugin_package};
 
 /// Builds the static system configuration used during application startup.
 ///
@@ -37,6 +40,9 @@ pub fn sysconfig() -> SysConfig {
             core_search_plugin_package(),
             core_window_plugin_package(),
             core_exec_plugin_package(),
+            core_git_plugin_package(),
+            core_iniad_ai_mop_plugin_package(),
+            core_excel_plugin_package(),
         ],
         plugin_package: vec![
             fetch_plugin_package(),
@@ -46,6 +52,9 @@ pub fn sysconfig() -> SysConfig {
             search_plugin_package(),
             window_plugin_package(),
             exec_plugin_package(),
+            git_plugin_package(),
+            iniad_ai_mop_plugin_package(),
+            excel_plugin_package(),
         ],
     }
 }

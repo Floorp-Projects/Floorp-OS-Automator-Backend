@@ -89,6 +89,9 @@ exec = { path = "./plugins/exec" }
 search = { path = "./plugins/search" }
 floorp = { path = "./plugins/floorp" }
 vscode = { path = "./plugins/vscode" }
+git = { path = "./plugins/git" }
+iniad = { path = "./plugins/iniad-ai-mop" }
+excel = { path = "./plugins/excel" }
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.12.0"
 tower-http = { version = "0.5.2", features = ["cors"] }
