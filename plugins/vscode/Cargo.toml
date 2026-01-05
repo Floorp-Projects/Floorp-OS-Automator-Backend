@@ -1,0 +1,18 @@
+[package]
+name = "vscode"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+deno_core.workspace = true
+deno_error.workspace = true
+sapphillon_core.workspace = true
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde_json.workspace = true
