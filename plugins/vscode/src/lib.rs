@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex};
 pub fn vscode_open_folder_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.open_folder".to_string(),
-        function_name: "vscode.open_folder".to_string(),
+        function_name: "Open Folder".to_string(),
         description: "Opens a folder in VSCode.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "String: path".to_string(),
@@ -33,7 +33,7 @@ pub fn vscode_open_folder_plugin_function() -> PluginFunction {
 pub fn vscode_open_file_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.open_file".to_string(),
-        function_name: "vscode.open_file".to_string(),
+        function_name: "Open File".to_string(),
         description: "Opens a file in VSCode.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "String: path".to_string(),
@@ -44,7 +44,7 @@ pub fn vscode_open_file_plugin_function() -> PluginFunction {
 pub fn vscode_write_file_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.write_file".to_string(),
-        function_name: "vscode.write_file".to_string(),
+        function_name: "Write File".to_string(),
         description: "Writes content to a file and opens it in VSCode.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "String: path, String: content".to_string(),
@@ -55,7 +55,7 @@ pub fn vscode_write_file_plugin_function() -> PluginFunction {
 pub fn vscode_close_workspace_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.close_workspace".to_string(),
-        function_name: "vscode.close_workspace".to_string(),
+        function_name: "Close Workspace".to_string(),
         description: "Closes the current VSCode workspace/project.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "".to_string(),
@@ -66,7 +66,7 @@ pub fn vscode_close_workspace_plugin_function() -> PluginFunction {
 pub fn vscode_get_active_file_content_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.get_active_file_content".to_string(),
-        function_name: "vscode.get_active_file_content".to_string(),
+        function_name: "Get Active File Content".to_string(),
         description: "Gets the content of the currently active file in VSCode.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "".to_string(),
@@ -77,7 +77,7 @@ pub fn vscode_get_active_file_content_plugin_function() -> PluginFunction {
 pub fn vscode_get_workspace_path_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.vscode.get_workspace_path".to_string(),
-        function_name: "vscode.get_workspace_path".to_string(),
+        function_name: "Get Workspace Path".to_string(),
         description: "Gets the path of the current workspace folder in VSCode.".to_string(),
         permissions: vscode_plugin_permissions(),
         arguments: "".to_string(),

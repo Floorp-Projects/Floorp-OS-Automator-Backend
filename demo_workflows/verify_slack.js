@@ -11,7 +11,7 @@
  * - メッセージの送信
  */
 
-const SLACK_URL = "https://app.slack.com";
+const SLACK_URL = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
 
 function workflow() {
   console.log("=== Slack Workflow using Floorp ===");
