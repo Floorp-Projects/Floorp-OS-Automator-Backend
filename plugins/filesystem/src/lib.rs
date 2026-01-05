@@ -367,6 +367,7 @@ mod tests {
     use super::*;
     use sapphillon_core::proto::sapphillon::v1::PermissionType;
     use sapphillon_core::workflow::CoreWorkflowCode;
+    use serial_test::serial;
     use std::io::Write;
 
     // Tests below use std::env::temp_dir() to construct temporary file paths so
@@ -374,6 +375,7 @@ mod tests {
     // like /tmp/... and handles backslashes in JS string literals).
 
     #[test]
+    #[serial]
     fn test_permission_check_backend_filesystem_list_files_empty_permissions() {
         // Test that empty permissions triggers permission denied error
         let perm = PluginFunctionPermissions {
@@ -391,6 +393,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_read_file_text() {
         // create a temp file
         let mut f = tempfile::NamedTempFile::new().unwrap();
@@ -404,6 +407,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_write_file_text() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         let path = tmp.path().to_str().unwrap().to_string();
@@ -414,6 +418,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_list_files() {
         let dir = tempfile::tempdir().unwrap();
         let file1_path = dir.path().join("file1.txt");
@@ -431,6 +436,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_permission_in_workflow() {
         // Create a platform-appropriate temp path and write the file
         let mut tmp_path_buf = std::env::temp_dir();
@@ -459,13 +465,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![core_filesystem_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
@@ -479,6 +486,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_permission_write_in_workflow() {
         // Ensure file does not exist then grant permission
         let mut tmp_path_buf = std::env::temp_dir();
@@ -506,13 +514,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test-write".to_string(),
             code.to_string(),
             vec![core_filesystem_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
@@ -533,6 +542,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_permission_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -561,13 +571,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![core_filesystem_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
@@ -591,6 +602,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_permission_denied_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
@@ -614,13 +626,14 @@ mod tests {
             },
         };
 
+        let workflow_permissions = vec![perm.clone()];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
             vec![core_filesystem_plugin_package()],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            workflow_permissions.clone(),
+            workflow_permissions,
         );
 
         workflow.run();
