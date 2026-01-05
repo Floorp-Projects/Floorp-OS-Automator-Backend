@@ -105,9 +105,12 @@ function workflow() {
       floorp.tabWaitForElement(tabId, inputSelector, 5000);
       console.log("Found message input");
 
-      // メッセージを入力
-      floorp.tabFillForm(tabId, inputSelector, testMessage);
-      console.log("Entered message: " + testMessage);
+      // メッセージを入力 (contenteditable 対応)
+      floorp.tabSetTextContent(tabId, inputSelector, testMessage);
+      floorp.tabDispatchEvent(tabId, inputSelector, "input");
+      console.log(
+        "Entered message using setTextContent/dispatchEvent: " + testMessage
+      );
 
       // 少し待つ
       // (Note: 実際に送信する場合は以下のコメントを外す)
