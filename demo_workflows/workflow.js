@@ -114,7 +114,8 @@ function workflow() {
         "Sheet1",
         "A1:D5",
         "column",
-        "Test Score Chart"
+        "Test Score Chart",
+        { left: 50, top: 50, width: 600, height: 400 }
       );
       console.log("Result: " + chartResult);
       const chart = JSON.parse(chartResult);
