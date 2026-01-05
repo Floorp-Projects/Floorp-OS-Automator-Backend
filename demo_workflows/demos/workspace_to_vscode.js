@@ -5,6 +5,7 @@
  * 1. Floorpで開いているタブを取得
  * 2. タブのURLからGitHub/GitLabリポジトリ名を抽出
  * 3. 対応するローカルフォルダをVSCodeで開く
+ * 4. 不要なVSCodeウィンドウを閉じる
  */
 
 // 設定: リポジトリのベースディレクトリ
@@ -65,51 +66,98 @@ function workflow() {
       }
     }
 
-    // Step 4: 不要なVSCodeウィンドウを閉じる
-    console.log("Step 4: Closing unused VSCode windows...");
+    // Step 4: AIを使って不要なウィンドウを閉じる
+    console.log("Step 4: Analyzing windows with AI...");
     let closedCount = 0;
 
     try {
-      // Get all window titles
       const allTitles = get_inactive_window_titles();
       console.log("Found " + allTitles.length + " inactive windows");
 
-      for (const title of allTitles) {
-        // Check if this is a VSCode window
-        if (title.includes("Visual Studio Code") || title.includes("- Code")) {
-          // Check if it's NOT related to any of our projects
-          let isRelated = false;
-          for (const projectPath of projectPaths) {
-            // Extract folder name from path
-            const folderName = projectPath.split("/").pop();
-            if (title.includes(folderName)) {
-              isRelated = true;
-              break;
-            }
-          }
+      if (allTitles.length > 0) {
+        // デバッグ: 全ウィンドウをログ
+        console.log("=== All window titles ===");
+        for (let i = 0; i < allTitles.length; i++) {
+          console.log("[" + i + "] " + allTitles[i]);
+        }
+        console.log("=========================");
 
-          if (!isRelated) {
-            console.log("Closing unrelated VSCode window: " + title);
-            try {
-              close_window(title);
-              closedCount++;
-            } catch (e) {
-              console.log("Failed to close: " + title + " - " + String(e));
+        // AIにウィンドウを分析してもらう
+        const windowsJson = JSON.stringify(allTitles);
+        console.log("Sending to AI for analysis...");
+        const toCloseJson = iniad.analyzeWindows(windowsJson);
+        console.log("AI response: " + toCloseJson);
+
+        try {
+          const windowsToClose = JSON.parse(toCloseJson);
+          console.log("=== Windows AI wants to close ===");
+
+          // 保護するアプリのリスト
+          const protectedApps = [
+            "floorp",
+            "firefox",
+            "chrome",
+            "safari",
+            "edge",
+            "code",
+            "vscode",
+            "visual studio",
+            "cursor",
+            "terminal",
+            "iterm",
+            "warp",
+            "alacritty",
+            "antigravity",
+            "windowmanager",
+            "dock",
+            "finder",
+            "systemuiserver",
+            "spotlight",
+            "controlcenter",
+          ];
+
+          for (const titleToClose of windowsToClose) {
+            const lowerTitle = titleToClose.toLowerCase();
+
+            // 保護対象かチェック
+            let isProtected = false;
+            for (const app of protectedApps) {
+              if (lowerTitle.includes(app)) {
+                isProtected = true;
+                console.log("[SKIP] Protected: " + titleToClose);
+                break;
+              }
+            }
+
+            if (!isProtected) {
+              console.log("[CLOSING] " + titleToClose);
+              try {
+                close_window(titleToClose);
+                closedCount++;
+              } catch (e) {
+                console.log(
+                  "Failed to close: " + titleToClose + " - " + String(e)
+                );
+              }
             }
           }
+          console.log("=================================");
+        } catch (parseError) {
+          console.log("Failed to parse AI response: " + parseError);
         }
       }
     } catch (e) {
       console.log("Could not get window list: " + String(e));
     }
 
-    console.log("Closed " + closedCount + " unused VSCode windows");
+    console.log("Closed " + closedCount + " non-development windows");
 
     return {
       ok: true,
       message: "Workflow completed",
       openedProjects: opened,
       failedProjects: failed,
+      closedWindows: closedCount,
     };
   } catch (e) {
     return {
@@ -120,11 +168,6 @@ function workflow() {
   }
 }
 
-/**
- * URLからプロジェクトパスを抽出する
- * @param {string} url タブのURL
- * @returns {string|null} プロジェクトパス
- */
 function extractProjectPath(url) {
   try {
     // GitHub URL: https://github.com/owner/repo
@@ -134,17 +177,13 @@ function extractProjectPath(url) {
         const owner = match[1].toLowerCase();
         const repo = match[2];
 
-        // Check owner mapping
         const localDir = OWNER_MAPPING[owner];
         if (localDir) {
           return "/Users/user/dev-source/" + localDir + "/" + repo;
         }
 
-        // Try to find the repo in known directories
         for (const baseDir of REPO_BASE_DIRS) {
-          const possiblePath = baseDir + "/" + repo;
-          // We'll try this path
-          return possiblePath;
+          return baseDir + "/" + repo;
         }
       }
     }
