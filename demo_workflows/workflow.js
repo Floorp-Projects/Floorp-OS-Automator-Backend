@@ -43,19 +43,28 @@ function workflow() {
 
       // ページ読み込みを待つ
       console.log("Waiting for Slack to load...");
+      // ネットワークアイドルを待機（ページ読み込み完了を保証）
+      floorp.tabWaitForNetworkIdle(tabId, "15000");
       floorp.tabWaitForElement(tabId, "[data-qa='channel_sidebar']", 10000);
 
-      return {
-        success: true,
-        action: "opened_slack",
-        message: "Opened Slack in new tab. Please log in if needed.",
-        tabId: tabId,
+      slackTab = {
+        instance_id: tabId,
+        url: SLACK_URL,
+        title: "Slack",
+        status: "complete",
       };
     }
 
     // Step 2: 既存の Slack タブにアタッチ
     console.log("[Step 2] Attaching to Slack tab...");
     const tabId = String(slackTab.instance_id || slackTab.id);
+
+    // ページが読み込まれていない場合は待機
+    if (slackTab.status !== "complete") {
+      console.log("Tab is loading. Waiting for network idle...");
+      floorp.tabWaitForNetworkIdle(tabId, "10000");
+    }
+
     const attachResult = floorp.attachToTab(tabId);
     console.log("Attached to tab: " + attachResult);
 
@@ -105,20 +114,17 @@ function workflow() {
       floorp.tabWaitForElement(tabId, inputSelector, 5000);
       console.log("Found message input");
 
-      // メッセージを入力 (contenteditable 対応)
-      floorp.tabSetTextContent(tabId, inputSelector, testMessage);
-      floorp.tabDispatchEvent(tabId, inputSelector, "input");
-      console.log(
-        "Entered message using setTextContent/dispatchEvent: " + testMessage
-      );
+      // メッセージを入力 (setInnerHTMLを使用 - 紫色ハイライト)
+      floorp.tabSetInnerHTML(tabId, inputSelector, testMessage);
+      console.log("Entered message using setInnerHTML: " + testMessage);
+
+      // Wait for 1 second to ensure editor state update
+      const start = Date.now();
+      while (Date.now() - start < 1000) {}
 
       // 少し待つ
-      // (Note: 実際に送信する場合は以下のコメントを外す)
-      // floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
-      // console.log("Message sent!");
-
-      console.log("NOTE: Send button click is commented out for safety.");
-      console.log("Uncomment the tabClick line to actually send messages.");
+      floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
+      console.log("Message sent!");
     } catch (e) {
       console.log("Could not interact with message input: " + e);
     }

@@ -105,17 +105,17 @@ function workflow() {
       floorp.tabWaitForElement(tabId, inputSelector, 5000);
       console.log("Found message input");
 
-      // メッセージを入力
-      floorp.tabFillForm(tabId, inputSelector, testMessage);
-      console.log("Entered message: " + testMessage);
+      // メッセージを入力 (setInnerHTMLを使用 - 紫色ハイライト)
+      floorp.tabSetInnerHTML(tabId, inputSelector, testMessage);
+      console.log("Entered message using setInnerHTML: " + testMessage);
+
+      // Wait for 1 second to ensure editor state update
+      const start = Date.now();
+      while (Date.now() - start < 1000) {}
 
       // 少し待つ
-      // (Note: 実際に送信する場合は以下のコメントを外す)
-      // floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
-      // console.log("Message sent!");
-
-      console.log("NOTE: Send button click is commented out for safety.");
-      console.log("Uncomment the tabClick line to actually send messages.");
+      floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
+      console.log("Message sent!");
     } catch (e) {
       console.log("Could not interact with message input: " + e);
     }
