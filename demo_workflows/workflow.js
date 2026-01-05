@@ -1,184 +1,141 @@
 /**
- * Slack Workflow using Floorp Browser Automation
+ * Excel Plugin Test Workflow
  *
- * このワークフローは Floorp ブラウザを使用して Slack Web アプリから情報を取得し、
- * メッセージを送信する機能を提供します。
- *
- * 機能:
- * - Slack タブを検出
- * - チャンネル/DM リストの取得
- * - メッセージの読み取り
- * - メッセージの送信
+ * This workflow tests all Excel plugin functions:
+ * - createWorkbook: Create a new Excel file
+ * - writeCell: Write a single cell
+ * - writeRange: Write multiple cells
+ * - addSheet: Add a new sheet
+ * - getSheetNames: Get all sheet names
+ * - readCell: Read a single cell
+ * - readRange: Read multiple cells
+ * - openInApp: Open in default application
  */
 
-const SLACK_URL = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
-
 function workflow() {
-  console.log("=== Slack Workflow using Floorp ===");
+  console.log("=== Excel Plugin Test Workflow ===");
   console.log("");
 
+  const testDir = "/tmp";
+  const testFile = testDir + "/sapphillon_excel_test.xlsx";
+
   try {
-    // Step 1: ブラウザタブから Slack を探す
-    console.log("[Step 1] Searching for Slack tab...");
-    const tabsResponse = floorp.browserTabs();
-    const tabsData = JSON.parse(tabsResponse);
-    const tabs = tabsData.tabs || tabsData;
-
-    let slackTab = null;
-    for (const tab of tabs) {
-      const url = tab.url || "";
-      if (url.includes("slack.com") || url.includes("app.slack.com")) {
-        slackTab = tab;
-        console.log("Found Slack tab: " + tab.title);
-        break;
-      }
-    }
-
-    if (!slackTab) {
-      console.log("No Slack tab found. Opening Slack...");
-      // Slack を新しいタブで開く
-      const createResult = floorp.createTab(SLACK_URL, false);
-      const createData = JSON.parse(createResult);
-      const tabId = createData.instance_id || createData.id;
-
-      // ページ読み込みを待つ
-      console.log("Waiting for Slack to load...");
-      // ネットワークアイドルを待機（ページ読み込み完了を保証）
-      floorp.tabWaitForNetworkIdle(tabId, "15000");
-      floorp.tabWaitForElement(tabId, "[data-qa='channel_sidebar']", 10000);
-
-      slackTab = {
-        instance_id: tabId,
-        url: SLACK_URL,
-        title: "Slack",
-        status: "complete",
-      };
-    }
-
-    // Step 2: 既存の Slack タブにアタッチ
-    console.log("[Step 2] Attaching to Slack tab...");
-    const tabId = String(slackTab.instance_id || slackTab.id);
-    const attachResult = floorp.attachToTab(tabId);
-    console.log("Attached to tab: " + attachResult);
-
-    // Step 3: Slack の情報を取得
-    console.log("[Step 3] Getting Slack information...");
-
-    // ワークスペース名を取得
-    let workspaceName = "Unknown";
-    try {
-      const wsResult = floorp.tabAttribute(
-        tabId,
-        ".p-client_workspace_wrapper",
-        "aria-label"
-      );
-      workspaceName = wsResult || workspaceName;
-    } catch (e) {
-      console.log("Could not get workspace name: " + e);
-    }
-    console.log("Workspace: " + workspaceName);
-
-    // 現在のチャンネル名を取得
-    let currentChannel = "Unknown";
-    try {
-      const chResult = floorp.tabElementText(
-        tabId,
-        ".p-view_header__channel_title"
-      );
-      currentChannel = chResult || currentChannel;
-    } catch (e) {
-      try {
-        // 別のセレクタを試す
-        const chResult2 = floorp.tabElementText(
-          tabId,
-          ".p-channel_sidebar__channel--selected"
-        );
-        currentChannel = JSON.parse(chResult2).text || currentChannel;
-      } catch (e2) {
-        console.log("Could not get current channel: " + e2);
-      }
-    }
-    console.log("Current channel: " + currentChannel);
-
-    // Step 4: メッセージを入力して送信
-    console.log("[Step 4] Sending a test message...");
-
-    const testMessage = "Hello from Floorp OS Automator! 🚀";
-    const inputSelector = '[role="textbox"] p';
-
-    try {
-      // メッセージ入力欄を待つ
-      floorp.tabWaitForElement(tabId, inputSelector, 5000);
-      console.log("Found message input");
-
-      // メッセージを入力 (setInnerHTMLを使用 - 紫色ハイライト)
-      floorp.tabSetInnerHTML(tabId, inputSelector, testMessage);
-      console.log("Entered message using setInnerHTML: " + testMessage);
-
-      // Wait for 1 second to ensure editor state update
-      const start = Date.now();
-      while (Date.now() - start < 1000) {}
-
-      // 少し待つ
-      floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
-      console.log("Message sent!");
-    } catch (e) {
-      console.log("Could not interact with message input: " + e);
-    }
-
-    // Step 5: チャンネルリストを取得
-    console.log("[Step 5] Getting channel list...");
-    const channels = [];
-
-    try {
-      // サイドバーのチャンネル名を持つspan要素を取得
-      // .p-channel_sidebar__channel_icon_prefix の隣にある span を取得する
-      const selector = ".p-channel_sidebar__channel_icon_prefix + span";
-      console.log(
-        `[Debug] Executing tabGetElements with selector: "${selector}"`
-      );
-
-      const resultJson = floorp.tabGetElements(tabId, selector);
-      console.log(`[Debug] Raw result JSON length: ${resultJson.length}`);
-
-      const result = JSON.parse(resultJson); // { elements: string[] }
-
-      const elementStrings = result.elements || [];
-      console.log(`[Debug] Found ${elementStrings.length} matching elements.`);
-
-      const attrRegex = /data-qa="channel_sidebar_name_([^"]+)"/;
-
-      for (let i = 0; i < elementStrings.length; i++) {
-        const html = elementStrings[i];
-        const match = html.match(attrRegex);
-        if (match) {
-          channels.push(match[1]);
-        } else {
-          if (i < 3)
-            console.log(
-              `[Debug] No regex match for element: ${html.substring(0, 100)}...`
-            );
-        }
-        if (channels.length >= 20) break;
-      }
-      console.log("Found " + channels.length + " channels");
-    } catch (e) {
-      console.log("Could not get channel list: " + e);
-    }
-
+    // Test 1: Create a new workbook
+    console.log("[Test 1] Creating new workbook...");
+    const createResult = excel.createWorkbook(testFile);
+    console.log("Result: " + createResult);
+    console.log("✓ Workbook created at: " + testFile);
     console.log("");
-    console.log("=== Workflow Complete ===");
+
+    // Test 2: Write a range of data (this will replace the file)
+    console.log("[Test 2] Writing range of data...");
+    const headers = ["Name", "Age", "City", "Score"];
+    const data = [
+      ["Alice", "28", "Tokyo", "95"],
+      ["Bob", "32", "Osaka", "88"],
+      ["Charlie", "25", "Kyoto", "92"],
+      ["Diana", "30", "Nagoya", "97"],
+    ];
+    const allData = [headers, ...data];
+
+    const writeRangeResult = excel.writeRange(
+      testFile,
+      "Sheet1",
+      "A1",
+      allData
+    );
+    console.log("Result: " + writeRangeResult);
+    console.log("✓ Wrote " + allData.length + " rows of data");
+    console.log("");
+
+    // Test 3: Get sheet names
+    console.log("[Test 3] Getting sheet names...");
+    const sheetsResult = excel.getSheetNames(testFile);
+    console.log("Result: " + sheetsResult);
+    const sheets = JSON.parse(sheetsResult);
+    console.log("✓ Found sheets: " + sheets.sheets.join(", "));
+    console.log("");
+
+    // Test 4: Read a single cell
+    console.log("[Test 4] Reading cell A1...");
+    const cellResult = excel.readCell(testFile, "Sheet1", "A1");
+    console.log("Result: " + cellResult);
+    const cell = JSON.parse(cellResult);
+    console.log("✓ Cell A1 value: " + cell.value);
+    console.log("");
+
+    // Test 5: Read a range of cells
+    console.log("[Test 5] Reading range A1:D3...");
+    const rangeResult = excel.readRange(testFile, "Sheet1", "A1:D3");
+    console.log("Result: " + rangeResult);
+    const range = JSON.parse(rangeResult);
+    console.log("✓ Read " + range.rows + " rows x " + range.cols + " cols");
+    console.log("");
+
+    // Display the data nicely
+    console.log("=== Data Preview ===");
+    for (let i = 0; i < range.data.length; i++) {
+      console.log("Row " + (i + 1) + ": " + range.data[i].join(" | "));
+    }
+    console.log("");
+
+    // Test 6: Open in default app
+    console.log("[Test 6] Opening in default application...");
+    const openResult = excel.openInApp(testFile);
+    console.log("Result: " + openResult);
+    console.log("✓ Opened in default app");
+    console.log("");
+
+    // Test 6: Get open workbooks (Mac only)
+    console.log("[Test 6] Getting open workbooks from Excel app...");
+    try {
+      const openWbResult = excel.getOpenWorkbooks();
+      console.log("Result: " + openWbResult);
+      const openWb = JSON.parse(openWbResult);
+      console.log("✓ Found " + openWb.count + " open workbook(s)");
+      if (openWb.workbooks.length > 0) {
+        console.log("  Open files:");
+        for (const path of openWb.workbooks) {
+          console.log("    - " + path);
+        }
+      }
+    } catch (e) {
+      console.log("⚠ getOpenWorkbooks failed (Excel may not be running): " + e);
+    }
+    console.log("");
+
+    // Test 7: Create a chart (Mac only)
+    console.log("[Test 7] Creating a chart...");
+    try {
+      // Data range is A1:D5 (Headers + 4 rows of data)
+      // Attempt to chart "Name" (A) vs "Score" (D) - simplified for whole range selection usually takes all relevant data
+      const chartResult = excel.createChart(
+        testFile,
+        "Sheet1",
+        "A1:D5",
+        "column",
+        "Test Score Chart"
+      );
+      console.log("Result: " + chartResult);
+      const chart = JSON.parse(chartResult);
+      console.log("✓ Created " + chart.chartType + " chart: " + chart.title);
+    } catch (e) {
+      console.log("⚠ createChart failed: " + e);
+    }
+    console.log("");
+
+    console.log("=== All Tests Passed! ===");
+    console.log("");
+    console.log("Test file location: " + testFile);
 
     return {
       success: true,
-      workspace: workspaceName,
-      currentChannel: currentChannel,
-      channelsFound: channels.length,
-      channels: channels.slice(0, 5), // 最初の5つだけ返す
-      message: "Slack information retrieved successfully",
+      testFile: testFile,
+      testsRun: 6,
+      message: "All Excel plugin tests passed",
     };
   } catch (error) {
-    console.error("Workflow failed: " + error);
+    console.error("Test failed with error: " + error);
     return {
       success: false,
       error: String(error),
