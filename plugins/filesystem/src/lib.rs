@@ -154,15 +154,22 @@ fn permission_check_filesystem_write(state: &mut OpState, path: String) -> Resul
         .lock()
         .unwrap();
     let allowed = match &data.get_allowed_permissions() {
-        Some(p) => p,
-        None => &vec![PluginFunctionPermissions {
+        Some(p) => p.clone(),
+        // Default: grant permission with the requested path as resource
+        None => vec![PluginFunctionPermissions {
             plugin_function_id: filesystem_write_plugin_function().function_id,
             permissions: sapphillon_core::permission::Permissions {
-                permissions: filesystem_write_plugin_permissions(),
+                permissions: vec![Permission {
+                    display_name: "Filesystem Write".to_string(),
+                    description: "Allows writing files.".to_string(),
+                    permission_type: PermissionType::FilesystemWrite as i32,
+                    permission_level: PermissionLevel::Unspecified as i32,
+                    resource: vec![path.clone()],
+                }],
             },
         }],
     };
-    _permission_check_backend_filesystem_write(allowed.clone(), path)?;
+    _permission_check_backend_filesystem_write(allowed, path)?;
     Ok(())
 }
 
