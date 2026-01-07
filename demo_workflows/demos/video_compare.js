@@ -22,93 +22,108 @@ function workflow() {
   try {
     ytTab = floorp.createTab(ytUrl, false);
 
-    // Initial wait
+    // Initial wait - ensure content is fully loaded
     try {
       floorp.tabWaitForElement(ytTab, "ytd-video-renderer #video-title", 10000);
-      floorp.tabWaitForNetworkIdle(ytTab, 2000);
+      floorp.tabWaitForNetworkIdle(ytTab, 3000);
+      sleep(ytTab, 3000); // Extra wait for thumbnail images to fully load
     } catch (e) {
       /* ignore */
     }
 
+    // Scroll to top first to ensure first items are visible
+    try {
+      floorp.tabScrollTo(ytTab, "ytd-video-renderer:nth-of-type(1)");
+      sleep(ytTab, 1000);
+    } catch (e) {}
+
     // Scroll Loop to load more items (Lazy Loading) - Aiming for 100 items
     console.log("   Scrolling to load more items (Targeting Loader)...");
 
-    for (var s = 0; s < 12; s++) {
+    for (var s = 0; s < 15; s++) {
       // Scroll loader into view to trigger next batch
       try {
         floorp.tabScrollTo(ytTab, "ytd-continuation-item-renderer");
       } catch (e) {
-        // Fallback: Scroll to the last video we probably have loaded
+        // Fallback: Scroll to a section
         try {
-          var index = (s + 1) * 10; // rough guess
           floorp.tabScrollTo(
             ytTab,
-            "ytd-video-renderer:nth-of-type(" + index + ")"
+            "ytd-item-section-renderer:nth-of-type(" + (s + 1) + ")"
           );
         } catch (ex) {}
       }
-      sleep(ytTab, 3000); // 3s wait for load
+      sleep(ytTab, 2500); // 2.5s wait for load
     }
 
-    // Nested Loop Strategy: Section -> Videos
-    // We expect multiple sections due to infinite scroll
-    var totalNeeded = 100;
+    // Nested Loop: Section -> Videos (YouTube structure)
+    var totalNeeded = 70;
     var currentRank = 1;
 
-    for (var sec = 1; sec <= 20; sec++) {
+    for (var sec = 1; sec <= 25; sec++) {
       if (results.length >= totalNeeded) break;
 
       var sectionSel = "ytd-item-section-renderer:nth-of-type(" + sec + ")";
 
-      for (var vid = 1; vid <= 50; vid++) {
+      for (var vid = 1; vid <= 20; vid++) {
         if (results.length >= totalNeeded) break;
 
-        // Selector for video INSIDE section
         var baseSel =
           sectionSel + " ytd-video-renderer:nth-of-type(" + vid + ")";
         var titleSel = baseSel + " #video-title";
         var viewSel = baseSel + " #metadata-line span:nth-of-type(1)";
-        var thumbSel = baseSel + " ytd-thumbnail";
+        var thumbSel = baseSel + " ytd-thumbnail img";
 
         try {
           var title = getText(ytTab, titleSel);
-
-          // If title is missing, it might be an ad or end of section.
-          // Check if the NEXT video element exists/has title to decide if we should break.
           if (!title) {
-            // Look ahead to vid+1 and vid+2 to be safe against ads/shorts gaps
-            var nextCheck = getText(
+            // Check next to see if section continues
+            var nextTitle = getText(
               ytTab,
               sectionSel +
                 " ytd-video-renderer:nth-of-type(" +
                 (vid + 1) +
                 ") #video-title"
             );
-            if (!nextCheck) {
-              // Double check (vid+2)
-              var nextNext = getText(
-                ytTab,
-                sectionSel +
-                  " ytd-video-renderer:nth-of-type(" +
-                  (vid + 2) +
-                  ") #video-title"
-              );
-              if (!nextNext) {
-                break; // Assume end of section
-              }
-            }
-            continue; // It was a gap/ad, but section continues
+            if (!nextTitle) break; // End of section
+            continue; // Skip this slot (might be ad)
           }
 
           var viewRaw = getText(ytTab, viewSel);
 
-          // Thumbnail
+          // Get video URL from title link href
+          var videoUrl = "https://www.youtube.com";
+          try {
+            var attrJson = floorp.tabAttribute(ytTab, titleSel, "href");
+            var attrData = JSON.parse(attrJson);
+            var href = attrData.value || "";
+            if (href) {
+              // href might be relative like "/watch?v=xxx" or absolute
+              if (href.startsWith("/")) {
+                videoUrl = "https://www.youtube.com" + href;
+              } else {
+                videoUrl = href;
+              }
+            }
+          } catch (e) {}
+
+          // Thumbnail capture - scroll and wait, then capture
           var thumbPath = "";
           try {
-            var tmp = "/tmp/yt_thumb_" + currentRank + ".png";
+            var desktop = "/Users/user/Desktop";
+            var tmp = desktop + "/thumbs/yt_thumb_" + currentRank + ".png";
+
+            // Scroll to video element
+            try {
+              floorp.tabScrollTo(ytTab, baseSel);
+            } catch (e) {}
+            sleep(ytTab, 800);
+
             saveElementScreenshot(ytTab, thumbSel, tmp);
             thumbPath = tmp;
-          } catch (e) {}
+          } catch (e) {
+            console.log("YT Thumb Error (" + currentRank + "): " + e);
+          }
 
           results.push({
             platform: "YouTube",
@@ -116,7 +131,7 @@ function workflow() {
             title: title,
             viewsRaw: viewRaw,
             views: parseViews(viewRaw),
-            url: "https://www.youtube.com", // Generic link
+            url: videoUrl,
             thumbPath: thumbPath,
           });
         } catch (e) {
@@ -164,9 +179,27 @@ function workflow() {
         // Thumb
         var thumbPath = "";
         try {
-          var tmp = "/tmp/nico_thumb_" + i + ".png";
+          var desktop = "/Users/user/Desktop";
+          var tmp = desktop + "/thumbs/nico_thumb_" + i + ".png";
           saveElementScreenshot(nicoTab, baseSel + " img", tmp);
           thumbPath = tmp;
+        } catch (e) {
+          console.log("Nico Thumb Error: " + e);
+        }
+
+        // Get video URL from title link href
+        var videoUrl = "https://www.nicovideo.jp";
+        try {
+          var attrJson = floorp.tabAttribute(nicoTab, titleSel, "href");
+          var attrData = JSON.parse(attrJson);
+          var href = attrData.value || "";
+          if (href) {
+            if (href.startsWith("/")) {
+              videoUrl = "https://www.nicovideo.jp" + href;
+            } else {
+              videoUrl = href;
+            }
+          }
         } catch (e) {}
 
         if (title) {
@@ -176,7 +209,7 @@ function workflow() {
             title: title,
             viewsRaw: viewRaw,
             views: parseViews(viewRaw),
-            url: "https://www.nicovideo.jp",
+            url: videoUrl,
             thumbPath: thumbPath,
           });
         }
@@ -190,65 +223,82 @@ function workflow() {
 
   console.log("Collected " + results.length + " videos.");
 
-  // --- 3. Excel Export ---
+  // --- 3. Excel Export (Using Native Rust Image Embedding) ---
   console.log("Creating Excel: " + excelPath);
   try {
     // Columns: "Platform", "Rank", "Image", "Title", "Views", "Raw Views", "Link"
     var matrix = [
       ["Platform", "Rank", "Image", "Title", "Views", "Raw Views", "Link"],
     ];
+
+    // Build image list for native embedding
+    // Format: { file_path, row, col }
+    var imageList = [];
+
     for (var k = 0; k < results.length; k++) {
       var r = results[k];
       matrix.push([
         String(r.platform),
         String(r.rank),
-        "",
+        "", // Empty cell for image
         String(r.title),
         String(r.views),
         String(r.viewsRaw),
         String(r.url),
       ]);
-    }
 
-    excel.writeRange(excelPath, "Sheet1", "A1", matrix);
-    console.log("Data written.");
-
-    // Insert Thumbnails
-    for (var k = 0; k < results.length; k++) {
-      var r = results[k];
+      // Add image to list if thumbnail exists
       if (r.thumbPath) {
-        try {
-          // Approximate position.
-          // Row 1 is header. Data starts Row 2.
-          // Top = 20 + k*15.
-          // To prevent heavy overlap with 50 items, maybe resize rows?
-          // We can't resize rows yet.
-          // Just insert.
-          var topPos = 20 + k * 15;
-
-          excel.insertPicture(excelPath, "Sheet1", r.thumbPath, {
-            left: 100, // Col C
-            top: topPos,
-            width: 40,
-            height: 25,
-          });
-        } catch (e) {}
+        imageList.push({
+          file_path: r.thumbPath,
+          row: k + 1, // Row 0 is header, data starts at row 1
+          col: 2, // Column C (0-indexed: A=0, B=1, C=2)
+        });
       }
     }
 
-    // Create Chart
-    // var totalRows = results.length + 1;
-    // var range = "D1:E" + totalRows;
+    // Use the new native Rust function that writes data AND embeds images
+    console.log(
+      "Writing " +
+        matrix.length +
+        " rows with " +
+        imageList.length +
+        " images..."
+    );
 
-    // excel.createChart(
-    //   excelPath,
-    //   "Sheet1",
-    //   range,
-    //   "bar",
-    //   "Floorp Video Views",
-    //   { left: 400, top: 50, width: 800, height: 800 } // Taller chart for more items
-    // );
-    // console.log("Chart created.");
+    // Formatting options (customizable)
+    var formatOptions = {
+      row_height: 80, // Reduced to fit better
+      column_widths: [12, 6, 22, 50, 14, 15, 25], // Column C: balanced
+      image_scale: 0.3, // Smaller to fit in cell
+      font_size: 14, // Larger font (default is 11)
+      // Chart configuration
+      chart: {
+        chart_type: "pie", // Pie chart for views distribution
+        title: "Views Distribution (Top 15)",
+        category_col: 3, // Column D (Title)
+        value_col: 4, // Column E (Views)
+        position_row: 1,
+        position_col: 12, // Column M (further right)
+        width: 2400, // 5x default
+        height: 1440, // 5x default
+        top_n: 15, // Show only top 15 + Others
+      },
+    };
+
+    var result = excel.writeRangeWithImages(
+      excelPath,
+      "Sheet1",
+      "A1",
+      matrix,
+      imageList,
+      formatOptions
+    );
+    console.log("Write complete: " + result);
+
+    // Open the file
+    excel.openInApp(excelPath);
+    console.log("Excel file opened.");
   } catch (e) {
     console.log("Excel Error: " + e);
   }
@@ -272,13 +322,14 @@ function saveElementScreenshot(tab, sel, path) {
   var jsonStr = floorp.tabElementScreenshot(tab, sel);
   var obj = JSON.parse(jsonStr);
   if (obj.image) {
-    var binStr = atob(obj.image);
-    var len = binStr.length;
-    var bytes = new Uint8Array(len);
-    for (var i = 0; i < len; i++) {
-      bytes[i] = binStr.charCodeAt(i);
+    // Strip "data:image/png;base64," prefix. Safe split.
+    var parts = obj.image.split(",");
+    var b64Data = parts.length > 1 ? parts[1] : parts[0];
+    try {
+      excel.saveBase64Image(path, b64Data);
+    } catch (e) {
+      throw new Error("excel.saveBase64Image failed: " + e);
     }
-    Deno.writeFileSync(path, bytes);
   }
 }
 

@@ -271,6 +271,7 @@ function workflow() {
       row_height: 80, // Reduced to fit better
       column_widths: [12, 6, 22, 50, 14, 15, 25], // Column C: balanced
       image_scale: 0.3, // Smaller to fit in cell
+      font_size: 14, // Larger font (default is 11)
       // Chart configuration
       chart: {
         chart_type: "pie", // Pie chart for views distribution

@@ -140,6 +140,29 @@ function excelWriteRangeWithImages(
   );
 }
 
+// --- Edit Existing Excel Files ---
+
+function excelEditCell(filePath, sheetName, cellRef, value) {
+  return Deno.core.ops.op_excel_edit_cell(filePath, sheetName, cellRef, value);
+}
+
+function excelEditRange(filePath, sheetName, startCell, values) {
+  return Deno.core.ops.op_excel_edit_range(
+    filePath,
+    sheetName,
+    startCell,
+    JSON.stringify(values)
+  );
+}
+
+function excelInsertRow(filePath, sheetName, rowIndex) {
+  return Deno.core.ops.op_excel_insert_row(filePath, sheetName, rowIndex);
+}
+
+function excelDeleteRow(filePath, sheetName, rowIndex) {
+  return Deno.core.ops.op_excel_delete_row(filePath, sheetName, rowIndex);
+}
+
 // --- Export ---
 
 globalThis.excel = {
@@ -147,12 +170,17 @@ globalThis.excel = {
   getSheetNames: excelGetSheetNames,
   readCell: excelReadCell,
   readRange: excelReadRange,
-  // Write operations
+  // Write operations (new file)
   createWorkbook: excelCreateWorkbook,
   writeCell: excelWriteCell,
   writeRange: excelWriteRange,
   writeRangeWithImages: excelWriteRangeWithImages,
   addSheet: excelAddSheet,
+  // Edit operations (existing file)
+  editCell: excelEditCell,
+  editRange: excelEditRange,
+  insertRow: excelInsertRow,
+  deleteRow: excelDeleteRow,
   // Utility operations
   openInApp: excelOpenInApp,
   getOpenWorkbooks: excelGetOpenWorkbooks,

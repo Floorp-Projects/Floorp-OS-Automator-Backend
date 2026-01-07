@@ -340,6 +340,11 @@ pub fn core_excel_plugin_package() -> CorePluginPackage {
             core_excel_save_base64_image_plugin(),
             core_excel_insert_pictures_batch_plugin(),
             core_excel_write_range_with_images_plugin(),
+            // Edit existing Excel files
+            core_excel_edit_cell_plugin(),
+            core_excel_edit_range_plugin(),
+            core_excel_insert_row_plugin(),
+            core_excel_delete_row_plugin(),
         ],
     )
 }
@@ -741,6 +746,8 @@ struct FormattingOptions {
     column_widths: Option<Vec<f64>>,
     /// Image scale factor (default: 0.35)
     image_scale: Option<f64>,
+    /// Font size for cells (default: 11)
+    font_size: Option<f64>,
     /// Chart configuration (optional)
     chart: Option<ChartConfig>,
 }
@@ -801,9 +808,16 @@ pub fn op_excel_write_range_with_images(
     let image_scale = options.image_scale.unwrap_or(0.35);
     let default_widths = vec![12.0, 6.0, 18.0, 50.0, 14.0, 15.0, 25.0];
     let column_widths = options.column_widths.unwrap_or(default_widths);
+    let font_size = options.font_size.unwrap_or(11.0);
 
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
+
+    // Create format with font size
+    let cell_format = rust_xlsxwriter::Format::new().set_font_size(font_size);
+    let header_format = rust_xlsxwriter::Format::new()
+        .set_font_size(font_size + 2.0)
+        .set_bold();
 
     // Write data cells
     for (row_idx, row_values) in values.iter().enumerate() {
@@ -811,13 +825,16 @@ pub fn op_excel_write_range_with_images(
             let row = start_row + row_idx as u32;
             let col: u16 = (start_col + col_idx as u32).try_into().unwrap();
 
+            // Use header format for first row, cell format for others
+            let format = if row_idx == 0 { &header_format } else { &cell_format };
+
             if let Ok(num) = value.parse::<f64>() {
                 worksheet
-                    .write_number(row, col, num)
+                    .write_number_with_format(row, col, num, format)
                     .map_err(|e| JsErrorBox::new("Error", format!("Failed to write cell: {}", e)))?;
             } else {
                 worksheet
-                    .write_string(row, col, value)
+                    .write_string_with_format(row, col, value, format)
                     .map_err(|e| JsErrorBox::new("Error", format!("Failed to write cell: {}", e)))?;
             }
         }
@@ -1480,6 +1497,186 @@ pub fn core_excel_insert_pictures_batch_plugin() -> CorePluginFunction {
         "Insert Pictures Batch".to_string(),
         "Insert multiple pictures in a batch".to_string(),
         op_excel_insert_pictures_batch(),
+        None,
+    )
+}
+
+// ============================================================================
+// Edit Existing Excel Files (using umya-spreadsheet)
+// ============================================================================
+
+/// Edit a single cell in an existing Excel file
+#[op2]
+#[string]
+pub fn op_excel_edit_cell(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] cell_ref: String,
+    #[string] value: String,
+) -> Result<String, JsErrorBox> {
+    let path = std::path::Path::new(&file_path);
+    
+    let mut book = umya_spreadsheet::reader::xlsx::read(path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read Excel file: {}", e)))?;
+    
+    let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        .ok_or_else(|| JsErrorBox::new("Error", format!("Sheet '{}' not found", sheet_name)))?;
+    
+    sheet.get_cell_mut(&*cell_ref).set_value(&value);
+    
+    umya_spreadsheet::writer::xlsx::write(&book, path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save Excel file: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "cell": cell_ref,
+        "value": value,
+    });
+    
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+pub fn core_excel_edit_cell_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.editCell".to_string(),
+        "Edit Cell".to_string(),
+        "Edit a single cell in an existing Excel file".to_string(),
+        op_excel_edit_cell(),
+        None,
+    )
+}
+
+/// Edit a range of cells in an existing Excel file
+#[op2]
+#[string]
+pub fn op_excel_edit_range(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] start_cell: String,
+    #[string] values_json: String,
+) -> Result<String, JsErrorBox> {
+    let (start_row, start_col) = parse_cell_ref(&start_cell)?;
+    
+    let values: Vec<Vec<String>> = serde_json::from_str(&values_json)
+        .map_err(|e| JsErrorBox::new("Error", format!("Invalid JSON array: {}", e)))?;
+    
+    let path = std::path::Path::new(&file_path);
+    
+    let mut book = umya_spreadsheet::reader::xlsx::read(path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read Excel file: {}", e)))?;
+    
+    let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        .ok_or_else(|| JsErrorBox::new("Error", format!("Sheet '{}' not found", sheet_name)))?;
+    
+    for (row_idx, row_values) in values.iter().enumerate() {
+        for (col_idx, value) in row_values.iter().enumerate() {
+            let row = start_row + row_idx as u32 + 1; // umya uses 1-indexed
+            let col = start_col + col_idx as u32 + 1;
+            sheet.get_cell_mut((col, row)).set_value(value);
+        }
+    }
+    
+    umya_spreadsheet::writer::xlsx::write(&book, path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save Excel file: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "startCell": start_cell,
+        "rows": values.len(),
+        "cols": if values.is_empty() { 0 } else { values[0].len() },
+    });
+    
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+pub fn core_excel_edit_range_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.editRange".to_string(),
+        "Edit Range".to_string(),
+        "Edit a range of cells in an existing Excel file".to_string(),
+        op_excel_edit_range(),
+        None,
+    )
+}
+
+/// Insert a row in an existing Excel file
+#[op2]
+#[string]
+pub fn op_excel_insert_row(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    row_index: u32,
+) -> Result<String, JsErrorBox> {
+    let path = std::path::Path::new(&file_path);
+    
+    let mut book = umya_spreadsheet::reader::xlsx::read(path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read Excel file: {}", e)))?;
+    
+    let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        .ok_or_else(|| JsErrorBox::new("Error", format!("Sheet '{}' not found", sheet_name)))?;
+    
+    sheet.insert_new_row(&row_index, &1);
+    
+    umya_spreadsheet::writer::xlsx::write(&book, path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save Excel file: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "insertedRow": row_index,
+    });
+    
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+pub fn core_excel_insert_row_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.insertRow".to_string(),
+        "Insert Row".to_string(),
+        "Insert a new row at the specified index".to_string(),
+        op_excel_insert_row(),
+        None,
+    )
+}
+
+/// Delete a row in an existing Excel file
+#[op2]
+#[string]
+pub fn op_excel_delete_row(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    row_index: u32,
+) -> Result<String, JsErrorBox> {
+    let path = std::path::Path::new(&file_path);
+    
+    let mut book = umya_spreadsheet::reader::xlsx::read(path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to read Excel file: {}", e)))?;
+    
+    let sheet = book.get_sheet_by_name_mut(&sheet_name)
+        .ok_or_else(|| JsErrorBox::new("Error", format!("Sheet '{}' not found", sheet_name)))?;
+    
+    sheet.remove_row(&row_index, &1);
+    
+    umya_spreadsheet::writer::xlsx::write(&book, path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save Excel file: {}", e)))?;
+    
+    let result = serde_json::json!({
+        "success": true,
+        "deletedRow": row_index,
+    });
+    
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+pub fn core_excel_delete_row_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.deleteRow".to_string(),
+        "Delete Row".to_string(),
+        "Delete a row at the specified index".to_string(),
+        op_excel_delete_row(),
         None,
     )
 }
