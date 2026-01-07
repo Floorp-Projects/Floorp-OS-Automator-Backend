@@ -741,6 +741,31 @@ struct FormattingOptions {
     column_widths: Option<Vec<f64>>,
     /// Image scale factor (default: 0.35)
     image_scale: Option<f64>,
+    /// Chart configuration (optional)
+    chart: Option<ChartConfig>,
+}
+
+/// Chart configuration
+#[derive(serde::Deserialize)]
+struct ChartConfig {
+    /// Chart type: "column", "bar", "line", "pie"
+    chart_type: String,
+    /// Title of the chart
+    title: Option<String>,
+    /// Column index for category labels (e.g., titles)
+    category_col: u16,
+    /// Column index for values (e.g., views)
+    value_col: u16,
+    /// Row where chart should be placed
+    position_row: Option<u32>,
+    /// Column where chart should be placed
+    position_col: Option<u16>,
+    /// Chart width in pixels
+    width: Option<u32>,
+    /// Chart height in pixels
+    height: Option<u32>,
+    /// Show only top N entries (rest grouped as "Other")
+    top_n: Option<u32>,
 }
 
 /// Write a range of data AND embed images in a single operation.
@@ -833,6 +858,56 @@ pub fn op_excel_write_range_with_images(
             Err(e) => {
                 eprintln!("Warning: Failed to load image {}: {}", img_data.file_path, e);
             }
+        }
+    }
+
+    // Generate chart if requested
+    if let Some(chart_config) = options.chart {
+        let chart_type = match chart_config.chart_type.to_lowercase().as_str() {
+            "bar" => rust_xlsxwriter::ChartType::Bar,
+            "line" => rust_xlsxwriter::ChartType::Line,
+            "pie" => rust_xlsxwriter::ChartType::Pie,
+            _ => rust_xlsxwriter::ChartType::Column, // default to column
+        };
+
+        let mut chart = rust_xlsxwriter::Chart::new(chart_type);
+
+        // Set chart title
+        if let Some(title) = chart_config.title {
+            chart.title().set_name(&title);
+        }
+
+        // Calculate data range (skip header row)
+        let data_rows = values.len() as u32;
+        if data_rows > 1 {
+            // Apply top_n limit if specified
+            let effective_rows = if let Some(top_n) = chart_config.top_n {
+                std::cmp::min(top_n, data_rows - 1) // -1 for header
+            } else {
+                data_rows - 1
+            };
+
+            let last_row = start_row + effective_rows;
+            let cat_col = chart_config.category_col;
+            let val_col = chart_config.value_col;
+
+            // Add series with categories and values
+            chart.add_series()
+                .set_categories(("Sheet1", start_row + 1, cat_col, last_row, cat_col))
+                .set_values(("Sheet1", start_row + 1, val_col, last_row, val_col));
+
+            // Set chart size (default: 480x288, which is Excel's default)
+            let chart_width = chart_config.width.unwrap_or(480);
+            let chart_height = chart_config.height.unwrap_or(288);
+            chart.set_width(chart_width);
+            chart.set_height(chart_height);
+
+            // Set chart position (right of data by default)
+            let chart_row = chart_config.position_row.unwrap_or(1);
+            let chart_col = chart_config.position_col.unwrap_or(8); // Column I by default
+
+            worksheet.insert_chart(chart_row, chart_col, &chart)
+                .map_err(|e| JsErrorBox::new("Error", format!("Failed to insert chart: {}", e)))?;
         }
     }
 

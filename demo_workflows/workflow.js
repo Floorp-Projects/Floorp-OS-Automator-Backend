@@ -91,6 +91,22 @@ function workflow() {
 
           var viewRaw = getText(ytTab, viewSel);
 
+          // Get video URL from title link href
+          var videoUrl = "https://www.youtube.com";
+          try {
+            var attrJson = floorp.tabAttribute(ytTab, titleSel, "href");
+            var attrData = JSON.parse(attrJson);
+            var href = attrData.value || "";
+            if (href) {
+              // href might be relative like "/watch?v=xxx" or absolute
+              if (href.startsWith("/")) {
+                videoUrl = "https://www.youtube.com" + href;
+              } else {
+                videoUrl = href;
+              }
+            }
+          } catch (e) {}
+
           // Thumbnail capture - scroll and wait, then capture
           var thumbPath = "";
           try {
@@ -115,7 +131,7 @@ function workflow() {
             title: title,
             viewsRaw: viewRaw,
             views: parseViews(viewRaw),
-            url: "https://www.youtube.com",
+            url: videoUrl,
             thumbPath: thumbPath,
           });
         } catch (e) {
@@ -171,6 +187,21 @@ function workflow() {
           console.log("Nico Thumb Error: " + e);
         }
 
+        // Get video URL from title link href
+        var videoUrl = "https://www.nicovideo.jp";
+        try {
+          var attrJson = floorp.tabAttribute(nicoTab, titleSel, "href");
+          var attrData = JSON.parse(attrJson);
+          var href = attrData.value || "";
+          if (href) {
+            if (href.startsWith("/")) {
+              videoUrl = "https://www.nicovideo.jp" + href;
+            } else {
+              videoUrl = href;
+            }
+          }
+        } catch (e) {}
+
         if (title) {
           results.push({
             platform: "Niconico",
@@ -178,7 +209,7 @@ function workflow() {
             title: title,
             viewsRaw: viewRaw,
             views: parseViews(viewRaw),
-            url: "https://www.nicovideo.jp",
+            url: videoUrl,
             thumbPath: thumbPath,
           });
         }
@@ -237,9 +268,21 @@ function workflow() {
 
     // Formatting options (customizable)
     var formatOptions = {
-      row_height: 60,
-      column_widths: [12, 6, 18, 50, 14, 15, 25],
-      image_scale: 0.35,
+      row_height: 80, // Reduced to fit better
+      column_widths: [12, 6, 22, 50, 14, 15, 25], // Column C: balanced
+      image_scale: 0.3, // Smaller to fit in cell
+      // Chart configuration
+      chart: {
+        chart_type: "pie", // Pie chart for views distribution
+        title: "Views Distribution (Top 15)",
+        category_col: 3, // Column D (Title)
+        value_col: 4, // Column E (Views)
+        position_row: 1,
+        position_col: 12, // Column M (further right)
+        width: 2400, // 5x default
+        height: 1440, // 5x default
+        top_n: 15, // Show only top 15 + Others
+      },
     };
 
     var result = excel.writeRangeWithImages(
