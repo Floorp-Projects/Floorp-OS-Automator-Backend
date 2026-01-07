@@ -43,13 +43,15 @@ function workflow() {
 
       // ページ読み込みを待つ
       console.log("Waiting for Slack to load...");
+      // ネットワークアイドルを待機（ページ読み込み完了を保証）
+      floorp.tabWaitForNetworkIdle(tabId, "15000");
       floorp.tabWaitForElement(tabId, "[data-qa='channel_sidebar']", 10000);
 
-      return {
-        success: true,
-        action: "opened_slack",
-        message: "Opened Slack in new tab. Please log in if needed.",
-        tabId: tabId,
+      slackTab = {
+        instance_id: tabId,
+        url: SLACK_URL,
+        title: "Slack",
+        status: "complete",
       };
     }
 
@@ -65,8 +67,12 @@ function workflow() {
     // ワークスペース名を取得
     let workspaceName = "Unknown";
     try {
-      const wsResult = floorp.tabElementText(tabId, "[data-qa='team-name']");
-      workspaceName = JSON.parse(wsResult).text || workspaceName;
+      const wsResult = floorp.tabAttribute(
+        tabId,
+        ".p-client_workspace_wrapper",
+        "aria-label"
+      );
+      workspaceName = wsResult || workspaceName;
     } catch (e) {
       console.log("Could not get workspace name: " + e);
     }
@@ -77,9 +83,9 @@ function workflow() {
     try {
       const chResult = floorp.tabElementText(
         tabId,
-        "[data-qa='channel_header_info']"
+        ".p-view_header__channel_title"
       );
-      currentChannel = JSON.parse(chResult).text || currentChannel;
+      currentChannel = chResult || currentChannel;
     } catch (e) {
       try {
         // 別のセレクタを試す

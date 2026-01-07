@@ -22,20 +22,13 @@ function workflow() {
   try {
     ytTab = floorp.createTab(ytUrl, false);
 
-    // Initial wait - ensure content is fully loaded
+    // Initial wait
     try {
       floorp.tabWaitForElement(ytTab, "ytd-video-renderer #video-title", 10000);
-      floorp.tabWaitForNetworkIdle(ytTab, 3000);
-      sleep(ytTab, 3000); // Extra wait for thumbnail images to fully load
+      floorp.tabWaitForNetworkIdle(ytTab, 2000);
     } catch (e) {
       /* ignore */
     }
-
-    // Scroll to top first to ensure first items are visible
-    try {
-      floorp.tabScrollTo(ytTab, "ytd-video-renderer:nth-of-type(1)");
-      sleep(ytTab, 1000);
-    } catch (e) {}
 
     // Scroll Loop to load more items (Lazy Loading) - Aiming for 100 items
     console.log("   Scrolling to load more items (Targeting Loader)...");
@@ -47,65 +40,88 @@ function workflow() {
       } catch (e) {
         // Fallback: Scroll to the last video we probably have loaded
         try {
-          var index = results.length > 0 ? results.length : (s + 1) * 10;
+          var index = (s + 1) * 10; // rough guess
           floorp.tabScrollTo(
             ytTab,
-            "ytd-item-section-renderer:nth-of-type(" + (s + 1) + ")"
+            "ytd-video-renderer:nth-of-type(" + index + ")"
           );
         } catch (ex) {}
       }
       sleep(ytTab, 3000); // 3s wait for load
     }
 
-    // Simple approach: Get all videos using global index
+    // Nested Loop Strategy: Section -> Videos
+    // We expect multiple sections due to infinite scroll
     var totalNeeded = 100;
     var currentRank = 1;
 
-    for (var i = 1; i <= 200 && results.length < totalNeeded; i++) {
-      // Simple global selector - gets the i-th video-renderer on the page
-      var baseSel = "ytd-video-renderer:nth-child(" + i + ")";
-      var titleSel = baseSel + " #video-title";
-      var viewSel = baseSel + " #metadata-line span:nth-child(1)";
-      var thumbSel = baseSel + " ytd-thumbnail img";
+    for (var sec = 1; sec <= 20; sec++) {
+      if (results.length >= totalNeeded) break;
 
-      try {
-        var title = getText(ytTab, titleSel);
-        if (!title) continue; // Skip empty/ad slots
+      var sectionSel = "ytd-item-section-renderer:nth-of-type(" + sec + ")";
 
-        var viewRaw = getText(ytTab, viewSel);
+      for (var vid = 1; vid <= 50; vid++) {
+        if (results.length >= totalNeeded) break;
 
-        // Thumbnail capture with scroll and wait
-        var thumbPath = "";
+        // Selector for video INSIDE section
+        var baseSel =
+          sectionSel + " ytd-video-renderer:nth-of-type(" + vid + ")";
+        var titleSel = baseSel + " #video-title";
+        var viewSel = baseSel + " #metadata-line span:nth-of-type(1)";
+        var thumbSel = baseSel + " ytd-thumbnail";
+
         try {
-          var desktop = "/Users/user/Desktop";
-          var tmp = desktop + "/thumbs/yt_thumb_" + currentRank + ".png";
+          var title = getText(ytTab, titleSel);
 
-          // Scroll to this video to ensure it's in viewport and loaded
+          // If title is missing, it might be an ad or end of section.
+          // Check if the NEXT video element exists/has title to decide if we should break.
+          if (!title) {
+            // Look ahead to vid+1 and vid+2 to be safe against ads/shorts gaps
+            var nextCheck = getText(
+              ytTab,
+              sectionSel +
+                " ytd-video-renderer:nth-of-type(" +
+                (vid + 1) +
+                ") #video-title"
+            );
+            if (!nextCheck) {
+              // Double check (vid+2)
+              var nextNext = getText(
+                ytTab,
+                sectionSel +
+                  " ytd-video-renderer:nth-of-type(" +
+                  (vid + 2) +
+                  ") #video-title"
+              );
+              if (!nextNext) {
+                break; // Assume end of section
+              }
+            }
+            continue; // It was a gap/ad, but section continues
+          }
+
+          var viewRaw = getText(ytTab, viewSel);
+
+          // Thumbnail
+          var thumbPath = "";
           try {
-            floorp.tabScrollTo(ytTab, baseSel);
+            var tmp = "/tmp/yt_thumb_" + currentRank + ".png";
+            saveElementScreenshot(ytTab, thumbSel, tmp);
+            thumbPath = tmp;
           } catch (e) {}
 
-          // Wait for lazy loading
-          sleep(ytTab, 1000);
-
-          // Capture
-          saveElementScreenshot(ytTab, thumbSel, tmp);
-          thumbPath = tmp;
+          results.push({
+            platform: "YouTube",
+            rank: currentRank++,
+            title: title,
+            viewsRaw: viewRaw,
+            views: parseViews(viewRaw),
+            url: "https://www.youtube.com", // Generic link
+            thumbPath: thumbPath,
+          });
         } catch (e) {
-          console.log("YT Thumb Error (" + currentRank + "): " + e);
+          // Ignore transient errors
         }
-
-        results.push({
-          platform: "YouTube",
-          rank: currentRank++,
-          title: title,
-          viewsRaw: viewRaw,
-          views: parseViews(viewRaw),
-          url: "https://www.youtube.com",
-          thumbPath: thumbPath,
-        });
-      } catch (e) {
-        // Ignore transient errors
       }
     }
   } catch (e) {
@@ -148,13 +164,10 @@ function workflow() {
         // Thumb
         var thumbPath = "";
         try {
-          var desktop = "/Users/user/Desktop";
-          var tmp = desktop + "/thumbs/nico_thumb_" + i + ".png";
+          var tmp = "/tmp/nico_thumb_" + i + ".png";
           saveElementScreenshot(nicoTab, baseSel + " img", tmp);
           thumbPath = tmp;
-        } catch (e) {
-          console.log("Nico Thumb Error: " + e);
-        }
+        } catch (e) {}
 
         if (title) {
           results.push({
@@ -177,60 +190,65 @@ function workflow() {
 
   console.log("Collected " + results.length + " videos.");
 
-  // --- 3. Excel Export (Using Native Rust Image Embedding) ---
+  // --- 3. Excel Export ---
   console.log("Creating Excel: " + excelPath);
   try {
     // Columns: "Platform", "Rank", "Image", "Title", "Views", "Raw Views", "Link"
     var matrix = [
       ["Platform", "Rank", "Image", "Title", "Views", "Raw Views", "Link"],
     ];
-
-    // Build image list for native embedding
-    // Format: { file_path, row, col }
-    var imageList = [];
-
     for (var k = 0; k < results.length; k++) {
       var r = results[k];
       matrix.push([
         String(r.platform),
         String(r.rank),
-        "", // Empty cell for image
+        "",
         String(r.title),
         String(r.views),
         String(r.viewsRaw),
         String(r.url),
       ]);
+    }
 
-      // Add image to list if thumbnail exists
+    excel.writeRange(excelPath, "Sheet1", "A1", matrix);
+    console.log("Data written.");
+
+    // Insert Thumbnails
+    for (var k = 0; k < results.length; k++) {
+      var r = results[k];
       if (r.thumbPath) {
-        imageList.push({
-          file_path: r.thumbPath,
-          row: k + 1, // Row 0 is header, data starts at row 1
-          col: 2, // Column C (0-indexed: A=0, B=1, C=2)
-        });
+        try {
+          // Approximate position.
+          // Row 1 is header. Data starts Row 2.
+          // Top = 20 + k*15.
+          // To prevent heavy overlap with 50 items, maybe resize rows?
+          // We can't resize rows yet.
+          // Just insert.
+          var topPos = 20 + k * 15;
+
+          excel.insertPicture(excelPath, "Sheet1", r.thumbPath, {
+            left: 100, // Col C
+            top: topPos,
+            width: 40,
+            height: 25,
+          });
+        } catch (e) {}
       }
     }
 
-    // Use the new native Rust function that writes data AND embeds images
-    console.log(
-      "Writing " +
-        matrix.length +
-        " rows with " +
-        imageList.length +
-        " images..."
-    );
-    var result = excel.writeRangeWithImages(
-      excelPath,
-      "Sheet1",
-      "A1",
-      matrix,
-      imageList
-    );
-    console.log("Write complete: " + result);
+    // Create Chart
+    // var totalRows = results.length + 1;
+    // var range = "D1:E" + totalRows;
 
-    // Open the file
-    excel.openInApp(excelPath);
-    console.log("Excel file opened.");
+    // excel.createChart(
+    //   excelPath,
+    //   "Sheet1",
+    //   range,
+    //   "bar",
+    //   "Floorp Video Views",
+    //   { left: 400, top: 50, width: 800, height: 800 } // Taller chart for more items
+    // );
+    // console.log("Chart created.");
   } catch (e) {
     console.log("Excel Error: " + e);
   }
@@ -254,14 +272,13 @@ function saveElementScreenshot(tab, sel, path) {
   var jsonStr = floorp.tabElementScreenshot(tab, sel);
   var obj = JSON.parse(jsonStr);
   if (obj.image) {
-    // Strip "data:image/png;base64," prefix. Safe split.
-    var parts = obj.image.split(",");
-    var b64Data = parts.length > 1 ? parts[1] : parts[0];
-    try {
-      excel.saveBase64Image(path, b64Data);
-    } catch (e) {
-      throw new Error("excel.saveBase64Image failed: " + e);
+    var binStr = atob(obj.image);
+    var len = binStr.length;
+    var bytes = new Uint8Array(len);
+    for (var i = 0; i < len; i++) {
+      bytes[i] = binStr.charCodeAt(i);
     }
+    Deno.writeFileSync(path, bytes);
   }
 }
 

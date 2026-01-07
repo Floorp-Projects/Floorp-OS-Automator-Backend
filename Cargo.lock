@@ -1847,6 +1847,7 @@ name = "excel"
 version = "0.12.1"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "calamine",
  "deno_core",
  "deno_error",

@@ -21,3 +21,4 @@ serde_json.workspace = true
 # Excel file handling
 calamine = "0.26"
 rust_xlsxwriter = "0.79"
+base64 = "0.22"

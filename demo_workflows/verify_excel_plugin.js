@@ -79,11 +79,12 @@ function workflow() {
     }
     console.log("");
 
-    // Test 6: Open in default app (optional - uncomment to test)
-    // console.log("[Test 6] Opening in default application...");
-    // const openResult = excel.openInApp(testFile);
-    // console.log("Result: " + openResult);
-    // console.log("✓ Opened in default app");
+    // Test 6: Open in default app
+    console.log("[Test 6] Opening in default application...");
+    const openResult = excel.openInApp(testFile);
+    console.log("Result: " + openResult);
+    console.log("✓ Opened in default app");
+    console.log("");
 
     // Test 6: Get open workbooks (Mac only)
     console.log("[Test 6] Getting open workbooks from Excel app...");
@@ -100,6 +101,27 @@ function workflow() {
       }
     } catch (e) {
       console.log("⚠ getOpenWorkbooks failed (Excel may not be running): " + e);
+    }
+    console.log("");
+
+    // Test 7: Create a chart (Mac only)
+    console.log("[Test 7] Creating a chart...");
+    try {
+      // Data range is A1:D5 (Headers + 4 rows of data)
+      // Attempt to chart "Name" (A) vs "Score" (D) - simplified for whole range selection usually takes all relevant data
+      const chartResult = excel.createChart(
+        testFile,
+        "Sheet1",
+        "A1:D5",
+        "column",
+        "Test Score Chart",
+        { left: 50, top: 50, width: 600, height: 400 }
+      );
+      console.log("Result: " + chartResult);
+      const chart = JSON.parse(chartResult);
+      console.log("✓ Created " + chart.chartType + " chart: " + chart.title);
+    } catch (e) {
+      console.log("⚠ createChart failed: " + e);
     }
     console.log("");
 

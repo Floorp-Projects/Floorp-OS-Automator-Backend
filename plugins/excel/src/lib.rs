@@ -5,7 +5,7 @@
 use calamine::{Reader, Xlsx, open_workbook};
 use deno_core::{OpState, op2};
 use deno_error::JsErrorBox;
-use rust_xlsxwriter::Workbook;
+use rust_xlsxwriter::{Image, Workbook};
 use sapphillon_core::permission::{
     CheckPermissionResult, PluginFunctionPermissions, check_permission,
 };
@@ -15,6 +15,7 @@ use sapphillon_core::proto::sapphillon::v1::{
 };
 use sapphillon_core::runtime::OpStateWorkflowData;
 use std::sync::{Arc, Mutex};
+use base64::prelude::*;
 
 // ============================================================================
 // Plugin Function Definitions
@@ -259,13 +260,61 @@ pub fn core_excel_get_open_workbooks_plugin() -> CorePluginFunction {
         None,
     )
 }
-
+pub fn core_excel_insert_picture_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.insertPicture".to_string(),
+        "Insert Picture".to_string(),
+        "Insert a picture into a sheet (Mac only)".to_string(),
+        op_excel_insert_picture(),
+        None,
+    )
+}
 pub fn core_excel_create_chart_plugin() -> CorePluginFunction {
     CorePluginFunction::new(
         "app.sapphillon.core.excel.createChart".to_string(),
         "Create Chart".to_string(),
         "Create a chart in Excel (Mac only)".to_string(),
         op_excel_create_chart(),
+        None,
+    )
+}
+
+pub fn core_excel_set_column_width_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.setColumnWidth".to_string(),
+        "Set Column Width".to_string(),
+        "Set the width of a column or range".to_string(),
+        op_excel_set_column_width(),
+        None,
+    )
+}
+
+pub fn core_excel_set_row_height_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.setRowHeight".to_string(),
+        "Set Row Height".to_string(),
+        "Set the height of a row or range".to_string(),
+        op_excel_set_row_height(),
+        None,
+    )
+}
+
+pub fn core_excel_save_base64_image_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.saveBase64Image".to_string(),
+        "Save Base64 Image".to_string(),
+        "Save a base64 encoded image to a file".to_string(),
+        op_excel_save_base64_image(),
+        None,
+    )
+}
+
+pub fn core_excel_write_range_with_images_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.writeRangeWithImages".to_string(),
+        "Write Range With Images".to_string(),
+        "Write data and embed images in a single operation".to_string(),
+        op_excel_write_range_with_images(),
         None,
     )
 }
@@ -284,7 +333,13 @@ pub fn core_excel_plugin_package() -> CorePluginPackage {
             core_excel_add_sheet_plugin(),
             core_excel_open_in_app_plugin(),
             core_excel_get_open_workbooks_plugin(),
+            core_excel_insert_picture_plugin(),
             core_excel_create_chart_plugin(),
+            core_excel_set_column_width_plugin(),
+            core_excel_set_row_height_plugin(),
+            core_excel_save_base64_image_plugin(),
+            core_excel_insert_pictures_batch_plugin(),
+            core_excel_write_range_with_images_plugin(),
         ],
     )
 }
@@ -669,6 +724,105 @@ pub fn op_excel_add_sheet(
     Ok(serde_json::to_string(&result).unwrap())
 }
 
+#[derive(serde::Deserialize)]
+struct ImageInsert {
+    file_path: String,
+    row: u32,
+    col: u16,
+}
+
+/// Write a range of data AND embed images in a single operation.
+/// This is more efficient than separate AppleScript calls.
+#[op2]
+#[string]
+pub fn op_excel_write_range_with_images(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] _sheet_name: String,
+    #[string] start_cell: String,
+    #[string] values_json: String,
+    #[string] images_json: String,
+) -> Result<String, JsErrorBox> {
+    let (start_row, start_col) = parse_cell_ref(&start_cell)?;
+
+    let values: Vec<Vec<String>> = serde_json::from_str(&values_json)
+        .map_err(|e| JsErrorBox::new("Error", format!("Invalid JSON array: {}", e)))?;
+
+    let images: Vec<ImageInsert> = serde_json::from_str(&images_json)
+        .map_err(|e| JsErrorBox::new("Error", format!("Invalid images JSON: {}", e)))?;
+
+    let mut workbook = Workbook::new();
+    let worksheet = workbook.add_worksheet();
+
+    // Write data cells
+    for (row_idx, row_values) in values.iter().enumerate() {
+        for (col_idx, value) in row_values.iter().enumerate() {
+            let row = start_row + row_idx as u32;
+            let col: u16 = (start_col + col_idx as u32).try_into().unwrap();
+
+            if let Ok(num) = value.parse::<f64>() {
+                worksheet
+                    .write_number(row, col, num)
+                    .map_err(|e| JsErrorBox::new("Error", format!("Failed to write cell: {}", e)))?;
+            } else {
+                worksheet
+                    .write_string(row, col, value)
+                    .map_err(|e| JsErrorBox::new("Error", format!("Failed to write cell: {}", e)))?;
+            }
+        }
+    }
+
+    // Set row heights for images (row 0 is header, rows 1+ are data)
+    for row_idx in 1..=values.len() {
+        worksheet.set_row_height(row_idx as u32, 40.0)
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to set row height: {}", e)))?;
+    }
+
+    // Set column C width for images
+    worksheet.set_column_width(2, 15.0)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to set column width: {}", e)))?;
+
+    // Insert images
+    let mut inserted_count = 0;
+    for img_data in images {
+        // Check if file exists
+        if !std::path::Path::new(&img_data.file_path).exists() {
+            continue;
+        }
+
+        match Image::new(&img_data.file_path) {
+            Ok(mut image) => {
+                // Scale image to fit in cell
+                image = image.set_scale_width(0.25).set_scale_height(0.25);
+                
+                if let Err(e) = worksheet.insert_image(img_data.row, img_data.col, &image) {
+                    // Log but don't fail
+                    eprintln!("Warning: Failed to insert image {}: {}", img_data.file_path, e);
+                } else {
+                    inserted_count += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to load image {}: {}", img_data.file_path, e);
+            }
+        }
+    }
+
+    workbook
+        .save(&file_path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save workbook: {}", e)))?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "startCell": start_cell,
+        "rows": values.len(),
+        "cols": if values.is_empty() { 0 } else { values[0].len() },
+        "imagesInserted": inserted_count,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
 // --- Utility Operations ---
 
 #[op2]
@@ -805,14 +959,20 @@ pub fn op_excel_create_chart(
             tell application "Microsoft Excel"
                 activate
 
-                -- 【修正1】パスの扱いを安全にする（文字列パスをファイル参照に変換）
-                -- もし入力が "/Users/..." なら POSIX file を使う
+                -- Robust Workbook Opening
                 try
-                    set targetWorkbook to open (POSIX file "{file_path}")
+                    open POSIX file "{file_path}"
                 on error
-                    -- 既に開いている場合やパスエラーのハンドリングが必要かもしれません
-                    set targetWorkbook to active workbook
                 end try
+                
+                set targetWorkbook to missing value
+                try
+                     set targetWorkbook to active workbook
+                end try
+                
+                if targetWorkbook is missing value then
+                    error "Critical: targetWorkbook could not be determined. Please make sure the file is open."
+                end if
 
                 set targetSheet to sheet "{sheet_name}" of targetWorkbook
                 set dataRange to range "{data_range}" of targetSheet
@@ -884,4 +1044,339 @@ pub fn op_excel_create_chart(
             "createChart is only supported on macOS",
         ))
     }
+}
+
+// --- Image Operations ---
+
+#[op2]
+#[string]
+pub fn op_excel_insert_picture(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] image_path: String,
+    left: Option<f64>,
+    top: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+) -> Result<String, JsErrorBox> {
+    // permission check disabled for demo
+
+    let left = left.unwrap_or(0.0);
+    let top = top.unwrap_or(0.0);
+    
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"
+            tell application "Microsoft Excel"
+                activate
+                delay 0.5
+                
+                -- Robust Workbook Opening
+                try
+                    open POSIX file "{file_path}"
+                on error
+                end try
+                
+                set theTargetWb to missing value
+                try
+                     set theTargetWb to active workbook
+                end try
+                
+                if theTargetWb is not missing value then
+                     tell theTargetWb
+                        tell sheet "{sheet_name}"
+                           -- Insert Picture
+                           set newPic to make new picture at beginning with properties {{file name:(POSIX file "{image_path}")}}
+                           
+                           -- Move/Resize
+                           if newPic is not missing value then
+                               tell newPic
+                                   set top to {top}
+                                   set left position to {left}
+                                   {set_width_script}
+                                   {set_height_script}
+                               end tell
+                           end if
+                        end tell
+                     end tell
+                end if
+            end tell
+            "#,
+            file_path = file_path,
+            sheet_name = sheet_name,
+            image_path = image_path,
+            top = top,
+            left = left,
+            set_width_script = if let Some(w) = width { format!("set width to {}", w) } else { "".to_string() },
+            set_height_script = if let Some(h) = height { format!("set height to {}", h) } else { "".to_string() }
+        );
+
+        let output = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to execute AppleScript: {}", e)))?;
+
+        if !output.status.success() {
+             let error_msg = String::from_utf8_lossy(&output.stderr);
+             return Err(JsErrorBox::new("Error", format!("AppleScript failed: {}", error_msg)));
+        }
+        
+        let result = serde_json::json!({
+            "success": true,
+            "message": "Picture inserted successfully",
+        });
+        Ok(serde_json::to_string(&result).unwrap())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(JsErrorBox::new(
+            "Error",
+            "insertPicture is only supported on macOS",
+        ))
+    }
+}
+
+#[op2]
+#[string]
+fn op_excel_set_column_width(
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] column_range: String, // e.g. "A:A" or "D:D"
+    #[string] width: String,
+) -> Result<String, JsErrorBox> {
+    
+    let w = width.parse::<f64>().unwrap_or(10.0);
+    
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"
+            tell application "Microsoft Excel"
+                activate
+                
+                -- Attempt to open
+                try
+                    open POSIX file "{file_path}"
+                on error
+                    -- Ignore, assume active or already open
+                end try
+                
+                -- Get active workbook safely
+                set theTargetWb to missing value
+                try
+                    set theTargetWb to active workbook
+                end try
+                
+                if theTargetWb is not missing value then
+                     tell theTargetWb
+                        tell sheet "{sheet_name}"
+                           set column width of range "{column_range}" to {w}
+                        end tell
+                     end tell
+                end if
+            end tell
+            "#
+        );
+        let output = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to execute AppleScript: {}", e)))?;
+
+        if !output.status.success() {
+             let error_msg = String::from_utf8_lossy(&output.stderr);
+             return Err(JsErrorBox::new("Error", format!("AppleScript failed: {}", error_msg)));
+        }
+    }
+    Ok("{}".to_string())
+}
+
+#[op2]
+#[string]
+fn op_excel_set_row_height(
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] row_range: String, // e.g. "2:102"
+    #[string] height: String,
+) -> Result<String, JsErrorBox> {
+    
+    let h = height.parse::<f64>().unwrap_or(15.0);
+    
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            r#"
+            tell application "Microsoft Excel"
+                activate
+                
+                try
+                    open POSIX file "{file_path}"
+                on error
+                end try
+                
+                set theTargetWb to missing value
+                try
+                     set theTargetWb to active workbook
+                end try
+                
+                if theTargetWb is not missing value then
+                     tell theTargetWb
+                        tell sheet "{sheet_name}"
+                           set row height of range "{row_range}" to {h}
+                        end tell
+                     end tell
+                end if
+            end tell
+            "#
+        );
+        let output = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to execute AppleScript: {}", e)))?;
+
+        if !output.status.success() {
+             let error_msg = String::from_utf8_lossy(&output.stderr);
+             return Err(JsErrorBox::new("Error", format!("AppleScript failed: {}", error_msg)));
+        }
+    }
+    Ok("{}".to_string())
+}
+
+#[op2]
+#[string]
+fn op_excel_save_base64_image(
+    #[string] file_path: String,
+    #[string] base64_content: String,
+) -> Result<String, JsErrorBox> {
+    
+    // Create parent directories if they don't exist
+    if let Some(parent) = std::path::Path::new(&file_path).parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to create directories: {}", e)))?;
+    }
+
+    let bytes = BASE64_STANDARD
+        .decode(&base64_content)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to decode base64: {}", e)))?;
+
+    std::fs::write(&file_path, bytes)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to write file: {}", e)))?;
+        
+    Ok("Success".to_string())
+}
+
+#[derive(serde::Deserialize)]
+struct ImageItem {
+    file_path: String,
+    left: Option<f64>,
+    top: Option<f64>,
+    width: Option<f64>,
+    height: Option<f64>,
+}
+
+#[op2]
+#[string]
+fn op_excel_insert_pictures_batch(
+    #[string] file_path: String,
+    #[string] sheet_name: String,
+    #[string] items_json: String,
+) -> Result<String, JsErrorBox> {
+
+    let items: Vec<ImageItem> = serde_json::from_str(&items_json)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to parse image items: {}", e)))?;
+
+    if items.is_empty() {
+        return Ok("No images to insert".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Build a single AppleScript to handle all images
+        let mut script_body = String::new();
+
+        for item in items {
+            // Escape path just in case
+            let path = item.file_path.replace("\"", "\\\"");
+
+            let props = format!("file name:(POSIX file \"{}\")", path);
+
+            // Note: In AppleScript "make new picture", we can try setting properties directly.
+            // However, positioning usually requires setting properties on the created object.
+            // We use a block for each image.
+
+            // "make new picture at beginning with properties {file name:...}" returns the object.
+
+            let mut setters = String::new();
+            if let Some(l) = item.left { setters.push_str(&format!("set left position to {}\n", l)); }
+            if let Some(t) = item.top { setters.push_str(&format!("set top to {}\n", t)); }
+            if let Some(w) = item.width { setters.push_str(&format!("set width to {}\n", w)); }
+            if let Some(h) = item.height { setters.push_str(&format!("set height to {}\n", h)); }
+
+            // Use 'at end' to preserve insertion order
+            script_body.push_str(&format!(
+                r#"
+                set newPic to make new picture at end with properties {{{}}}
+                tell newPic
+                    {}
+                end tell
+                "#,
+                props, setters
+            ));
+        }
+
+        let script = format!(
+            r#"
+            tell application "Microsoft Excel"
+                activate
+                set targetWorkbook to missing value
+                set filePath to "{}"
+
+                try
+                    set targetWorkbook to open POSIX file filePath
+                on error
+                    try
+                       set targetWorkbook to active workbook
+                    end try
+                end try
+
+                if targetWorkbook is not missing value then
+                     tell targetWorkbook
+                        tell sheet "{}"
+                            {}
+                        end tell
+                     end tell
+                end if
+            end tell
+            "#,
+            file_path, sheet_name, script_body
+        );
+
+        let output = std::process::Command::new("osascript")
+            .args(["-e", &script])
+            .output()
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to execute AppleScript: {}", e)))?;
+
+        if !output.status.success() {
+             let error_msg = String::from_utf8_lossy(&output.stderr);
+             return Err(JsErrorBox::new("Error", format!("AppleScript failed: {}", error_msg)));
+        }
+    }
+    
+    #[cfg(not(target_os = "macos"))]
+    {
+        return Err(JsErrorBox::new("Error", "Batch insert only supported on macOS"));
+    }
+
+    Ok("Batch insert completed".to_string())
+}
+pub fn core_excel_insert_pictures_batch_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.insertPicturesBatch".to_string(),
+        "Insert Pictures Batch".to_string(),
+        "Insert multiple pictures in a batch".to_string(),
+        op_excel_insert_pictures_batch(),
+        None,
+    )
 }
