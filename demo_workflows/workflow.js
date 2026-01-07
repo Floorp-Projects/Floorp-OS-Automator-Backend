@@ -40,72 +40,87 @@ function workflow() {
     // Scroll Loop to load more items (Lazy Loading) - Aiming for 100 items
     console.log("   Scrolling to load more items (Targeting Loader)...");
 
-    for (var s = 0; s < 12; s++) {
+    for (var s = 0; s < 15; s++) {
       // Scroll loader into view to trigger next batch
       try {
         floorp.tabScrollTo(ytTab, "ytd-continuation-item-renderer");
       } catch (e) {
-        // Fallback: Scroll to the last video we probably have loaded
+        // Fallback: Scroll to a section
         try {
-          var index = results.length > 0 ? results.length : (s + 1) * 10;
           floorp.tabScrollTo(
             ytTab,
             "ytd-item-section-renderer:nth-of-type(" + (s + 1) + ")"
           );
         } catch (ex) {}
       }
-      sleep(ytTab, 3000); // 3s wait for load
+      sleep(ytTab, 2500); // 2.5s wait for load
     }
 
-    // Simple approach: Get all videos using global index
+    // Nested Loop: Section -> Videos (YouTube structure)
     var totalNeeded = 100;
     var currentRank = 1;
 
-    for (var i = 1; i <= 200 && results.length < totalNeeded; i++) {
-      // Simple global selector - gets the i-th video-renderer on the page
-      var baseSel = "ytd-video-renderer:nth-child(" + i + ")";
-      var titleSel = baseSel + " #video-title";
-      var viewSel = baseSel + " #metadata-line span:nth-child(1)";
-      var thumbSel = baseSel + " ytd-thumbnail img";
+    for (var sec = 1; sec <= 25; sec++) {
+      if (results.length >= totalNeeded) break;
 
-      try {
-        var title = getText(ytTab, titleSel);
-        if (!title) continue; // Skip empty/ad slots
+      var sectionSel = "ytd-item-section-renderer:nth-of-type(" + sec + ")";
 
-        var viewRaw = getText(ytTab, viewSel);
+      for (var vid = 1; vid <= 20; vid++) {
+        if (results.length >= totalNeeded) break;
 
-        // Thumbnail capture with scroll and wait
-        var thumbPath = "";
+        var baseSel =
+          sectionSel + " ytd-video-renderer:nth-of-type(" + vid + ")";
+        var titleSel = baseSel + " #video-title";
+        var viewSel = baseSel + " #metadata-line span:nth-of-type(1)";
+        var thumbSel = baseSel + " ytd-thumbnail img";
+
         try {
-          var desktop = "/Users/user/Desktop";
-          var tmp = desktop + "/thumbs/yt_thumb_" + currentRank + ".png";
+          var title = getText(ytTab, titleSel);
+          if (!title) {
+            // Check next to see if section continues
+            var nextTitle = getText(
+              ytTab,
+              sectionSel +
+                " ytd-video-renderer:nth-of-type(" +
+                (vid + 1) +
+                ") #video-title"
+            );
+            if (!nextTitle) break; // End of section
+            continue; // Skip this slot (might be ad)
+          }
 
-          // Scroll to this video to ensure it's in viewport and loaded
+          var viewRaw = getText(ytTab, viewSel);
+
+          // Thumbnail capture - scroll and wait, then capture
+          var thumbPath = "";
           try {
-            floorp.tabScrollTo(ytTab, baseSel);
-          } catch (e) {}
+            var desktop = "/Users/user/Desktop";
+            var tmp = desktop + "/thumbs/yt_thumb_" + currentRank + ".png";
 
-          // Wait for lazy loading
-          sleep(ytTab, 1000);
+            // Scroll to video element
+            try {
+              floorp.tabScrollTo(ytTab, baseSel);
+            } catch (e) {}
+            sleep(ytTab, 800);
 
-          // Capture
-          saveElementScreenshot(ytTab, thumbSel, tmp);
-          thumbPath = tmp;
+            saveElementScreenshot(ytTab, thumbSel, tmp);
+            thumbPath = tmp;
+          } catch (e) {
+            console.log("YT Thumb Error (" + currentRank + "): " + e);
+          }
+
+          results.push({
+            platform: "YouTube",
+            rank: currentRank++,
+            title: title,
+            viewsRaw: viewRaw,
+            views: parseViews(viewRaw),
+            url: "https://www.youtube.com",
+            thumbPath: thumbPath,
+          });
         } catch (e) {
-          console.log("YT Thumb Error (" + currentRank + "): " + e);
+          // Ignore transient errors
         }
-
-        results.push({
-          platform: "YouTube",
-          rank: currentRank++,
-          title: title,
-          viewsRaw: viewRaw,
-          views: parseViews(viewRaw),
-          url: "https://www.youtube.com",
-          thumbPath: thumbPath,
-        });
-      } catch (e) {
-        // Ignore transient errors
       }
     }
   } catch (e) {
