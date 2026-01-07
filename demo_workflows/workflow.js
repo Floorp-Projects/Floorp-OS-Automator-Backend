@@ -57,7 +57,7 @@ function workflow() {
     }
 
     // Nested Loop: Section -> Videos (YouTube structure)
-    var totalNeeded = 100;
+    var totalNeeded = 70;
     var currentRank = 1;
 
     for (var sec = 1; sec <= 25; sec++) {
@@ -234,12 +234,21 @@ function workflow() {
         imageList.length +
         " images..."
     );
+
+    // Formatting options (customizable)
+    var formatOptions = {
+      row_height: 60,
+      column_widths: [12, 6, 18, 50, 14, 15, 25],
+      image_scale: 0.35,
+    };
+
     var result = excel.writeRangeWithImages(
       excelPath,
       "Sheet1",
       "A1",
       matrix,
-      imageList
+      imageList,
+      formatOptions
     );
     console.log("Write complete: " + result);
 

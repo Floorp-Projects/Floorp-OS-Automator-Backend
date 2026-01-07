@@ -731,6 +731,18 @@ struct ImageInsert {
     col: u16,
 }
 
+/// Formatting options for writeRangeWithImages
+#[derive(serde::Deserialize, Default)]
+#[serde(default)]
+struct FormattingOptions {
+    /// Height for data rows (default: 60)
+    row_height: Option<f64>,
+    /// Width for each column (indexed array)
+    column_widths: Option<Vec<f64>>,
+    /// Image scale factor (default: 0.35)
+    image_scale: Option<f64>,
+}
+
 /// Write a range of data AND embed images in a single operation.
 /// This is more efficient than separate AppleScript calls.
 #[op2]
@@ -742,6 +754,7 @@ pub fn op_excel_write_range_with_images(
     #[string] start_cell: String,
     #[string] values_json: String,
     #[string] images_json: String,
+    #[string] options_json: Option<String>,
 ) -> Result<String, JsErrorBox> {
     let (start_row, start_col) = parse_cell_ref(&start_cell)?;
 
@@ -750,6 +763,19 @@ pub fn op_excel_write_range_with_images(
 
     let images: Vec<ImageInsert> = serde_json::from_str(&images_json)
         .map_err(|e| JsErrorBox::new("Error", format!("Invalid images JSON: {}", e)))?;
+
+    // Parse options with defaults
+    let options: FormattingOptions = if let Some(opts_str) = options_json {
+        serde_json::from_str(&opts_str).unwrap_or_default()
+    } else {
+        FormattingOptions::default()
+    };
+
+    // Apply defaults
+    let row_height = options.row_height.unwrap_or(60.0);
+    let image_scale = options.image_scale.unwrap_or(0.35);
+    let default_widths = vec![12.0, 6.0, 18.0, 50.0, 14.0, 15.0, 25.0];
+    let column_widths = options.column_widths.unwrap_or(default_widths);
 
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
@@ -772,15 +798,17 @@ pub fn op_excel_write_range_with_images(
         }
     }
 
-    // Set row heights for images (row 0 is header, rows 1+ are data)
+    // Set row heights for data rows (row 0 is header, rows 1+ are data)
     for row_idx in 1..=values.len() {
-        worksheet.set_row_height(row_idx as u32, 40.0)
+        worksheet.set_row_height(row_idx as u32, row_height)
             .map_err(|e| JsErrorBox::new("Error", format!("Failed to set row height: {}", e)))?;
     }
 
-    // Set column C width for images
-    worksheet.set_column_width(2, 15.0)
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to set column width: {}", e)))?;
+    // Set column widths from options
+    for (col_idx, &width) in column_widths.iter().enumerate() {
+        worksheet.set_column_width(col_idx as u16, width)
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to set column width: {}", e)))?;
+    }
 
     // Insert images
     let mut inserted_count = 0;
@@ -792,8 +820,8 @@ pub fn op_excel_write_range_with_images(
 
         match Image::new(&img_data.file_path) {
             Ok(mut image) => {
-                // Scale image to fit in cell
-                image = image.set_scale_width(0.25).set_scale_height(0.25);
+                // Scale image using options
+                image = image.set_scale_width(image_scale).set_scale_height(image_scale);
                 
                 if let Err(e) = worksheet.insert_image(img_data.row, img_data.col, &image) {
                     // Log but don't fail

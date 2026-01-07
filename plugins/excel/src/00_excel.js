@@ -126,14 +126,17 @@ function excelWriteRangeWithImages(
   sheetName,
   startCell,
   values,
-  images
+  images,
+  options
 ) {
+  // Options: { rowHeight, columnWidths, imageScale }
   return Deno.core.ops.op_excel_write_range_with_images(
     filePath,
     sheetName,
     startCell,
     JSON.stringify(values),
-    JSON.stringify(images)
+    JSON.stringify(images),
+    options ? JSON.stringify(options) : null
   );
 }
 
