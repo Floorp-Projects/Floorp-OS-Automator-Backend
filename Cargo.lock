@@ -30,6 +30,7 @@ dependencies = [
  "search",
  "serde",
  "serde_json",
+ "thunderbird",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -6100,6 +6101,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "thunderbird"
+version = "0.12.1"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "regex",
+ "sapphillon_core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

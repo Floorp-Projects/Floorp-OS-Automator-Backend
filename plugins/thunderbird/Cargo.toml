@@ -1,0 +1,19 @@
+[package]
+name = "thunderbird"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+deno_core.workspace = true
+deno_error.workspace = true
+sapphillon_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+regex = "1"
