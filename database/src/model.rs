@@ -112,6 +112,7 @@ mod tests {
             display_name: "Demo".to_string(),
             description: Some("desc".to_string()),
             provider_name: "providers/base".to_string(),
+            priority: Some(0),
         };
 
         let stored = create_model(&db, model).await?;
@@ -132,6 +133,7 @@ mod tests {
                 display_name: format!("Model {idx}"),
                 description: Some(format!("desc{idx}")),
                 provider_name: "providers/base".to_string(),
+                priority: Some(0),
             };
             create_model(&db, model).await?;
         }
@@ -141,6 +143,7 @@ mod tests {
             display_name: "Updated".to_string(),
             description: None,
             provider_name: "providers/base".to_string(),
+            priority: Some(0),
         };
         let updated = update_model(&db, update_proto).await?;
         assert!(updated.is_some());

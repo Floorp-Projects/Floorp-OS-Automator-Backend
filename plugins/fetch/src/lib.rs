@@ -244,8 +244,8 @@ mod tests {
         println!("Posted content: {body}");
     }
 
-    #[test]
-    fn test_permission_error() {
+    #[tokio::test]
+    async fn test_permission_error() {
         let code = r#"
             const url = "https://dummyjson.com/test";
             const response = app.sapphillon.core.fetch.fetch(url);
@@ -271,13 +271,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             vec![],
             allowed_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let actual = &workflow.result[0].result;
@@ -287,8 +287,8 @@ mod tests {
             "Unexpected workflow result: {actual}"
         );
     }
-    #[test]
-    fn test_fetch_in_workflow() {
+    #[tokio::test]
+    async fn test_fetch_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/test";
             const response = app.sapphillon.core.fetch.fetch(url);
@@ -314,13 +314,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let expected = fetch(&url).unwrap() + "\n";
@@ -330,8 +330,8 @@ mod tests {
         assert!(actual == &expected, "Unexpected workflow result: {actual}");
     }
 
-    #[test]
-    fn test_post_in_workflow() {
+    #[tokio::test]
+    async fn test_post_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/products/add";
             const response = app.sapphillon.core.fetch.post(url, '{"title":"test"}');
@@ -357,13 +357,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let expected = post(&url, r#"{"title":"test"}"#).unwrap() + "\n";

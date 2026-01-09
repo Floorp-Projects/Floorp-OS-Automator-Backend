@@ -174,8 +174,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_exec_in_workflow() {
+    #[tokio::test]
+    async fn test_exec_in_workflow() {
         let code = r#"
             const output = app.sapphillon.core.exec.exec("echo test_workflow");
             console.log(output);
@@ -198,20 +198,20 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_exec_plugin_package()],
+            vec![Arc::new(core_exec_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let result_str = workflow.result[0].result.trim();
         assert_eq!(result_str, "test_workflow");
     }
 
-    #[test]
-    fn test_permission_error_in_workflow() {
+    #[tokio::test]
+    async fn test_permission_error_in_workflow() {
         let code = r#"
             app.sapphillon.core.exec.exec("echo should_fail");
         "#;
@@ -228,13 +228,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_exec_plugin_package()],
+            vec![Arc::new(core_exec_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         assert!(

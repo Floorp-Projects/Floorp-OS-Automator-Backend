@@ -4061,6 +4061,7 @@ dependencies = [
  "deno_error",
  "log",
  "sapphillon_core",
+ "tokio",
 ]
 
 [[package]]
@@ -4213,6 +4214,7 @@ dependencies = [
  "deno_error",
  "log",
  "sapphillon_core",
+ "tokio",
  "ureq",
 ]
 
@@ -4251,6 +4253,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -11290,6 +11293,7 @@ dependencies = [
  "deno_error",
  "log",
  "sapphillon_core",
+ "tokio",
  "x-win",
 ]
 

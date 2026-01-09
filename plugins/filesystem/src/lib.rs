@@ -354,9 +354,9 @@ mod tests {
         assert!(files.iter().any(|f| f == file2_path.to_str().unwrap()));
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_in_workflow() {
+    async fn test_permission_in_workflow() {
         // Create a platform-appropriate temp path and write the file
         let mut tmp_path_buf = std::env::temp_dir();
         tmp_path_buf.push("__sapphillon_test__");
@@ -388,13 +388,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let expected = std::fs::read_to_string(&tmp_path).unwrap() + "\n";
         let actual = &workflow.result[0].result;
@@ -404,9 +404,9 @@ mod tests {
         let _ = std::fs::remove_file(&tmp_path);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_write_in_workflow() {
+    async fn test_permission_write_in_workflow() {
         // Ensure file does not exist then grant permission
         let mut tmp_path_buf = std::env::temp_dir();
         tmp_path_buf.push("__sapphillon_test_write__");
@@ -437,13 +437,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test-write".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // workflow prints "done\n"
         let actual = &workflow.result[0].result;
@@ -460,9 +460,9 @@ mod tests {
         let _ = std::fs::remove_file(&tmp_path);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_list_files_in_workflow() {
+    async fn test_permission_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
         let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
@@ -494,13 +494,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         // The expected result is a JSON string of a list of files, followed by a newline.
@@ -520,9 +520,9 @@ mod tests {
         });
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_denied_list_files_in_workflow() {
+    async fn test_permission_denied_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
         let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
@@ -549,13 +549,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         println!("workflow.result: {:?}", workflow.result);
         assert_eq!(workflow.result.len(), 1);
         // assert!(

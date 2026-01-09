@@ -203,8 +203,8 @@ mod tests {
     use sapphillon_core::permission::PluginFunctionPermissions;
     use sapphillon_core::workflow::CoreWorkflowCode;
 
-    #[test]
-    fn test_get_active_window_title_in_workflow() {
+    #[tokio::test]
+    async fn test_get_active_window_title_in_workflow() {
         let code = r#"
             const title = app.sapphillon.core.window.getActiveWindowTitle();
             console.log(title);
@@ -221,21 +221,21 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_window_plugin_package()],
+            vec![Arc::new(core_window_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of a title.
         // We just check that we got some result (either a title or an error message).
         assert!(!workflow.result[0].result.is_empty());
     }
 
-    #[test]
-    fn test_get_inactive_window_titles_in_workflow() {
+    #[tokio::test]
+    async fn test_get_inactive_window_titles_in_workflow() {
         let code = r#"
             const titles = app.sapphillon.core.window.getInactiveWindowTitles();
             console.log(JSON.stringify(titles));
@@ -252,13 +252,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_window_plugin_package()],
+            vec![Arc::new(core_window_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of window titles.
         // Accept either a JSON array (success) or an error message (headless environment).
