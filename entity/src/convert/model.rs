@@ -100,6 +100,7 @@ mod tests {
             display_name: "".to_string(),
             description: None,
             provider_name: "providers/any".to_string(),
+            priority: None,
         };
 
         let entity: EntityModel = proto.clone().into();

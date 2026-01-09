@@ -13,7 +13,10 @@ use database::plugin::list_plugins;
 use log::{debug, error};
 use sapphillon_core::proto::google::rpc::{Code as RpcCode, Status as RpcStatus};
 use sapphillon_core::proto::sapphillon::v1::plugin_service_server::PluginService;
-use sapphillon_core::proto::sapphillon::v1::{ListPluginsRequest, ListPluginsResponse};
+use sapphillon_core::proto::sapphillon::v1::{
+    InstallPluginRequest, InstallPluginResponse, ListPluginsRequest, ListPluginsResponse,
+    UninstallPluginRequest, UninstallPluginResponse,
+};
 use sea_orm::{DatabaseConnection, DbErr};
 use tonic::{Request, Response, Status};
 
@@ -78,6 +81,20 @@ impl PluginService for MyPluginService {
         };
 
         Ok(Response::new(response))
+    }
+
+    async fn install_plugin(
+        &self,
+        _request: Request<InstallPluginRequest>,
+    ) -> Result<Response<InstallPluginResponse>, Status> {
+        Err(Status::unimplemented("install_plugin not implemented"))
+    }
+
+    async fn uninstall_plugin(
+        &self,
+        _request: Request<UninstallPluginRequest>,
+    ) -> Result<Response<UninstallPluginResponse>, Status> {
+        Err(Status::unimplemented("uninstall_plugin not implemented"))
     }
 }
 
