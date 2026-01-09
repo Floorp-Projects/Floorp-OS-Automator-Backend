@@ -77,7 +77,10 @@ impl fmt::Debug for SysConfig {
             .field("version", &self.version)
             .field("authors", &self.authors)
             .field("copyright_year", &self.copyright_year)
-            .field("core_plugin_package", &format_args!("[{} packages]", self.core_plugin_package.len()))
+            .field(
+                "core_plugin_package",
+                &format_args!("[{} packages]", self.core_plugin_package.len()),
+            )
             .field("initial_plugins", &self.initial_plugins)
             .field("initial_workflows", &self.initial_workflows)
             .finish()
