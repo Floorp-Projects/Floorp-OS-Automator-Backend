@@ -61,6 +61,27 @@ function workflow() {
     console.log("  ✗ Error: " + e);
   }
 
+  // Test 5: Get Emails
+  console.log("");
+  console.log("[Test 5] thunderbird.getEmails('inbox', 5)");
+  try {
+    var emails = thunderbird.getEmails("inbox", 5);
+    console.log("  ✓ Found " + emails.length + " emails");
+    for (var i = 0; i < emails.length; i++) {
+      var email = emails[i];
+      console.log(
+        "    - [" +
+          email.date +
+          "] " +
+          email.subject.substring(0, 40) +
+          (email.subject.length > 40 ? "..." : "")
+      );
+      console.log("      From: " + email.sender);
+    }
+  } catch (e) {
+    console.log("  ✗ Error: " + e);
+  }
+
   console.log("");
   console.log("=== Test Complete ===");
 }

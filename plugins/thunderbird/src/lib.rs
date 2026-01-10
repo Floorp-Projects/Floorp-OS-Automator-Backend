@@ -35,6 +35,17 @@ pub struct CalendarEvent {
     pub date: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Email {
+    pub id: i64,
+    pub subject: String,
+    pub sender: String,
+    pub recipients: String,
+    pub body: String,
+    pub date: String,
+    pub folder: String,
+}
+
 // ============================================================================
 // Plugin Functions Metadata
 // ============================================================================
@@ -72,6 +83,17 @@ pub fn thunderbird_get_profile_function() -> PluginFunction {
     }
 }
 
+pub fn thunderbird_get_emails_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.thunderbird.getEmails".to_string(),
+        function_name: "Get Thunderbird Emails".to_string(),
+        description: "Retrieves emails from Thunderbird.".to_string(),
+        permissions: thunderbird_read_permissions(),
+        arguments: "String: folder (optional, default '受信トレイ'), Number: limit (optional, default 20)".to_string(),
+        returns: "JSON: Array of { id, subject, sender, recipients, body, date, folder }".to_string(),
+    }
+}
+
 pub fn thunderbird_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.thunderbird".to_string(),
@@ -81,6 +103,7 @@ pub fn thunderbird_plugin_package() -> PluginPackage {
             thunderbird_get_identity_function(),
             thunderbird_get_calendar_function(),
             thunderbird_get_profile_function(),
+            thunderbird_get_emails_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -122,6 +145,16 @@ pub fn core_thunderbird_get_profile() -> CorePluginFunction {
         "Get Thunderbird Profile".to_string(),
         "Finds and returns the default Thunderbird profile name.".to_string(),
         op2_thunderbird_get_profile(),
+        None,
+    )
+}
+
+pub fn core_thunderbird_get_emails() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.thunderbird.getEmails".to_string(),
+        "Get Thunderbird Emails".to_string(),
+        "Retrieves emails from Thunderbird.".to_string(),
+        op2_thunderbird_get_emails(),
         Some(include_str!("00_thunderbird.js").to_string()),
     )
 }
@@ -134,6 +167,7 @@ pub fn core_thunderbird_plugin_package() -> CorePluginPackage {
             core_thunderbird_get_identity(),
             core_thunderbird_get_calendar_events(),
             core_thunderbird_get_profile(),
+            core_thunderbird_get_emails(),
         ],
     )
 }
@@ -197,16 +231,67 @@ fn permission_check(state: &mut OpState) -> Result<(), JsErrorBox> {
 
 fn find_thunderbird_profile() -> anyhow::Result<String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
+    let profiles_ini = format!("{}/Library/Thunderbird/profiles.ini", home);
     let profiles_dir = format!("{}/Library/Thunderbird/Profiles", home);
     
+    // Try to read profiles.ini and find the default profile from [Install*] section
+    if let Ok(output) = Command::new("cat").arg(&profiles_ini).output() {
+        if output.status.success() {
+            let content = String::from_utf8_lossy(&output.stdout);
+            let mut in_install_section = false;
+            
+            for line in content.lines() {
+                let trimmed = line.trim();
+                
+                // Check if we're entering an [Install*] section
+                if trimmed.starts_with("[Install") {
+                    in_install_section = true;
+                    continue;
+                }
+                
+                // Check if we're leaving the section
+                if trimmed.starts_with('[') {
+                    in_install_section = false;
+                    continue;
+                }
+                
+                // Look for Default= in [Install*] section
+                if in_install_section && trimmed.starts_with("Default=") {
+                    let path = trimmed.trim_start_matches("Default=").trim();
+                    // Path is like "Profiles/x9dsn3v8.default-release"
+                    if let Some(profile_name) = path.strip_prefix("Profiles/") {
+                        return Ok(profile_name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback: list profiles directory and pick one with calendar-data
     let output = Command::new("ls")
         .arg(&profiles_dir)
         .output()?;
     
     if output.status.success() {
         let profiles = String::from_utf8_lossy(&output.stdout);
-        let first_profile = profiles.lines().next().unwrap_or("").trim();
-        if !first_profile.is_empty() {
+        let profile_list: Vec<&str> = profiles.lines().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        
+        // Try to find profile with calendar-data
+        for profile in &profile_list {
+            let calendar_path = format!("{}/{}/calendar-data", profiles_dir, profile);
+            let exists = Command::new("test")
+                .arg("-d")
+                .arg(&calendar_path)
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if exists {
+                return Ok(profile.to_string());
+            }
+        }
+        
+        // Fallback to first profile
+        if let Some(first_profile) = profile_list.first() {
             return Ok(first_profile.to_string());
         }
     }
@@ -251,11 +336,13 @@ fn extract_quoted_value(line: &str) -> Option<String> {
 
 fn get_calendar_events_from_db(profile: &str, days: i64) -> anyhow::Result<Vec<CalendarEvent>> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
-    let db_path = format!("{}/Library/Thunderbird/Profiles/{}/calendar-data/cache.sqlite", home, profile);
-    let tmp_db = "/tmp/thunderbird_cal_plugin.sqlite";
+    let calendar_data_dir = format!("{}/Library/Thunderbird/Profiles/{}/calendar-data", home, profile);
     
-    // Copy DB to avoid lock issues
-    let _ = Command::new("cp").arg(&db_path).arg(tmp_db).output()?;
+    // Try both local.sqlite (primary for local calendars) and cache.sqlite (for CalDAV/remote)
+    let db_files = vec![
+        ("local.sqlite", "/tmp/thunderbird_cal_local.sqlite"),
+        ("cache.sqlite", "/tmp/thunderbird_cal_cache.sqlite"),
+    ];
     
     let now_micros = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -271,9 +358,111 @@ fn get_calendar_events_from_db(profile: &str, days: i64) -> anyhow::Result<Vec<C
         now_micros, future_micros
     );
     
+    let mut all_events = Vec::new();
+    
+    for (db_name, tmp_db) in &db_files {
+        let db_path = format!("{}/{}", calendar_data_dir, db_name);
+        let wal_path = format!("{}-wal", db_path);
+        let tmp_wal = format!("{}-wal", tmp_db);
+        
+        // Check if DB exists
+        let db_exists = Command::new("test")
+            .arg("-f")
+            .arg(&db_path)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        
+        if !db_exists {
+            continue;
+        }
+        
+        // Copy DB and WAL file (if exists) to avoid lock issues
+        let _ = Command::new("cp").arg(&db_path).arg(tmp_db).output();
+        let _ = Command::new("cp").arg(&wal_path).arg(&tmp_wal).output();
+        
+        let output = Command::new("sqlite3")
+            .arg("-separator")
+            .arg("|")
+            .arg(tmp_db)
+            .arg(&query)
+            .output();
+        
+        // Clean up
+        let _ = Command::new("rm").arg("-f").arg(tmp_db).output();
+        let _ = Command::new("rm").arg("-f").arg(&tmp_wal).output();
+        
+        if let Ok(output) = output {
+            let result = String::from_utf8_lossy(&output.stdout);
+            for line in result.lines() {
+                let parts: Vec<&str> = line.split('|').collect();
+                if parts.len() >= 3 {
+                    let start_time = parts[1].to_string();
+                    let date = start_time.split(' ').next().unwrap_or("").to_string();
+                    all_events.push(CalendarEvent {
+                        title: parts[0].to_string(),
+                        start_time,
+                        end_time: parts[2].to_string(),
+                        date,
+                    });
+                }
+            }
+        }
+    }
+    
+    // Sort events by start_time
+    all_events.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+    
+    Ok(all_events)
+}
+
+fn folder_to_uri_pattern(folder: &str) -> String {
+    // Convert folder alias to URI pattern for locale-independent matching
+    match folder.to_lowercase().as_str() {
+        "inbox" | "" => "%/INBOX".to_string(),
+        "sent" => "%Sent%".to_string(),
+        "drafts" | "draft" => "%Draft%".to_string(),
+        "trash" => "%Trash%".to_string(),
+        "spam" | "junk" => "%Spam%".to_string(),
+        "all" => "%/すべてのメール".to_string(),  // Gmail specific
+        // If not a known alias, use as-is for name matching
+        _ => folder.to_string(),
+    }
+}
+
+fn get_emails_from_db(profile: &str, folder: &str, limit: i64) -> anyhow::Result<Vec<Email>> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
+    let db_path = format!("{}/Library/Thunderbird/Profiles/{}/global-messages-db.sqlite", home, profile);
+    let tmp_db = "/tmp/thunderbird_email_plugin.sqlite";
+    
+    // Copy DB to avoid lock issues
+    let _ = Command::new("cp").arg(&db_path).arg(tmp_db).output()?;
+    
+    let uri_pattern = folder_to_uri_pattern(folder);
+    
+    // Check if we should match by URI pattern or by exact name
+    let where_clause = if uri_pattern.contains('%') {
+        format!("f.folderURI LIKE '{}'", uri_pattern.replace("'", "''"))
+    } else {
+        format!("f.name = '{}'", uri_pattern.replace("'", "''"))
+    };
+    
+    // Query emails with folder filter
+    let query = format!(
+        "SELECT m.id, datetime(m.date/1000000,'unixepoch','localtime'), f.name, \
+         mc.c1subject, mc.c3author, mc.c4recipients, mc.c0body \
+         FROM messages m \
+         JOIN messagesText_content mc ON m.id = mc.docid \
+         JOIN folderLocations f ON m.folderID = f.id \
+         WHERE m.deleted = 0 AND {} \
+         ORDER BY m.date DESC LIMIT {};",
+        where_clause,
+        limit
+    );
+    
     let output = Command::new("sqlite3")
         .arg("-separator")
-        .arg("|")
+        .arg("|||")  // Use unique separator to avoid conflicts with email content
         .arg(tmp_db)
         .arg(&query)
         .output()?;
@@ -282,23 +471,24 @@ fn get_calendar_events_from_db(profile: &str, days: i64) -> anyhow::Result<Vec<C
     let _ = Command::new("rm").arg("-f").arg(tmp_db).output();
     
     let result = String::from_utf8_lossy(&output.stdout);
-    let mut events = Vec::new();
+    let mut emails = Vec::new();
     
     for line in result.lines() {
-        let parts: Vec<&str> = line.split('|').collect();
-        if parts.len() >= 3 {
-            let start_time = parts[1].to_string();
-            let date = start_time.split(' ').next().unwrap_or("").to_string();
-            events.push(CalendarEvent {
-                title: parts[0].to_string(),
-                start_time,
-                end_time: parts[2].to_string(),
-                date,
+        let parts: Vec<&str> = line.splitn(7, "|||").collect();
+        if parts.len() >= 7 {
+            emails.push(Email {
+                id: parts[0].parse().unwrap_or(0),
+                date: parts[1].to_string(),
+                folder: parts[2].to_string(),
+                subject: parts[3].to_string(),
+                sender: parts[4].to_string(),
+                recipients: parts[5].to_string(),
+                body: parts[6].to_string(),
             });
         }
     }
     
-    Ok(events)
+    Ok(emails)
 }
 
 // ============================================================================
@@ -348,6 +538,28 @@ fn op2_thunderbird_get_profile(
     permission_check(state)?;
     
     find_thunderbird_profile()
+        .map_err(|e| JsErrorBox::new("Error", e.to_string()))
+}
+
+#[op2]
+#[string]
+fn op2_thunderbird_get_emails(
+    state: &mut OpState,
+    #[string] folder: String,
+    #[bigint] limit: i64,
+) -> std::result::Result<String, JsErrorBox> {
+    permission_check(state)?;
+    
+    let profile = find_thunderbird_profile()
+        .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
+    
+    let folder_name = if folder.is_empty() { "inbox".to_string() } else { folder };
+    let email_limit = if limit > 0 { limit } else { 20 };
+    
+    let emails = get_emails_from_db(&profile, &folder_name, email_limit)
+        .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
+    
+    serde_json::to_string(&emails)
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))
 }
 

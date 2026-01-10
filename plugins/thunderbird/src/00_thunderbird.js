@@ -15,6 +15,12 @@ var thunderbird = {
   getProfile: function () {
     return Deno.core.ops.op2_thunderbird_get_profile();
   },
+
+  getEmails: function (folder, limit) {
+    return JSON.parse(
+      Deno.core.ops.op2_thunderbird_get_emails(folder || "inbox", limit || 20)
+    );
+  },
 };
 
 globalThis.thunderbird = thunderbird;
