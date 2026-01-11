@@ -142,7 +142,7 @@ pub async fn list_missing_ext_plugin_packages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
         let state = crate::global_state_for_tests!();
