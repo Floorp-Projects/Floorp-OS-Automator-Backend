@@ -14,7 +14,8 @@ CREATE TABLE plugin_package (
     verified BOOLEAN NOT NULL DEFAULT FALSE,
     deprecated BOOLEAN NOT NULL DEFAULT FALSE,
     installed_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    provider_id TEXT
 );
 
 -- plugin_function
@@ -25,6 +26,8 @@ CREATE TABLE plugin_function (
     description TEXT,
     arguments TEXT,
     returns TEXT,
+    function_define TEXT,
+    version TEXT,
     PRIMARY KEY (package_id, function_id),
     FOREIGN KEY (package_id) REFERENCES plugin_package(package_id) ON DELETE CASCADE
 );
@@ -183,6 +186,7 @@ impl MigrationTrait for Migration {
                             .null(),
                     )
                     .col(ColumnDef::new(PluginPackage::UpdatedAt).timestamp().null())
+                    .col(ColumnDef::new(PluginPackage::ProviderId).string().null())
                     .to_owned(),
             )
             .await?;
@@ -205,8 +209,13 @@ impl MigrationTrait for Migration {
                     .col(string(PluginFunction::FunctionName))
                     .col(ColumnDef::new(PluginFunction::Description).string().null())
                     // Separate ID with colons (SQLite does not support for array)
+                    // arguments and returns are reserved for backward compatibility
                     .col(ColumnDef::new(PluginFunction::Arguments).text().null())
                     .col(ColumnDef::new(PluginFunction::Returns).text().null())
+                    // JSDoc-style function definition with parameters and return value (JSON)
+                    .col(ColumnDef::new(PluginFunction::FunctionDefine).text().null())
+                    // Version of the function (e.g., "1.0.0")
+                    .col(ColumnDef::new(PluginFunction::Version).string().null())
                     .primary_key(
                         Index::create()
                             .col(PluginFunction::PackageId)
@@ -712,6 +721,7 @@ enum PluginPackage {
     Deprecated,
     InstalledAt,
     UpdatedAt,
+    ProviderId,
 }
 
 #[derive(DeriveIden)]
@@ -723,6 +733,8 @@ enum PluginFunction {
     Description,
     Arguments,
     Returns,
+    FunctionDefine,
+    Version,
 }
 
 #[derive(DeriveIden)]
