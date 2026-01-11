@@ -18,6 +18,7 @@ pub fn exec_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.exec.exec".to_string(),
         function_name: "Exec".to_string(),
+        version: "".to_string(),
         description: "Executes a command in the default shell and returns its output.".to_string(),
         permissions: exec_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -39,6 +40,7 @@ pub fn exec_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.exec".to_string(),
         package_name: "Exec".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to execute shell commands.".to_string(),
         functions: vec![exec_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),

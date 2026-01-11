@@ -4081,8 +4081,8 @@ dependencies = [
 
 [[package]]
 name = "ext_plugin"
-version = "0.10.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.10.0#e8de3b3a4302dd7b508dbe0ed4e1225133963b6c"
+version = "0.11.0"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -4102,7 +4102,7 @@ dependencies = [
  "sys_traits",
  "tokio",
  "url",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7498,7 +7498,7 @@ dependencies = [
 [[package]]
 name = "proto"
 version = "0.10.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.10.0#e8de3b3a4302dd7b508dbe0ed4e1225133963b6c"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
 dependencies = [
  "bytes",
  "pbjson",
@@ -8404,8 +8404,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.10.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.10.0#e8de3b3a4302dd7b508dbe0ed4e1225133963b6c"
+version = "0.11.0"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8432,7 +8432,7 @@ dependencies = [
  "tonic 0.14.2",
  "unescaper",
  "url",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -18,6 +18,7 @@ pub fn get_active_window_title_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.window.get_active_window_title".to_string(),
         function_name: "Get Active Window Title".to_string(),
+        version: "".to_string(),
         description: "Gets the title of the currently active window.".to_string(),
         permissions: window_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -35,6 +36,7 @@ pub fn get_inactive_window_titles_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
         function_name: "Get Inactive Window Titles".to_string(),
+        version: "".to_string(),
         description: "Gets the titles of all inactive windows.".to_string(),
         permissions: window_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -52,6 +54,7 @@ pub fn window_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.window".to_string(),
         package_name: "Window".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to manage windows.".to_string(),
         functions: vec![
             get_active_window_title_plugin_function(),

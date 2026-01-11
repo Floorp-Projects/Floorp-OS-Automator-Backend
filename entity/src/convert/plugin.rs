@@ -39,6 +39,7 @@ pub fn plugin_package_to_proto(entity: &EntityPluginPackage) -> ProtoPluginPacka
     ProtoPluginPackage {
         package_id: entity.package_id.clone(),
         package_name: entity.package_name.clone(),
+        provider_id: "".to_string(),
         package_version: entity.package_version.clone(),
         description: entity.description.clone().unwrap_or_default(),
         functions: Vec::new(),
@@ -75,6 +76,7 @@ pub fn plugin_function_to_proto(
     let mut p = ProtoPluginFunction {
         function_id: entity.function_id.clone(),
         function_name: entity.function_name.clone(),
+        version: "".to_string(),
         description: entity.description.clone().unwrap_or_default(),
         permissions: Vec::new(),
         function_define,
@@ -236,6 +238,7 @@ mod tests {
         let proto = ProtoPluginPackage {
             package_id: "pkg1".to_string(),
             package_name: "Plugin".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.2.3".to_string(),
             description: "Best plugin".to_string(),
             functions: Vec::new(),

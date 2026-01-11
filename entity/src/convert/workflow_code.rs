@@ -372,6 +372,7 @@ mod tests {
         let packages = vec![ProtoPluginPackage {
             package_id: "pkg1".to_string(),
             package_name: "Pkg".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.0.0".to_string(),
             description: String::new(),
             functions: Vec::new(),

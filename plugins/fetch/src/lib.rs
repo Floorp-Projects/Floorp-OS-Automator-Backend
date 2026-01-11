@@ -18,6 +18,7 @@ pub fn post_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.fetch.post".to_string(),
         function_name: "Post".to_string(),
+        version: "".to_string(),
         description: "Posts the content of a URL using reqwest and returns it as a string."
             .to_string(),
         permissions: fetch_plugin_permissions(),
@@ -47,6 +48,7 @@ pub fn fetch_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.fetch.fetch".to_string(),
         function_name: "Fetch".to_string(),
+        version: "".to_string(),
         description: "Fetches the content of a URL using reqwest and returns it as a string."
             .to_string(),
         permissions: fetch_plugin_permissions(),
@@ -69,6 +71,7 @@ pub fn fetch_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.fetch".to_string(),
         package_name: "Fetch".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to fetch the content of a URL.".to_string(),
         functions: vec![fetch_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
