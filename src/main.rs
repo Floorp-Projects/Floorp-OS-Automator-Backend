@@ -4,6 +4,7 @@
 
 mod args;
 mod dummy_plugin;
+#[allow(unused)]
 mod ext_plugin_manager;
 mod init;
 mod server;

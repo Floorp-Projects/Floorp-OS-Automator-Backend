@@ -23,6 +23,7 @@ use window::{core_window_plugin_package, window_plugin_package};
 /// # Returns
 ///
 /// Returns a [`SysConfig`] populated with metadata and packaged plugins.
+#[allow(clippy::arc_with_non_send_sync)]
 pub fn sysconfig() -> SysConfig {
     SysConfig {
         app_name: "Sapphillon",
