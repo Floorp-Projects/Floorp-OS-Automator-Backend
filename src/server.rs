@@ -160,19 +160,14 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
         .trace_fn(|_| tracing::info_span!("grpc_server")) // Add tracing span
         .accept_http1(true)
         .layer(cors)
-        .add_service(tonic_web::enable(reflection_service_v1_alpha))
-        .add_service(tonic_web::enable(reflection_service_v1))
-        .add_service(tonic_web::enable(VersionServiceServer::new(
-            version_service,
-        )))
-        .add_service(tonic_web::enable(WorkflowServiceServer::new(
-            workflow_service,
-        )))
-        .add_service(tonic_web::enable(ModelServiceServer::new(model_service)))
-        .add_service(tonic_web::enable(ProviderServiceServer::new(
-            provider_service,
-        )))
-        .add_service(tonic_web::enable(PluginServiceServer::new(plugin_service)))
+        .layer(tonic_web::GrpcWebLayer::new())
+        .add_service(reflection_service_v1_alpha)
+        .add_service(reflection_service_v1)
+        .add_service(VersionServiceServer::new(version_service))
+        .add_service(WorkflowServiceServer::new(workflow_service))
+        .add_service(ModelServiceServer::new(model_service))
+        .add_service(ProviderServiceServer::new(provider_service))
+        .add_service(PluginServiceServer::new(plugin_service))
         .serve(addr)
         .await?;
 

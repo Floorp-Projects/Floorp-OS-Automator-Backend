@@ -1,7 +1,7 @@
 [workspace.package]
 
 # name = "Sapphillon"
-version = "0.12.1"
+version = "0.13.0"
 edition = "2024"
 authors = ["Yuuta Takahashi <y.highbridge04@gmail.com>"]
 license = "MPL-2.0 OR GPL-3.0-or-later"
@@ -21,15 +21,15 @@ tokio = { version = "1", features = ["full"] }    # reqwest needs a tokio runtim
 chrono = "0.4"
 log = "0.4"
 env_logger = "0.11"
-deno_core = "0.355.0"
+deno_core = "0.363.0"
 deno_error = "0.7.0"
 x-win = "5.3.3"
 
-tonic = "0.12.0"
-prost = "0.13.1"
-prost-types = "0.13.1"
-sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.8.7" }
-tonic-build = "0.12.0"
+tonic = { version = "0.14.1", default-features = false, features = ["codegen", "transport", "router"] }
+prost = { version = "0.14.1", default-features = false, features = ["std"] }
+prost-types = { version = "0.14.1", default-features = false }
+sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.11.0" }
+tonic-build = "0.14.1"
 
 sea-orm = { version = "1.1.0", features = [
   "sqlx-sqlite",
@@ -94,13 +94,21 @@ iniad = { path = "./plugins/iniad-ai-mop" }
 excel = { path = "./plugins/excel" }
 thunderbird = { path = "./plugins/thunderbird" }
 uuid = { version = "1.18.0", features = ["v4"] }
-tonic-reflection = "0.12.0"
+tonic-reflection = "0.14.2"
 tower-http = { version = "0.5.2", features = ["cors"] }
-tonic-web = "0.12.0"
+tonic-web = "0.14.2"
 unescaper = "0.1.6"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
+thiserror = "2.0.17"
 
 
 [build-dependencies]
 tonic-build.workspace = true
+
+[patch.crates-io]
+sqlx = {git = "https://github.com/Walkmana-25/sqlx-patch.git"}
+timezone_provider = { git = "https://github.com/boa-dev/temporal.git", tag = "v0.0.11" }
+
+[dev-dependencies]
+tempfile = "3.24.0"

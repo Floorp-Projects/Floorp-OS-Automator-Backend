@@ -2,9 +2,12 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
-use sapphillon_core::plugin::CorePluginPackage;
+use sapphillon_core::plugin::{CorePluginPackage, PluginPackageTrait};
 use sapphillon_core::proto::sapphillon::v1::PluginPackage;
+use std::fmt;
+use std::sync::Arc;
 
+use crate::dummy_plugin::dummy_plugin_package;
 use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
@@ -26,6 +29,7 @@ use thunderbird::{core_thunderbird_plugin_package, thunderbird_plugin_package};
 /// # Returns
 ///
 /// Returns a [`SysConfig`] populated with metadata and packaged plugins.
+#[allow(clippy::arc_with_non_send_sync)]
 pub fn sysconfig() -> SysConfig {
     SysConfig {
         app_name: "Sapphillon",
@@ -34,19 +38,19 @@ pub fn sysconfig() -> SysConfig {
         copyright_year: 2025,
 
         core_plugin_package: vec![
-            core_fetch_plugin_package(),
-            core_filesystem_plugin_package(),
-            core_floorp_plugin_package(),
-            core_vscode_plugin_package(),
-            core_search_plugin_package(),
-            core_window_plugin_package(),
-            core_exec_plugin_package(),
-            core_git_plugin_package(),
-            core_iniad_ai_mop_plugin_package(),
-            core_excel_plugin_package(),
-            core_thunderbird_plugin_package(),
+            Arc::new(core_fetch_plugin_package()),
+            Arc::new(core_filesystem_plugin_package()),
+            Arc::new(core_floorp_plugin_package()),
+            Arc::new(core_vscode_plugin_package()),
+            Arc::new(core_search_plugin_package()),
+            Arc::new(core_window_plugin_package()),
+            Arc::new(core_exec_plugin_package()),
+            Arc::new(core_git_plugin_package()),
+            Arc::new(core_iniad_ai_mop_plugin_package()),
+            Arc::new(core_excel_plugin_package()),
+            Arc::new(core_thunderbird_plugin_package()),
         ],
-        plugin_package: vec![
+        initial_plugins: vec![
             fetch_plugin_package(),
             filesystem_plugin_package(),
             floorp_plugin_package(),
@@ -58,19 +62,48 @@ pub fn sysconfig() -> SysConfig {
             iniad_ai_mop_plugin_package(),
             excel_plugin_package(),
             thunderbird_plugin_package(),
+            dummy_plugin_package(),
         ],
+
+        initial_workflows: vec![],
     }
 }
 
 #[derive(Debug, Clone)]
+pub struct InitialWorkflow {
+    pub display_name: String,
+    pub description: Option<String>,
+    pub code: String,
+}
+
+#[derive(Clone)]
 pub struct SysConfig {
     pub app_name: &'static str,
     pub version: &'static str,
     pub authors: &'static str,
     pub copyright_year: u16,
 
-    pub core_plugin_package: Vec<CorePluginPackage>,
-    pub plugin_package: Vec<PluginPackage>,
+    pub core_plugin_package: Vec<Arc<dyn PluginPackageTrait>>,
+    pub initial_plugins: Vec<PluginPackage>,
+
+    pub initial_workflows: Vec<InitialWorkflow>,
+}
+
+impl fmt::Debug for SysConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SysConfig")
+            .field("app_name", &self.app_name)
+            .field("version", &self.version)
+            .field("authors", &self.authors)
+            .field("copyright_year", &self.copyright_year)
+            .field(
+                "core_plugin_package",
+                &format_args!("[{} packages]", self.core_plugin_package.len()),
+            )
+            .field("initial_plugins", &self.initial_plugins)
+            .field("initial_workflows", &self.initial_workflows)
+            .finish()
+    }
 }
 
 impl SysConfig {

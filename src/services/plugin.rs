@@ -13,7 +13,10 @@ use database::plugin::list_plugins;
 use log::{debug, error};
 use sapphillon_core::proto::google::rpc::{Code as RpcCode, Status as RpcStatus};
 use sapphillon_core::proto::sapphillon::v1::plugin_service_server::PluginService;
-use sapphillon_core::proto::sapphillon::v1::{ListPluginsRequest, ListPluginsResponse};
+use sapphillon_core::proto::sapphillon::v1::{
+    InstallPluginRequest, InstallPluginResponse, ListPluginsRequest, ListPluginsResponse,
+    UninstallPluginRequest, UninstallPluginResponse,
+};
 use sea_orm::{DatabaseConnection, DbErr};
 use tonic::{Request, Response, Status};
 
@@ -79,15 +82,118 @@ impl PluginService for MyPluginService {
 
         Ok(Response::new(response))
     }
+
+    async fn install_plugin(
+        &self,
+        request: Request<InstallPluginRequest>,
+    ) -> Result<Response<InstallPluginResponse>, Status> {
+        use crate::plugin_installer::{InstallError, install_plugin_from_uri};
+        use sapphillon_core::proto::google::rpc::Code as RpcCode;
+
+        let req = request.into_inner();
+        debug!("install_plugin request received: uri='{}'", req.uri);
+
+        // Get save directory from global state
+        let save_dir = crate::GLOBAL_STATE.get_ext_plugin_save_dir().await;
+
+        // Install the plugin using the installer module
+        match install_plugin_from_uri(&self.db, &save_dir, &req.uri).await {
+            Ok(result) => {
+                debug!(
+                    "plugin installed successfully: {}",
+                    result.plugin_package_id
+                );
+                Ok(Response::new(InstallPluginResponse {
+                    plugin: None, // Plugin metadata not available from raw download
+                    status: Self::ok_status(format!(
+                        "plugin installed: {}",
+                        result.plugin_package_id
+                    )),
+                }))
+            }
+            Err(e) => {
+                error!("failed to install plugin: {e}");
+                let code = match &e {
+                    InstallError::EmptyUri
+                    | InstallError::UnsupportedScheme(_)
+                    | InstallError::InvalidUriFormat(_) => RpcCode::InvalidArgument,
+                    InstallError::DownloadFailed(_) | InstallError::FileReadFailed(_) => {
+                        RpcCode::Unavailable
+                    }
+                    InstallError::AlreadyInstalled(_) => RpcCode::AlreadyExists,
+                    InstallError::InstallFailed(_) => RpcCode::Internal,
+                };
+                Ok(Response::new(InstallPluginResponse {
+                    plugin: None,
+                    status: Some(RpcStatus {
+                        code: code as i32,
+                        message: e.to_string(),
+                        details: vec![],
+                    }),
+                }))
+            }
+        }
+    }
+
+    async fn uninstall_plugin(
+        &self,
+        request: Request<UninstallPluginRequest>,
+    ) -> Result<Response<UninstallPluginResponse>, Status> {
+        use sapphillon_core::proto::google::rpc::Code as RpcCode;
+
+        let req = request.into_inner();
+        debug!(
+            "uninstall_plugin request received: package_id='{}'",
+            req.package_id
+        );
+
+        // Validate package_id is not empty
+        if req.package_id.trim().is_empty() {
+            return Ok(Response::new(UninstallPluginResponse {
+                status: Some(RpcStatus {
+                    code: RpcCode::InvalidArgument as i32,
+                    message: "package_id field is required".to_string(),
+                    details: vec![],
+                }),
+            }));
+        }
+
+        // Uninstall the plugin
+        match crate::ext_plugin_manager::uninstall_ext_plugin(&self.db, &req.package_id).await {
+            Ok(()) => {
+                debug!("plugin uninstalled successfully: {}", req.package_id);
+                Ok(Response::new(UninstallPluginResponse {
+                    status: Self::ok_status(format!("plugin uninstalled: {}", req.package_id)),
+                }))
+            }
+            Err(e) => {
+                error!("failed to uninstall plugin: {e}");
+                let code = if e.to_string().contains("not found") {
+                    RpcCode::NotFound
+                } else {
+                    RpcCode::Internal
+                };
+                Ok(Response::new(UninstallPluginResponse {
+                    status: Some(RpcStatus {
+                        code: code as i32,
+                        message: e.to_string(),
+                        details: vec![],
+                    }),
+                }))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{ConnectionTrait, Database, DbBackend, Statement};
+    use sea_orm::{ConnectionTrait, DbBackend, Statement};
+    use tempfile::TempDir;
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         // plugin_package table
         let sql_pkg = r#"
@@ -160,6 +266,20 @@ mod tests {
         ))
         .await?;
 
+        // ext_plugin_package table
+        let sql_ext = r#"
+			CREATE TABLE ext_plugin_package (
+				plugin_package_id TEXT NOT NULL PRIMARY KEY,
+				install_dir TEXT NOT NULL,
+				missing INTEGER NOT NULL DEFAULT 0
+			)
+		"#;
+        db.execute(Statement::from_string(
+            DbBackend::Sqlite,
+            sql_ext.to_string(),
+        ))
+        .await?;
+
         Ok(db)
     }
 
@@ -180,5 +300,208 @@ mod tests {
         let inner = resp.into_inner();
         assert!(inner.plugins.is_empty());
         assert!(inner.next_page_token.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_install_plugin_empty_uri() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        let req = Request::new(InstallPluginRequest {
+            uri: "".to_string(),
+        });
+
+        let resp = service
+            .install_plugin(req)
+            .await
+            .expect("install_plugin should not fail");
+        let inner = resp.into_inner();
+
+        // Should return InvalidArgument error
+        assert!(inner.status.is_some());
+        let status = inner.status.unwrap();
+        assert_eq!(
+            status.code,
+            sapphillon_core::proto::google::rpc::Code::InvalidArgument as i32
+        );
+        assert!(status.message.contains("required"));
+    }
+
+    #[tokio::test]
+    async fn test_install_plugin_unsupported_scheme() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        let req = Request::new(InstallPluginRequest {
+            uri: "ftp://example.com/author/pkg/1.0.0/package.js".to_string(),
+        });
+
+        let resp = service
+            .install_plugin(req)
+            .await
+            .expect("install_plugin should not fail");
+        let inner = resp.into_inner();
+
+        // Should return InvalidArgument error
+        assert!(inner.status.is_some());
+        let status = inner.status.unwrap();
+        assert_eq!(
+            status.code,
+            sapphillon_core::proto::google::rpc::Code::InvalidArgument as i32
+        );
+        assert!(status.message.contains("unsupported"));
+    }
+
+    #[tokio::test]
+    async fn test_install_plugin_from_file() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        // Create a temporary directory with plugin structure
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
+        let plugin_dir = temp_dir.path().join("test-author/test-pkg/1.0.0");
+        std::fs::create_dir_all(&plugin_dir).expect("failed to create plugin dir");
+
+        let plugin_file = plugin_dir.join("package.js");
+        std::fs::write(&plugin_file, b"console.log('test plugin');")
+            .expect("failed to write plugin");
+
+        // Set ext_plugin_save_dir in global state
+        crate::GLOBAL_STATE
+            .async_set_ext_plugin_save_dir(Some(temp_dir.path().to_string_lossy().to_string()))
+            .await;
+
+        let file_uri = format!("file://{}", plugin_file.to_string_lossy());
+        let req = Request::new(InstallPluginRequest { uri: file_uri });
+
+        let resp = service
+            .install_plugin(req)
+            .await
+            .expect("install_plugin should not fail");
+        let inner = resp.into_inner();
+
+        // Should return OK
+        assert!(inner.status.is_some());
+        let status = inner.status.unwrap();
+        assert_eq!(
+            status.code,
+            sapphillon_core::proto::google::rpc::Code::Ok as i32
+        );
+        assert!(status.message.contains("installed"));
+    }
+
+    #[tokio::test]
+    async fn test_uninstall_plugin_empty_package_id() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        let req = Request::new(UninstallPluginRequest {
+            package_id: "".to_string(),
+        });
+
+        let resp = service
+            .uninstall_plugin(req)
+            .await
+            .expect("uninstall_plugin should not fail");
+        let inner = resp.into_inner();
+
+        // Should return InvalidArgument error
+        assert!(inner.status.is_some());
+        let status = inner.status.unwrap();
+        assert_eq!(
+            status.code,
+            sapphillon_core::proto::google::rpc::Code::InvalidArgument as i32
+        );
+        assert!(status.message.contains("required"));
+    }
+
+    #[tokio::test]
+    async fn test_uninstall_plugin_not_found() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        let req = Request::new(UninstallPluginRequest {
+            package_id: "nonexistent/plugin/1.0.0".to_string(),
+        });
+
+        let resp = service
+            .uninstall_plugin(req)
+            .await
+            .expect("uninstall_plugin should not fail");
+        let inner = resp.into_inner();
+
+        // Should return NotFound error
+        assert!(inner.status.is_some());
+        let status = inner.status.unwrap();
+        assert_eq!(
+            status.code,
+            sapphillon_core::proto::google::rpc::Code::NotFound as i32
+        );
+        assert!(status.message.contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_install_and_uninstall_plugin() {
+        let db = setup_db().await.expect("db setup failed");
+        let service = MyPluginService::new(db);
+
+        // Create a temporary directory for plugins
+        let save_dir = TempDir::new().expect("failed to create save dir");
+        let source_dir = TempDir::new().expect("failed to create source dir");
+
+        // Create plugin source file
+        let plugin_source_dir = source_dir.path().join("myauthor/mypkg/2.0.0");
+        std::fs::create_dir_all(&plugin_source_dir).expect("failed to create source dir");
+        let plugin_file = plugin_source_dir.join("package.js");
+        std::fs::write(&plugin_file, b"console.log('my plugin');").expect("failed to write plugin");
+
+        // Set save directory
+        crate::GLOBAL_STATE
+            .async_set_ext_plugin_save_dir(Some(save_dir.path().to_string_lossy().to_string()))
+            .await;
+
+        // Install the plugin
+        let file_uri = format!("file://{}", plugin_file.to_string_lossy());
+        let install_req = Request::new(InstallPluginRequest {
+            uri: file_uri.clone(),
+        });
+
+        let install_resp = service
+            .install_plugin(install_req)
+            .await
+            .expect("install_plugin should not fail");
+        let install_inner = install_resp.into_inner();
+
+        assert!(install_inner.status.is_some());
+        let install_status = install_inner.status.unwrap();
+        assert_eq!(
+            install_status.code,
+            sapphillon_core::proto::google::rpc::Code::Ok as i32
+        );
+
+        // Verify plugin file was created in save directory
+        let installed_path = save_dir.path().join("myauthor/mypkg/2.0.0/package.js");
+        assert!(installed_path.exists());
+
+        // Uninstall the plugin
+        let uninstall_req = Request::new(UninstallPluginRequest {
+            package_id: "myauthor/mypkg/2.0.0".to_string(),
+        });
+
+        let uninstall_resp = service
+            .uninstall_plugin(uninstall_req)
+            .await
+            .expect("uninstall_plugin should not fail");
+        let uninstall_inner = uninstall_resp.into_inner();
+
+        assert!(uninstall_inner.status.is_some());
+        let uninstall_status = uninstall_inner.status.unwrap();
+        assert_eq!(
+            uninstall_status.code,
+            sapphillon_core::proto::google::rpc::Code::Ok as i32
+        );
+
+        // Verify plugin file was removed
+        assert!(!installed_path.exists());
     }
 }

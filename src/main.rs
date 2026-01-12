@@ -3,13 +3,20 @@
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
 mod args;
+mod dummy_plugin;
+#[allow(unused)]
+mod ext_plugin_manager;
 mod init;
+mod plugin_installer;
 mod server;
 mod services;
 mod workflow;
 
 #[allow(unused)]
 mod global;
+
+#[cfg(test)]
+mod test_support;
 
 /// System Configuration
 #[allow(unused)]
@@ -62,12 +69,15 @@ async fn main() -> Result<()> {
 
     // Check db_url
     info!("Using database URL: {}", args.db_url);
-    if args.db_url == "sqlite:memory:" {
+    if args.db_url == "sqlite:file::memory:?mode=memory&cache=shared" {
         warn!("Using in-memory SQLite database. Data will not be persisted.");
     }
     // Initialize Database Connection
 
     GLOBAL_STATE.async_set_db_url(args.db_url.clone()).await;
+    GLOBAL_STATE
+        .async_set_ext_plugin_save_dir(args.ext_plugin_save_dir.clone())
+        .await;
 
     match args.command {
         Command::Start => {

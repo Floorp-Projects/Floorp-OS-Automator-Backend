@@ -58,12 +58,11 @@ pub async fn delete_model(db: &DatabaseConnection, name: &str) -> Result<bool, D
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sea_orm::{
-        ActiveModelTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement,
-    };
+    use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseConnection, DbBackend, Statement};
 
     async fn setup_db() -> Result<DatabaseConnection, DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         let sql_provider = r#"
             CREATE TABLE provider (
@@ -113,6 +112,7 @@ mod tests {
             display_name: "Demo".to_string(),
             description: Some("desc".to_string()),
             provider_name: "providers/base".to_string(),
+            priority: Some(0),
         };
 
         let stored = create_model(&db, model).await?;
@@ -133,6 +133,7 @@ mod tests {
                 display_name: format!("Model {idx}"),
                 description: Some(format!("desc{idx}")),
                 provider_name: "providers/base".to_string(),
+                priority: Some(0),
             };
             create_model(&db, model).await?;
         }
@@ -142,6 +143,7 @@ mod tests {
             display_name: "Updated".to_string(),
             description: None,
             provider_name: "providers/base".to_string(),
+            priority: Some(0),
         };
         let updated = update_model(&db, update_proto).await?;
         assert!(updated.is_some());

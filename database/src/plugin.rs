@@ -387,12 +387,12 @@ pub async fn init_register_plugins(
 mod tests {
     use super::*;
     use sea_orm::{
-        ActiveModelTrait, ConnectionTrait, Database, DatabaseConnection, DbBackend, EntityTrait,
-        Statement,
+        ActiveModelTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait, Statement,
     };
 
     async fn setup_db() -> Result<DatabaseConnection, sea_orm::DbErr> {
-        let db = Database::connect("sqlite::memory:").await?;
+        let state = crate::global_state_for_tests!();
+        let db = state.get_db_connection().await?;
 
         // plugin_package table
         let sql_pkg = r#"
@@ -542,7 +542,8 @@ mod tests {
     #[tokio::test]
     async fn test_init_register_plugins_registers_data_once() -> Result<(), sea_orm::DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
-            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+            FunctionDefine, Permission, PermissionLevel, PermissionType, PluginFunction,
+            PluginPackage,
         };
 
         let db = setup_db().await?;
@@ -558,15 +559,19 @@ mod tests {
         let function_proto = PluginFunction {
             function_id: "pkg.fn".to_string(),
             function_name: "Fn".to_string(),
+            version: "".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
-            arguments: String::new(),
-            returns: String::new(),
+            function_define: Some(FunctionDefine {
+                parameters: vec![],
+                returns: vec![],
+            }),
         };
 
         let package_proto = PluginPackage {
             package_id: "pkg".to_string(),
             package_name: "Pkg".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.0.0".to_string(),
             description: "Example package".to_string(),
             functions: vec![function_proto],
@@ -642,7 +647,8 @@ mod tests {
     #[tokio::test]
     async fn test_init_register_plugins_updates_on_diff() -> Result<(), sea_orm::DbErr> {
         use sapphillon_core::proto::sapphillon::v1::{
-            Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+            FunctionDefine, Permission, PermissionLevel, PermissionType, PluginFunction,
+            PluginPackage,
         };
 
         let db = setup_db().await?;
@@ -659,15 +665,19 @@ mod tests {
         let function_proto_initial = PluginFunction {
             function_id: "pkg.fn".to_string(),
             function_name: "Fn".to_string(),
+            version: "".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
-            arguments: String::new(),
-            returns: String::new(),
+            function_define: Some(FunctionDefine {
+                parameters: vec![],
+                returns: vec![],
+            }),
         };
 
         let package_proto_initial = PluginPackage {
             package_id: "pkg".to_string(),
             package_name: "Pkg".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.0.0".to_string(),
             description: "Example package".to_string(),
             functions: vec![function_proto_initial.clone()],

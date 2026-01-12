@@ -14,5 +14,5 @@ log.workspace = true
 deno_core.workspace = true
 deno_error.workspace = true
 sapphillon_core.workspace = true
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.34", features = ["bundled"] }
 serde_json.workspace = true

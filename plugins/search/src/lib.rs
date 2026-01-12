@@ -12,13 +12,15 @@
 
 use deno_core::{op2, OpState};
 use deno_error::JsErrorBox;
-use sapphillon_core::permission::{check_permission, CheckPermissionResult};
+use sapphillon_core::permission::{check_permission, CheckPermissionResult, Permissions};
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 use sapphillon_core::proto::sapphillon::v1::{
-    Permission, PermissionLevel, PermissionType, PluginFunction, PluginPackage,
+    FunctionDefine, FunctionParameter, Permission, PermissionLevel, PermissionType, PluginFunction,
+    PluginPackage,
 };
 use sapphillon_core::runtime::OpStateWorkflowData;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::OnceLock;
+use std::sync::{Arc, Mutex};
 
 // Platform-specific modules
 #[cfg(target_os = "windows")]
@@ -76,11 +78,29 @@ pub fn search_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.search.file".to_string(),
         function_name: "search.file".to_string(),
+        version: "".to_string(),
         description: "Searches for files on the local filesystem using native OS search APIs."
             .to_string(),
         permissions: search_plugin_permissions(),
-        arguments: "String: root_path, String: query".to_string(),
-        returns: "String: (JSON) list of file paths".to_string(),
+        function_define: Some(FunctionDefine {
+            parameters: vec![
+                FunctionParameter {
+                    name: "root_path".to_string(),
+                    r#type: "string".to_string(),
+                    description: "Root directory to search".to_string(),
+                },
+                FunctionParameter {
+                    name: "query".to_string(),
+                    r#type: "string".to_string(),
+                    description: "Search query".to_string(),
+                },
+            ],
+            returns: vec![FunctionParameter {
+                name: "results".to_string(),
+                r#type: "string".to_string(),
+                description: "JSON array of file paths".to_string(),
+            }],
+        }),
     }
 }
 
@@ -88,6 +108,7 @@ pub fn search_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.search".to_string(),
         package_name: "Search".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to search for files on the local filesystem using native OS search APIs (Windows Search/Everything, macOS Spotlight, Linux Tracker/Baloo).".to_string(),
         functions: vec![search_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -128,39 +149,6 @@ fn search_plugin_permissions() -> Vec<Permission> {
     }]
 }
 
-fn permission_check_search(state: &mut OpState) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = data.get_allowed_permissions().clone().unwrap_or_default();
-
-    let required_permissions = sapphillon_core::permission::Permissions {
-        permissions: search_plugin_permissions(),
-    };
-
-    let allowed_permissions = {
-        allowed
-            .into_iter()
-            .find(|p| {
-                p.plugin_function_id == search_plugin_function().function_id
-                    || p.plugin_function_id == "*"
-            })
-            .map(|p| p.permissions)
-            .unwrap_or_else(|| sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            })
-    };
-
-    match check_permission(&allowed_permissions, &required_permissions) {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
-
 /// Core search logic using the best available searcher.
 fn search_file_logic(root_path: String, query: String) -> Result<String, JsErrorBox> {
     let searcher = get_searcher();
@@ -175,8 +163,52 @@ fn op2_search_file(
     #[string] root_path: String,
     #[string] query: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    permission_check_search(state)?;
+    ensure_permission(
+        state,
+        &search_plugin_function().function_id,
+        search_plugin_permissions(),
+        &root_path,
+    )?;
     search_file_logic(root_path, query)
+}
+
+fn ensure_permission(
+    state: &mut OpState,
+    plugin_function_id: &str,
+    required_permissions: Vec<Permission>,
+    resource: &str,
+) -> Result<(), JsErrorBox> {
+    let data = state
+        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
+        .lock()
+        .unwrap();
+    let allowed = data.get_allowed_permissions().clone().unwrap_or_default();
+
+    let required_permissions = Permissions::new(
+        required_permissions
+            .into_iter()
+            .map(|mut p| {
+                if !resource.is_empty() && p.resource.is_empty() {
+                    p.resource = vec![resource.to_string()];
+                }
+                p
+            })
+            .collect(),
+    );
+
+    let allowed_permissions = allowed
+        .into_iter()
+        .find(|p| p.plugin_function_id == plugin_function_id || p.plugin_function_id == "*")
+        .map(|p| p.permissions)
+        .unwrap_or_else(|| Permissions::new(vec![]));
+
+    match check_permission(&allowed_permissions, &required_permissions) {
+        CheckPermissionResult::Ok => Ok(()),
+        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
+            "PermissionDenied. Missing Permissions:",
+            perm.to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@
 
 pub mod prelude;
 
+pub mod ext_plugin_package;
 pub mod model;
 pub mod permission;
 pub mod plugin_function;

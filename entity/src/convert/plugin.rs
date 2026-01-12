@@ -9,9 +9,12 @@ use crate::entity::permission::Model as EntityPermission;
 use crate::entity::plugin_function::Model as EntityPluginFunction;
 use crate::entity::plugin_package::Model as EntityPluginPackage;
 
+use sapphillon_core::proto::sapphillon::v1::FunctionDefine;
+use sapphillon_core::proto::sapphillon::v1::FunctionParameter;
 use sapphillon_core::proto::sapphillon::v1::Permission as ProtoPermission;
 use sapphillon_core::proto::sapphillon::v1::PluginFunction as ProtoPluginFunction;
 use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
+use serde::{Deserialize, Serialize};
 
 /// Convert an entity `plugin_package::Model` into the proto `PluginPackage`.
 /// This does not attach related `functions` by default; use the "with_relations"
@@ -36,6 +39,7 @@ pub fn plugin_package_to_proto(entity: &EntityPluginPackage) -> ProtoPluginPacka
     ProtoPluginPackage {
         package_id: entity.package_id.clone(),
         package_name: entity.package_name.clone(),
+        provider_id: "".to_string(),
         package_version: entity.package_version.clone(),
         description: entity.description.clone().unwrap_or_default(),
         functions: Vec::new(),
@@ -67,16 +71,15 @@ pub fn plugin_function_to_proto(
     entity: &EntityPluginFunction,
     permissions: Option<&[ProtoPermission]>,
 ) -> ProtoPluginFunction {
-    let args = entity.arguments.clone().unwrap_or_default();
-    let ret = entity.returns.clone().unwrap_or_default();
+    let function_define = parse_function_define_from_entity(entity);
 
     let mut p = ProtoPluginFunction {
         function_id: entity.function_id.clone(),
         function_name: entity.function_name.clone(),
+        version: "".to_string(),
         description: entity.description.clone().unwrap_or_default(),
         permissions: Vec::new(),
-        arguments: args,
-        returns: ret,
+        function_define,
     };
 
     if let Some(perms) = permissions {
@@ -84,6 +87,52 @@ pub fn plugin_function_to_proto(
     }
 
     p
+}
+
+fn parse_function_define_from_entity(entity: &EntityPluginFunction) -> Option<FunctionDefine> {
+    let parameters = entity
+        .arguments
+        .as_deref()
+        .and_then(parse_params_json)
+        .unwrap_or_default();
+
+    let returns = entity
+        .returns
+        .as_deref()
+        .and_then(parse_params_json)
+        .unwrap_or_default();
+
+    if parameters.is_empty() && returns.is_empty() {
+        None
+    } else {
+        Some(FunctionDefine {
+            parameters,
+            returns,
+        })
+    }
+}
+
+fn parse_params_json(raw: &str) -> Option<Vec<FunctionParameter>> {
+    serde_json::from_str::<Vec<FunctionParameterSerde>>(raw)
+        .ok()
+        .map(|params| params.into_iter().map(FunctionParameter::from).collect())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FunctionParameterSerde {
+    name: String,
+    r#type: String,
+    description: String,
+}
+
+impl From<FunctionParameterSerde> for FunctionParameter {
+    fn from(value: FunctionParameterSerde) -> Self {
+        FunctionParameter {
+            name: value.name,
+            r#type: value.r#type,
+            description: value.description,
+        }
+    }
 }
 
 /// Convert an entity `permission::Model` into the proto `Permission` message.
@@ -144,8 +193,22 @@ mod tests {
             package_id: "pkg1".to_string(),
             function_name: "Fn".to_string(),
             description: Some("do it".to_string()),
-            arguments: Some("{}".to_string()),
-            returns: Some("{}".to_string()),
+            arguments: Some(
+                serde_json::to_string(&vec![FunctionParameterSerde {
+                    name: "path".to_string(),
+                    r#type: "string".to_string(),
+                    description: "file path".to_string(),
+                }])
+                .unwrap(),
+            ),
+            returns: Some(
+                serde_json::to_string(&vec![FunctionParameterSerde {
+                    name: "result".to_string(),
+                    r#type: "string".to_string(),
+                    description: "result".to_string(),
+                }])
+                .unwrap(),
+            ),
         };
 
         let perm_entity = EntityPermission {
@@ -165,6 +228,9 @@ mod tests {
         let proto_fn = plugin_function_to_proto(&f, Some(std::slice::from_ref(&proto_perm)));
         assert_eq!(proto_fn.function_id, f.function_id);
         assert_eq!(proto_fn.permissions.len(), 1);
+        let fd = proto_fn.function_define.unwrap();
+        assert_eq!(fd.parameters.len(), 1);
+        assert_eq!(fd.returns.len(), 1);
     }
 
     #[test]
@@ -172,6 +238,7 @@ mod tests {
         let proto = ProtoPluginPackage {
             package_id: "pkg1".to_string(),
             package_name: "Plugin".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.2.3".to_string(),
             description: "Best plugin".to_string(),
             functions: Vec::new(),

@@ -14,3 +14,9 @@ This section documents the project's common Makefile targets and their purpose.
 - `entity_generate`: Generate SeaORM entity code from the configured database into `./entity/src/entity`.
 
 If you need to run a sequence of tasks (for example create the DB, run migrations, and generate entities), run the targets in order: `make gen_empty_db && make migrate && make entity_generate`.
+
+## Permissions System
+
+### Wildcard Permission
+
+The permission system supports a wildcard `plugin_function_id` of `*`. When a workflow is granted a permission with this `plugin_function_id`, it is allowed to bypass all permission checks for all plugins. This is useful for testing and for workflows that are trusted to have full access to the system.

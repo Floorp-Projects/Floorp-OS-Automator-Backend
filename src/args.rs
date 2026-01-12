@@ -13,8 +13,12 @@ pub struct Args {
     pub loglevel: LogLevel,
 
     /// SQLite Database URL
-    #[arg(long, default_value_t = String::from("sqlite::memory:"))]
+    #[arg(long, default_value_t = String::from("sqlite:file::memory:?mode=memory&cache=shared"))]
     pub db_url: String,
+
+    /// Directory to save external plugin files. If not set, uses system temp directory.
+    #[arg(long)]
+    pub ext_plugin_save_dir: Option<String>,
 
     #[command(subcommand)]
     pub command: Command,
