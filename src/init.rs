@@ -173,7 +173,7 @@ async fn sync_ext_plugins() -> Result<()> {
     let db = GLOBAL_STATE.get_db_connection().await?;
     let save_dir = GLOBAL_STATE.get_ext_plugin_save_dir().await;
 
-    info!("Syncing external plugins from directory: {}", save_dir);
+    info!("Syncing external plugins from directory: {save_dir}");
 
     // 1. Get all registered plugins from DB
     let db_plugins = list_ext_plugin_packages(&db).await?;
@@ -213,16 +213,15 @@ async fn sync_ext_plugins() -> Result<()> {
             .iter()
             .any(|p| &p.plugin_package_id == fs_plugin_id)
         {
-            let install_dir = format!("{}/{}", save_dir, fs_plugin_id);
+            let install_dir = format!("{save_dir}/{fs_plugin_id}");
             create_ext_plugin_package(&db, fs_plugin_id.clone(), install_dir).await?;
-            info!("Registered new external plugin: {}", fs_plugin_id);
+            info!("Registered new external plugin: {fs_plugin_id}");
             new_count += 1;
         }
     }
 
     info!(
-        "External plugin sync complete: {} synced, {} new, {} missing",
-        synced_count, new_count, missing_count
+        "External plugin sync complete: {synced_count} synced, {new_count} new, {missing_count} missing"
     );
 
     Ok(())

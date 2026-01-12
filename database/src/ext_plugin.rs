@@ -95,8 +95,7 @@ pub async fn mark_ext_plugin_missing(
             active_model.update(db).await
         }
         None => Err(DbErr::RecordNotFound(format!(
-            "External plugin package not found: {}",
-            plugin_package_id
+            "External plugin package not found: {plugin_package_id}"
         ))),
     }
 }

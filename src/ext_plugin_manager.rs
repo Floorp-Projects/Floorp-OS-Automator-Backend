@@ -41,35 +41,34 @@ pub async fn install_ext_plugin(
 ) -> Result<String> {
     use database::ext_plugin::{create_ext_plugin_package, get_ext_plugin_package};
 
-    let plugin_package_id = format!("{}/{}/{}", author_id, package_id, version);
-    let install_dir = format!("{}/{}/{}/{}", save_dir, author_id, package_id, version);
-    let package_js_path = format!("{}/package.js", install_dir);
+    let plugin_package_id = format!("{author_id}/{package_id}/{version}");
+    let install_dir = format!("{save_dir}/{author_id}/{package_id}/{version}");
+    let package_js_path = format!("{install_dir}/package.js");
 
     // Check if plugin already exists
     let existing = get_ext_plugin_package(db, &plugin_package_id).await?;
     if existing.is_some() {
-        anyhow::bail!("External plugin already installed: {}", plugin_package_id);
+        anyhow::bail!("External plugin already installed: {plugin_package_id}");
     }
 
     // Create directory structure
     fs::create_dir_all(&install_dir)
-        .with_context(|| format!("Failed to create plugin directory: {}", install_dir))?;
+        .with_context(|| format!("Failed to create plugin directory: {install_dir}"))?;
 
     // Write package.js file
     fs::write(&package_js_path, package_js_content)
-        .with_context(|| format!("Failed to write package.js: {}", package_js_path))?;
+        .with_context(|| format!("Failed to write package.js: {package_js_path}"))?;
 
     // Register in database
     create_ext_plugin_package(db, plugin_package_id.clone(), install_dir)
         .await
         .with_context(|| {
             format!(
-                "Failed to register plugin in database: {}",
-                plugin_package_id
+                "Failed to register plugin in database: {plugin_package_id}"
             )
         })?;
 
-    log::info!("Installed external plugin: {}", plugin_package_id);
+    log::info!("Installed external plugin: {plugin_package_id}");
 
     Ok(plugin_package_id)
 }
@@ -92,7 +91,7 @@ pub async fn uninstall_ext_plugin(db: &DatabaseConnection, plugin_package_id: &s
     // Get the plugin record
     let plugin = get_ext_plugin_package(db, plugin_package_id)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("Plugin not found: {}", plugin_package_id))?;
+        .ok_or_else(|| anyhow::anyhow!("Plugin not found: {plugin_package_id}"))?;
 
     // Remove files from filesystem
     let install_path = Path::new(&plugin.install_dir);
@@ -110,12 +109,11 @@ pub async fn uninstall_ext_plugin(db: &DatabaseConnection, plugin_package_id: &s
         .await
         .with_context(|| {
             format!(
-                "Failed to delete plugin from database: {}",
-                plugin_package_id
+                "Failed to delete plugin from database: {plugin_package_id}"
             )
         })?;
 
-    log::info!("Uninstalled external plugin: {}", plugin_package_id);
+    log::info!("Uninstalled external plugin: {plugin_package_id}");
 
     Ok(())
 }
@@ -166,7 +164,7 @@ pub fn scan_ext_plugin_dir(save_dir: &str) -> Result<HashSet<String>> {
 
     // Traverse: author-id/package-id/ver/package.js
     for author_entry in fs::read_dir(base_path)
-        .with_context(|| format!("Failed to read directory: {}", save_dir))?
+        .with_context(|| format!("Failed to read directory: {save_dir}"))?
     {
         let author_entry = author_entry?;
         if !author_entry.file_type()?.is_dir() {
@@ -191,7 +189,7 @@ pub fn scan_ext_plugin_dir(save_dir: &str) -> Result<HashSet<String>> {
                 // Check if package.js exists
                 let package_js = version_entry.path().join("package.js");
                 if package_js.exists() {
-                    let plugin_id = format!("{}/{}/{}", author_id, package_id, version);
+                    let plugin_id = format!("{author_id}/{package_id}/{version}");
                     plugin_ids.insert(plugin_id);
                 }
             }

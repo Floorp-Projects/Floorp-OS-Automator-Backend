@@ -112,7 +112,7 @@ impl PluginService for MyPluginService {
                 }))
             }
             Err(e) => {
-                error!("failed to install plugin: {}", e);
+                error!("failed to install plugin: {e}");
                 let code = match &e {
                     InstallError::EmptyUri
                     | InstallError::UnsupportedScheme(_)
@@ -167,7 +167,7 @@ impl PluginService for MyPluginService {
                 }))
             }
             Err(e) => {
-                error!("failed to uninstall plugin: {}", e);
+                error!("failed to uninstall plugin: {e}");
                 let code = if e.to_string().contains("not found") {
                     RpcCode::NotFound
                 } else {

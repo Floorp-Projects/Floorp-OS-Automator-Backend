@@ -146,7 +146,7 @@ pub async fn fetch_plugin_content(uri: &str) -> Result<Vec<u8>, InstallError> {
         UriScheme::File => {
             let file_path = Path::new(path);
             std::fs::read(file_path)
-                .map_err(|e| InstallError::FileReadFailed(format!("{}: {}", path, e)))
+                .map_err(|e| InstallError::FileReadFailed(format!("{path}: {e}")))
         }
     }
 }
