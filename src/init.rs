@@ -20,6 +20,9 @@ pub async fn initialize_system(args: &Args) -> Result<()> {
     // Register Initial Plugins
     register_initial_plugins().await?;
 
+    // Sync External Plugins with filesystem
+    sync_ext_plugins().await?;
+
     // Register Initial Workflows
     register_initial_workflows().await?;
 
@@ -152,6 +155,75 @@ async fn register_initial_plugins() -> Result<()> {
     let plugin_packages = crate::sysconfig::sysconfig().initial_plugins;
 
     init_register_plugins(&database_connection, plugin_packages).await?;
+
+    Ok(())
+}
+
+/// Synchronizes external plugins between the filesystem and database.
+///
+/// - Plugins on filesystem but not in DB are registered
+/// - Plugins in DB but not on filesystem are marked as `missing`
+/// - Plugins in both locations have their `missing` flag cleared
+async fn sync_ext_plugins() -> Result<()> {
+    use crate::ext_plugin_manager::scan_ext_plugin_dir;
+    use database::ext_plugin::{
+        create_ext_plugin_package, list_ext_plugin_packages, mark_ext_plugin_missing,
+    };
+
+    let db = GLOBAL_STATE.get_db_connection().await?;
+    let save_dir = GLOBAL_STATE.get_ext_plugin_save_dir().await;
+
+    info!("Syncing external plugins from directory: {}", save_dir);
+
+    // 1. Get all registered plugins from DB
+    let db_plugins = list_ext_plugin_packages(&db).await?;
+
+    // 2. Scan filesystem for installed plugins
+    let fs_plugins = scan_ext_plugin_dir(&save_dir)?;
+
+    let mut synced_count = 0;
+    let mut new_count = 0;
+    let mut missing_count = 0;
+
+    // 3. Check each DB plugin against filesystem
+    for db_plugin in &db_plugins {
+        if fs_plugins.contains(&db_plugin.plugin_package_id) {
+            // Plugin exists on filesystem - ensure not marked as missing
+            if db_plugin.missing {
+                mark_ext_plugin_missing(&db, &db_plugin.plugin_package_id, false).await?;
+                info!("External plugin recovered: {}", db_plugin.plugin_package_id);
+            }
+            synced_count += 1;
+        } else {
+            // Plugin missing from filesystem
+            if !db_plugin.missing {
+                mark_ext_plugin_missing(&db, &db_plugin.plugin_package_id, true).await?;
+                warn!(
+                    "External plugin missing from filesystem: {}",
+                    db_plugin.plugin_package_id
+                );
+            }
+            missing_count += 1;
+        }
+    }
+
+    // 4. Register new plugins found on filesystem but not in DB
+    for fs_plugin_id in &fs_plugins {
+        if !db_plugins
+            .iter()
+            .any(|p| &p.plugin_package_id == fs_plugin_id)
+        {
+            let install_dir = format!("{}/{}", save_dir, fs_plugin_id);
+            create_ext_plugin_package(&db, fs_plugin_id.clone(), install_dir).await?;
+            info!("Registered new external plugin: {}", fs_plugin_id);
+            new_count += 1;
+        }
+    }
+
+    info!(
+        "External plugin sync complete: {} synced, {} new, {} missing",
+        synced_count, new_count, missing_count
+    );
 
     Ok(())
 }

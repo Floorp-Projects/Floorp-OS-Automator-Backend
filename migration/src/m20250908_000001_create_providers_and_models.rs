@@ -1,3 +1,148 @@
+// Sapphillon
+// SPDX-FileCopyrightText: 2025 Yuta Takahashi
+// SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
+
+/*
+-- plugin_package
+CREATE TABLE plugin_package (
+    package_id TEXT NOT NULL PRIMARY KEY,
+    package_name TEXT,
+    package_version TEXT,
+    description TEXT,
+    plugin_store_url TEXT,
+    internal_plugin BOOLEAN NOT NULL DEFAULT FALSE,
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    deprecated BOOLEAN NOT NULL DEFAULT FALSE,
+    installed_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    provider_id TEXT
+);
+
+-- plugin_function
+CREATE TABLE plugin_function (
+    function_id TEXT NOT NULL,
+    package_id TEXT NOT NULL,
+    function_name TEXT,
+    description TEXT,
+    arguments TEXT,
+    returns TEXT,
+    function_define TEXT,
+    version TEXT,
+    PRIMARY KEY (package_id, function_id),
+    FOREIGN KEY (package_id) REFERENCES plugin_package(package_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_plugin_function_function_id_unique ON plugin_function(function_id);
+
+-- plugin_function_permission
+CREATE TABLE plugin_function_permission (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    plugin_function_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL, -- Note: Defined as String in Rust, references Permission(Id) which is Integer
+    FOREIGN KEY (plugin_function_id) REFERENCES plugin_function(function_id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permission(id) ON DELETE CASCADE
+);
+
+-- permission
+CREATE TABLE permission (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    plugin_function_id TEXT NOT NULL,
+    display_name TEXT,
+    description TEXT,
+    type INTEGER NOT NULL,
+    resource_json TEXT,
+    level INTEGER,
+    FOREIGN KEY (plugin_function_id) REFERENCES plugin_function(function_id) ON DELETE CASCADE
+);
+
+-- provider
+CREATE TABLE provider (
+    name TEXT NOT NULL PRIMARY KEY,
+    display_name TEXT,
+    api_key TEXT,
+    api_endpoint TEXT
+);
+
+-- model
+CREATE TABLE model (
+    name TEXT NOT NULL PRIMARY KEY,
+    display_name TEXT,
+    description TEXT,
+    provider_name TEXT NOT NULL,
+    FOREIGN KEY (provider_name) REFERENCES provider(name) ON DELETE CASCADE
+);
+
+-- workflow
+CREATE TABLE workflow (
+    id TEXT NOT NULL PRIMARY KEY,
+    display_name TEXT,
+    description TEXT,
+    workflow_language INTEGER NOT NULL,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- workflow_code
+CREATE TABLE workflow_code (
+    id TEXT NOT NULL PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    code_revision INTEGER NOT NULL,
+    code TEXT NOT NULL,
+    language INTEGER NOT NULL,
+    created_at TIMESTAMP,
+    FOREIGN KEY (workflow_id) REFERENCES workflow(id) ON DELETE CASCADE
+);
+
+-- workflow_result
+CREATE TABLE workflow_result (
+    id TEXT NOT NULL PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    workflow_code_id TEXT NOT NULL,
+    display_name TEXT,
+    description TEXT,
+    result TEXT,
+    ran_at TIMESTAMP,
+    result_type INTEGER NOT NULL,
+    exit_code INTEGER,
+    workflow_result_revision INTEGER NOT NULL,
+    FOREIGN KEY (workflow_id) REFERENCES workflow(id) ON DELETE CASCADE,
+    FOREIGN KEY (workflow_code_id) REFERENCES workflow_code(id) ON DELETE CASCADE
+);
+
+-- workflow_code_plugin_package
+CREATE TABLE workflow_code_plugin_package (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    workflow_code_id TEXT NOT NULL,
+    plugin_package_id TEXT NOT NULL,
+    FOREIGN KEY (workflow_code_id) REFERENCES workflow_code(id) ON DELETE CASCADE,
+    FOREIGN KEY (plugin_package_id) REFERENCES plugin_package(package_id) ON DELETE CASCADE
+);
+
+-- workflow_code_plugin_function
+CREATE TABLE workflow_code_plugin_function (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    workflow_code_id TEXT NOT NULL,
+    plugin_function_id TEXT NOT NULL,
+    FOREIGN KEY (workflow_code_id) REFERENCES workflow_code(id) ON DELETE CASCADE,
+    FOREIGN KEY (plugin_function_id) REFERENCES plugin_function(function_id) ON DELETE CASCADE
+);
+
+-- workflow_code_allowed_permission
+CREATE TABLE workflow_code_allowed_permission (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    workflow_code_id TEXT NOT NULL,
+    permission_id INTEGER NOT NULL,
+    FOREIGN KEY (workflow_code_id) REFERENCES workflow_code(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permission(id) ON DELETE CASCADE
+);
+
+-- ext_plugin_package
+-- Tracks externally installed plugin packages from the filesystem.
+CREATE TABLE ext_plugin_package (
+    plugin_package_id TEXT NOT NULL PRIMARY KEY,
+    install_dir TEXT NOT NULL,
+    missing BOOLEAN NOT NULL DEFAULT FALSE
+);
+*/
 use sea_orm_migration::{prelude::*, schema::*};
 
 #[derive(DeriveMigrationName)]
@@ -49,6 +194,7 @@ impl MigrationTrait for Migration {
                             .null(),
                     )
                     .col(ColumnDef::new(PluginPackage::UpdatedAt).timestamp().null())
+                    .col(ColumnDef::new(PluginPackage::ProviderId).string().null())
                     .to_owned(),
             )
             .await?;
@@ -71,8 +217,13 @@ impl MigrationTrait for Migration {
                     .col(string(PluginFunction::FunctionName))
                     .col(ColumnDef::new(PluginFunction::Description).string().null())
                     // Separate ID with colons (SQLite does not support for array)
+                    // arguments and returns are reserved for backward compatibility
                     .col(ColumnDef::new(PluginFunction::Arguments).text().null())
                     .col(ColumnDef::new(PluginFunction::Returns).text().null())
+                    // JSDoc-style function definition with parameters and return value (JSON)
+                    .col(ColumnDef::new(PluginFunction::FunctionDefine).text().null())
+                    // Version of the function (e.g., "1.0.0")
+                    .col(ColumnDef::new(PluginFunction::Version).string().null())
                     .primary_key(
                         Index::create()
                             .col(PluginFunction::PackageId)
@@ -462,10 +613,41 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
+            .await?;
+
+        // External Plugin Package table
+        manager
+            .create_table(
+                Table::create()
+                    .table(ExtPluginPackage::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(ExtPluginPackage::PluginPackageId)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(ExtPluginPackage::InstallDir)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ExtPluginPackage::Missing)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(ExtPluginPackage::Table).to_owned())
+            .await?;
+
         manager
             .drop_table(
                 Table::drop()
@@ -578,6 +760,7 @@ enum PluginPackage {
     Deprecated,
     InstalledAt,
     UpdatedAt,
+    ProviderId,
 }
 
 #[derive(DeriveIden)]
@@ -589,6 +772,8 @@ enum PluginFunction {
     Description,
     Arguments,
     Returns,
+    FunctionDefine,
+    Version,
 }
 
 #[derive(DeriveIden)]
@@ -662,4 +847,13 @@ enum WorkflowCodeAllowedPermission {
     Id,
     WorkflowCodeId,
     PermissionId,
+}
+
+// ------ External Plugin Related Tables -------
+#[derive(DeriveIden)]
+enum ExtPluginPackage {
+    Table,
+    PluginPackageId,
+    InstallDir,
+    Missing,
 }

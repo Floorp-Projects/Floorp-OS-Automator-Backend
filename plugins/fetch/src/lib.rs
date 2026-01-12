@@ -18,6 +18,7 @@ pub fn post_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.fetch.post".to_string(),
         function_name: "Post".to_string(),
+        version: "".to_string(),
         description: "Posts the content of a URL using reqwest and returns it as a string."
             .to_string(),
         permissions: fetch_plugin_permissions(),
@@ -47,6 +48,7 @@ pub fn fetch_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.fetch.fetch".to_string(),
         function_name: "Fetch".to_string(),
+        version: "".to_string(),
         description: "Fetches the content of a URL using reqwest and returns it as a string."
             .to_string(),
         permissions: fetch_plugin_permissions(),
@@ -69,6 +71,7 @@ pub fn fetch_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.fetch".to_string(),
         package_name: "Fetch".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to fetch the content of a URL.".to_string(),
         functions: vec![fetch_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -244,8 +247,9 @@ mod tests {
         println!("Posted content: {body}");
     }
 
-    #[test]
-    fn test_permission_error() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_error() {
         let code = r#"
             const url = "https://dummyjson.com/test";
             const response = app.sapphillon.core.fetch.fetch(url);
@@ -271,13 +275,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             vec![],
             allowed_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let actual = &workflow.result[0].result;
@@ -287,8 +291,9 @@ mod tests {
             "Unexpected workflow result: {actual}"
         );
     }
-    #[test]
-    fn test_fetch_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_fetch_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/test";
             const response = app.sapphillon.core.fetch.fetch(url);
@@ -314,13 +319,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let expected = fetch(&url).unwrap() + "\n";
@@ -330,8 +335,9 @@ mod tests {
         assert!(actual == &expected, "Unexpected workflow result: {actual}");
     }
 
-    #[test]
-    fn test_post_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_post_in_workflow() {
         let code = r#"
             const url = "https://dummyjson.com/products/add";
             const response = app.sapphillon.core.fetch.post(url, '{"title":"test"}');
@@ -357,13 +363,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_fetch_plugin_package()],
+            vec![Arc::new(core_fetch_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
 
         let expected = post(&url, r#"{"title":"test"}"#).unwrap() + "\n";

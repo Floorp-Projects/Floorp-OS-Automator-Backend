@@ -301,6 +301,7 @@ mod tests {
         let proto = ProtoPluginPackage {
             package_id: "pkg1".to_string(),
             package_name: "Plugin".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.2.3".to_string(),
             description: "Best plugin".to_string(),
             functions: Vec::new(),
@@ -352,6 +353,7 @@ mod tests {
         let proto = ProtoPluginFunction {
             function_id: "pkg.fn".to_string(),
             function_name: "Fn".to_string(),
+            version: "".to_string(),
             description: "do it".to_string(),
             permissions: Vec::new(),
             function_define: Some(FunctionDefine {

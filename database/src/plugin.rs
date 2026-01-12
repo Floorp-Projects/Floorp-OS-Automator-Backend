@@ -559,6 +559,7 @@ mod tests {
         let function_proto = PluginFunction {
             function_id: "pkg.fn".to_string(),
             function_name: "Fn".to_string(),
+            version: "".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
             function_define: Some(FunctionDefine {
@@ -570,6 +571,7 @@ mod tests {
         let package_proto = PluginPackage {
             package_id: "pkg".to_string(),
             package_name: "Pkg".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.0.0".to_string(),
             description: "Example package".to_string(),
             functions: vec![function_proto],
@@ -663,6 +665,7 @@ mod tests {
         let function_proto_initial = PluginFunction {
             function_id: "pkg.fn".to_string(),
             function_name: "Fn".to_string(),
+            version: "".to_string(),
             description: "Example function".to_string(),
             permissions: vec![permission_proto.clone()],
             function_define: Some(FunctionDefine {
@@ -674,6 +677,7 @@ mod tests {
         let package_proto_initial = PluginPackage {
             package_id: "pkg".to_string(),
             package_name: "Pkg".to_string(),
+            provider_id: "".to_string(),
             package_version: "1.0.0".to_string(),
             description: "Example package".to_string(),
             functions: vec![function_proto_initial.clone()],

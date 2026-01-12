@@ -4,7 +4,10 @@
 
 mod args;
 mod dummy_plugin;
+#[allow(unused)]
+mod ext_plugin_manager;
 mod init;
+mod plugin_installer;
 mod server;
 mod services;
 mod workflow;
@@ -72,6 +75,9 @@ async fn main() -> Result<()> {
     // Initialize Database Connection
 
     GLOBAL_STATE.async_set_db_url(args.db_url.clone()).await;
+    GLOBAL_STATE
+        .async_set_ext_plugin_save_dir(args.ext_plugin_save_dir.clone())
+        .await;
 
     match args.command {
         Command::Start => {

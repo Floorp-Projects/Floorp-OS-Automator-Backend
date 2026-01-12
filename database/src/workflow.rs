@@ -853,11 +853,13 @@ mod tests {
                 plugin_packages: vec![ProtoPluginPackage {
                     package_id: "pkg1".to_string(),
                     package_name: "Demo Package".to_string(),
+                    provider_id: "".to_string(),
                     package_version: "1.0.0".to_string(),
                     description: "Plugin description".to_string(),
                     functions: vec![PluginFunction {
                         function_id: "pkg.fn".to_string(),
                         function_name: "Fn".to_string(),
+                        version: "".to_string(),
                         description: "Run function".to_string(),
                         permissions: Vec::new(),
                         function_define: Some(FunctionDefine {

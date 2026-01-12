@@ -463,6 +463,7 @@ mod tests {
                 display_name: "Sample Model".to_string(),
                 description: Some("desc".to_string()),
                 provider_name: "providers/test".to_string(),
+                priority: Some(0),
             }),
         });
 
@@ -510,6 +511,7 @@ mod tests {
                 display_name: "Initial".to_string(),
                 description: Some("detail".to_string()),
                 provider_name: "providers/base".to_string(),
+                priority: Some(0),
             }),
         });
 
@@ -526,6 +528,7 @@ mod tests {
                 display_name: "Updated".to_string(),
                 description: None,
                 provider_name: "providers/base".to_string(),
+                priority: Some(0),
             }),
             update_mask: Some(FieldMask {
                 paths: vec!["display_name".to_string(), "description".to_string()],
@@ -576,6 +579,7 @@ mod tests {
                 display_name: "ToDelete".to_string(),
                 description: None,
                 provider_name: "providers/main".to_string(),
+                priority: Some(0),
             }),
         });
 
@@ -622,6 +626,7 @@ mod tests {
                     display_name: "Invalid".to_string(),
                     description: None,
                     provider_name: "providers/missing".to_string(),
+                    priority: Some(0),
                 }),
             }))
             .await

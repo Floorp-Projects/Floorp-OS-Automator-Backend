@@ -105,10 +105,13 @@ jobs:
             extension: ""
             runner: ubuntu-latest
             cross: true
-          - target: x86_64-pc-windows-msvc
-            extension: ".exe"
-            runner: windows-latest
-            cross: false
+            
+          # TODO Re-enable Windows support
+          # - target: x86_64-pc-windows-msvc
+          #   extension: ".exe"
+          #   runner: windows-latest
+          #   cross: false
+          
           - target: aarch64-unknown-linux-gnu
             extension: ""
             runner: ubuntu-latest
@@ -137,12 +140,25 @@ jobs:
       - name: Install Dependencies on Windows
         if: runner.os == 'Windows'
         run: |
-            choco install make --yes
-            choco install nasm --yes
-            choco install protoc --yes
-            choco install llvm -y
-            echo 'LIBCLANG_PATH=C:\Program Files\LLVM\bin' | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            choco install make
+
+            choco install protoc
+
+            choco install nasm
             echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+            choco install llvm
+            $llvmPath = "C:\Program Files\LLVM\bin"
+            echo "$llvmPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            echo "LIBCLANG_PATH=$llvmPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            $clangPath = "C:\Program Files\LLVM\bin\clang.exe"
+            echo "CLANG_PATH=$clangPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+            choco install sqlite --no-progress
+            echo "C:\ProgramData\chocolatey\lib\sqlite\tools" >> $env:GITHUB_PATH
+
+            # Install Visual C++ Redistributable for V8/deno_runtime snapshot generation
+            choco install vcredist140 --no-progress
 
       - name: Install Dependencies on MacOS
         if: runner.os == 'macOS'

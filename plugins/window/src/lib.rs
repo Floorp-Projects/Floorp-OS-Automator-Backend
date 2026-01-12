@@ -18,6 +18,7 @@ pub fn get_active_window_title_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.window.get_active_window_title".to_string(),
         function_name: "Get Active Window Title".to_string(),
+        version: "".to_string(),
         description: "Gets the title of the currently active window.".to_string(),
         permissions: window_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -35,6 +36,7 @@ pub fn get_inactive_window_titles_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.window.get_inactive_window_titles".to_string(),
         function_name: "Get Inactive Window Titles".to_string(),
+        version: "".to_string(),
         description: "Gets the titles of all inactive windows.".to_string(),
         permissions: window_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -52,6 +54,7 @@ pub fn window_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.window".to_string(),
         package_name: "Window".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to manage windows.".to_string(),
         functions: vec![
             get_active_window_title_plugin_function(),
@@ -203,8 +206,9 @@ mod tests {
     use sapphillon_core::permission::PluginFunctionPermissions;
     use sapphillon_core::workflow::CoreWorkflowCode;
 
-    #[test]
-    fn test_get_active_window_title_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_get_active_window_title_in_workflow() {
         let code = r#"
             const title = app.sapphillon.core.window.getActiveWindowTitle();
             console.log(title);
@@ -221,21 +225,22 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_window_plugin_package()],
+            vec![Arc::new(core_window_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of a title.
         // We just check that we got some result (either a title or an error message).
         assert!(!workflow.result[0].result.is_empty());
     }
 
-    #[test]
-    fn test_get_inactive_window_titles_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_get_inactive_window_titles_in_workflow() {
         let code = r#"
             const titles = app.sapphillon.core.window.getInactiveWindowTitles();
             console.log(JSON.stringify(titles));
@@ -252,13 +257,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_window_plugin_package()],
+            vec![Arc::new(core_window_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of window titles.
         // Accept either a JSON array (success) or an error message (headless environment).

@@ -78,6 +78,7 @@ pub fn search_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.search.file".to_string(),
         function_name: "search.file".to_string(),
+        version: "".to_string(),
         description: "Searches for files on the local filesystem using native OS search APIs."
             .to_string(),
         permissions: search_plugin_permissions(),
@@ -107,6 +108,7 @@ pub fn search_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.search".to_string(),
         package_name: "Search".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to search for files on the local filesystem using native OS search APIs (Windows Search/Everything, macOS Spotlight, Linux Tracker/Baloo).".to_string(),
         functions: vec![search_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),

@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 pub struct GlobalStateData {
     db_initialized: bool,
     db_url: String,
+    ext_plugin_save_dir: Option<String>,
 }
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ impl GlobalState {
                 RwLock::new(GlobalStateData {
                     db_initialized: false,
                     db_url: String::new(),
+                    ext_plugin_save_dir: None,
                 })
             }),
         }
@@ -118,6 +120,37 @@ impl GlobalState {
     pub async fn async_get_db_url(&self) -> String {
         let data = self.data.read().await;
         data.db_url.clone()
+    }
+
+    /// Stores the external plugin save directory asynchronously.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Optional directory path. If None, the getter will fall back to temp directory.
+    ///
+    /// # Returns
+    ///
+    /// Returns `()` once the directory has been written to the shared state.
+    pub async fn async_set_ext_plugin_save_dir(&self, dir: Option<String>) {
+        let mut data = self.data.write().await;
+        data.ext_plugin_save_dir = dir;
+    }
+
+    /// Gets the external plugin save directory, falling back to system temp directory if not set.
+    ///
+    /// # Arguments
+    ///
+    /// This method takes no additional arguments beyond the borrowed [`GlobalState`].
+    ///
+    /// # Returns
+    ///
+    /// Returns the configured save directory or the system temp directory as fallback.
+    pub async fn get_ext_plugin_save_dir(&self) -> String {
+        let data = self.data.read().await;
+        match &data.ext_plugin_save_dir {
+            Some(dir) => dir.clone(),
+            None => std::env::temp_dir().to_string_lossy().to_string(),
+        }
     }
 
     /// Obtains the database URL by blocking within a Tokio-compatible context.

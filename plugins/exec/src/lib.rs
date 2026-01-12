@@ -18,6 +18,7 @@ pub fn exec_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.exec.exec".to_string(),
         function_name: "Exec".to_string(),
+        version: "".to_string(),
         description: "Executes a command in the default shell and returns its output.".to_string(),
         permissions: exec_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -39,6 +40,7 @@ pub fn exec_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.exec".to_string(),
         package_name: "Exec".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to execute shell commands.".to_string(),
         functions: vec![exec_plugin_function()],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -174,8 +176,9 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_exec_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_exec_in_workflow() {
         let code = r#"
             const output = app.sapphillon.core.exec.exec("echo test_workflow");
             console.log(output);
@@ -198,20 +201,21 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_exec_plugin_package()],
+            vec![Arc::new(core_exec_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let result_str = workflow.result[0].result.trim();
         assert_eq!(result_str, "test_workflow");
     }
 
-    #[test]
-    fn test_permission_error_in_workflow() {
+    #[tokio::test]
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_error_in_workflow() {
         let code = r#"
             app.sapphillon.core.exec.exec("echo should_fail");
         "#;
@@ -228,13 +232,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_exec_plugin_package()],
+            vec![Arc::new(core_exec_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         assert!(

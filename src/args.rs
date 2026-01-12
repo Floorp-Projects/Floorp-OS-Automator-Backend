@@ -16,6 +16,10 @@ pub struct Args {
     #[arg(long, default_value_t = String::from("sqlite:file::memory:?mode=memory&cache=shared"))]
     pub db_url: String,
 
+    /// Directory to save external plugin files. If not set, uses system temp directory.
+    #[arg(long)]
+    pub ext_plugin_save_dir: Option<String>,
+
     #[command(subcommand)]
     pub command: Command,
 }

@@ -27,6 +27,7 @@ use sapphillon_core::proto::sapphillon::v1::{
 };
 use sapphillon_core::workflow::CoreWorkflowCode;
 use sea_orm::{DatabaseConnection, DbErr, EntityTrait, QueryOrder, QuerySelect};
+use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
@@ -694,7 +695,7 @@ impl WorkflowService for MyWorkflowService {
                 allowed_permissions,
             );
 
-            workflow_core.run();
+            workflow_core.run(Handle::current());
 
             if workflow_core.result.is_empty() {
                 return Err(Status::internal("workflow execution produced no result"));

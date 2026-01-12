@@ -19,6 +19,7 @@ pub fn filesystem_read_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.filesystem.read".to_string(),
         function_name: "fs.read".to_string(),
+        version: "".to_string(),
         description:
             "Reads a text file from the local filesystem and returns its contents as a string."
                 .to_string(),
@@ -42,6 +43,7 @@ pub fn filesystem_list_files_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.filesystem.list_files".to_string(),
         function_name: "fs.list".to_string(),
+        version: "".to_string(),
         description: "List files in a directory.".to_string(),
         permissions: filesystem_list_files_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -63,6 +65,7 @@ pub fn filesystem_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.filesystem".to_string(),
         package_name: "Filesystem".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to read and write text files from the local filesystem.".to_string(),
         functions: vec![
             filesystem_read_plugin_function(),
@@ -116,6 +119,7 @@ pub fn filesystem_write_plugin_function() -> PluginFunction {
     PluginFunction {
         function_id: "app.sapphillon.core.filesystem.write".to_string(),
         function_name: "WriteFile".to_string(),
+        version: "".to_string(),
         description: "Writes text to a file on the local filesystem.".to_string(),
         permissions: filesystem_write_plugin_permissions(),
         function_define: Some(FunctionDefine {
@@ -354,9 +358,10 @@ mod tests {
         assert!(files.iter().any(|f| f == file2_path.to_str().unwrap()));
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_in_workflow() {
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_in_workflow() {
         // Create a platform-appropriate temp path and write the file
         let mut tmp_path_buf = std::env::temp_dir();
         tmp_path_buf.push("__sapphillon_test__");
@@ -388,13 +393,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let expected = std::fs::read_to_string(&tmp_path).unwrap() + "\n";
         let actual = &workflow.result[0].result;
@@ -404,9 +409,10 @@ mod tests {
         let _ = std::fs::remove_file(&tmp_path);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_write_in_workflow() {
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_write_in_workflow() {
         // Ensure file does not exist then grant permission
         let mut tmp_path_buf = std::env::temp_dir();
         tmp_path_buf.push("__sapphillon_test_write__");
@@ -437,13 +443,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test-write".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         // workflow prints "done\n"
         let actual = &workflow.result[0].result;
@@ -460,9 +466,10 @@ mod tests {
         let _ = std::fs::remove_file(&tmp_path);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_list_files_in_workflow() {
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
         let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
@@ -494,13 +501,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         // The expected result is a JSON string of a list of files, followed by a newline.
@@ -520,9 +527,10 @@ mod tests {
         });
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_permission_denied_list_files_in_workflow() {
+    #[allow(clippy::arc_with_non_send_sync)]
+    async fn test_permission_denied_list_files_in_workflow() {
         // Create a directory and some files in it
         let tmp_dir = tempfile::tempdir().unwrap();
         let tmp_path = tmp_dir.path().to_str().unwrap().to_string();
@@ -549,13 +557,13 @@ mod tests {
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_filesystem_plugin_package()],
+            vec![Arc::new(core_filesystem_plugin_package())],
             1,
             workflow_permissions.clone(),
             workflow_permissions,
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current());
         println!("workflow.result: {:?}", workflow.result);
         assert_eq!(workflow.result.len(), 1);
         // assert!(
