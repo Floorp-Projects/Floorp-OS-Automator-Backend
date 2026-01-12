@@ -81,7 +81,7 @@ pub async fn install_ext_plugin(
 /// # Arguments
 ///
 /// * `db` - Database connection
-/// * `plugin_package_id` - Full plugin ID (author-id/package-id/version)
+/// * `plugin_package_id` - Full plugin ID (author_id/package_id/version)
 ///
 /// # Returns
 ///
@@ -146,7 +146,7 @@ fn cleanup_empty_parent_dirs(path: &Path) {
 
 /// Scans a directory for installed external plugins.
 ///
-/// Traverses the directory structure `{save_dir}/{author-id}/{package-id}/{ver}/`
+/// Traverses the directory structure `{save_dir}/{author_id}/{package_id}/{version}/`
 /// and returns plugin IDs for directories containing `package.js`.
 ///
 /// # Arguments

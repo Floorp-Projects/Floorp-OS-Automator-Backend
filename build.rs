@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO Resuport Windows
+    // TODO Re-enable Windows support
     #[cfg(target_os = "windows")]
-    unimplemented!("Currently, Windows Support is suspended.");
+    compile_error!("Currently, Windows support is suspended.");
 
     Ok(())
 }

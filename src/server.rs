@@ -168,7 +168,6 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(ModelServiceServer::new(model_service))
         .add_service(ProviderServiceServer::new(provider_service))
         .add_service(PluginServiceServer::new(plugin_service))
-        // .layer(tonic_web::GrpcWebLayer::new())
         .serve(addr)
         .await?;
 

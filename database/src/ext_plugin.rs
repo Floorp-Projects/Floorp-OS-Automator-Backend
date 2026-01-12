@@ -16,7 +16,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTr
 /// # Arguments
 ///
 /// * `db` - Database connection
-/// * `plugin_package_id` - Unique identifier for the plugin (author-id/package-id/ver)
+/// * `plugin_package_id` - Unique identifier for the plugin (author_id/package_id/version)
 /// * `install_dir` - Directory path where the plugin is installed
 ///
 /// # Returns
