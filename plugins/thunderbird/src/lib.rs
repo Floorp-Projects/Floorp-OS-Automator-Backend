@@ -56,8 +56,8 @@ pub fn thunderbird_get_identity_function() -> PluginFunction {
         function_name: "Get Thunderbird Identity".to_string(),
         description: "Retrieves the user's name and email from Thunderbird.".to_string(),
         permissions: thunderbird_read_permissions(),
-        arguments: "None".to_string(),
-        returns: "JSON: { name, email, profile }".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -67,8 +67,8 @@ pub fn thunderbird_get_calendar_function() -> PluginFunction {
         function_name: "Get Thunderbird Calendar Events".to_string(),
         description: "Retrieves upcoming calendar events from Thunderbird.".to_string(),
         permissions: thunderbird_read_permissions(),
-        arguments: "Number: days (optional, default 14)".to_string(),
-        returns: "JSON: Array of { title, start_time, end_time, date }".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -78,8 +78,8 @@ pub fn thunderbird_get_profile_function() -> PluginFunction {
         function_name: "Get Thunderbird Profile".to_string(),
         description: "Finds and returns the default Thunderbird profile name.".to_string(),
         permissions: thunderbird_read_permissions(),
-        arguments: "None".to_string(),
-        returns: "String: profile name".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -89,8 +89,8 @@ pub fn thunderbird_get_emails_function() -> PluginFunction {
         function_name: "Get Thunderbird Emails".to_string(),
         description: "Retrieves emails from Thunderbird.".to_string(),
         permissions: thunderbird_read_permissions(),
-        arguments: "String: folder (optional, default '受信トレイ'), Number: limit (optional, default 20)".to_string(),
-        returns: "JSON: Array of { id, subject, sender, recipients, body, date, folder }".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -98,6 +98,7 @@ pub fn thunderbird_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.thunderbird".to_string(),
         package_name: "Thunderbird".to_string(),
+        provider_id: "".to_string(),
         description: "A plugin to read Thunderbird identity and calendar data.".to_string(),
         functions: vec![
             thunderbird_get_identity_function(),

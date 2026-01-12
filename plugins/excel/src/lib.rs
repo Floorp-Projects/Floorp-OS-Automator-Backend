@@ -29,8 +29,8 @@ pub fn excel_get_sheet_names_plugin_function() -> PluginFunction {
         function_name: "Get Sheet Names".to_string(),
         description: "Get all sheet names from an Excel file".to_string(),
         permissions: excel_read_permissions(),
-        arguments: "filePath: string".to_string(),
-        returns: "string: JSON array of sheet names".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -40,8 +40,8 @@ pub fn excel_read_cell_plugin_function() -> PluginFunction {
         function_name: "Read Cell".to_string(),
         description: "Read a single cell value from an Excel file".to_string(),
         permissions: excel_read_permissions(),
-        arguments: "filePath: string, sheetName: string, cellRef: string".to_string(),
-        returns: "string: cell value".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -51,8 +51,8 @@ pub fn excel_read_range_plugin_function() -> PluginFunction {
         function_name: "Read Range".to_string(),
         description: "Read a range of cells from an Excel file".to_string(),
         permissions: excel_read_permissions(),
-        arguments: "filePath: string, sheetName: string, rangeRef: string".to_string(),
-        returns: "string: JSON 2D array of cell values".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -64,8 +64,8 @@ pub fn excel_create_workbook_plugin_function() -> PluginFunction {
         function_name: "Create Workbook".to_string(),
         description: "Create a new Excel workbook".to_string(),
         permissions: excel_write_permissions(),
-        arguments: "filePath: string".to_string(),
-        returns: "string: result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -75,8 +75,8 @@ pub fn excel_write_cell_plugin_function() -> PluginFunction {
         function_name: "Write Cell".to_string(),
         description: "Write a value to a cell in an Excel file".to_string(),
         permissions: excel_write_permissions(),
-        arguments: "filePath: string, sheetName: string, cellRef: string, value: string".to_string(),
-        returns: "string: result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -86,8 +86,8 @@ pub fn excel_write_range_plugin_function() -> PluginFunction {
         function_name: "Write Range".to_string(),
         description: "Write a 2D array of values to a range in an Excel file".to_string(),
         permissions: excel_write_permissions(),
-        arguments: "filePath: string, sheetName: string, startCell: string, valuesJson: string".to_string(),
-        returns: "string: result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -97,8 +97,8 @@ pub fn excel_add_sheet_plugin_function() -> PluginFunction {
         function_name: "Add Sheet".to_string(),
         description: "Add a new sheet to an Excel file".to_string(),
         permissions: excel_write_permissions(),
-        arguments: "filePath: string, sheetName: string".to_string(),
-        returns: "string: result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -110,8 +110,8 @@ pub fn excel_open_in_app_plugin_function() -> PluginFunction {
         function_name: "Open In App".to_string(),
         description: "Open an Excel file in the default application".to_string(),
         permissions: excel_read_permissions(),
-        arguments: "filePath: string".to_string(),
-        returns: "string: result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -121,8 +121,8 @@ pub fn excel_get_open_workbooks_plugin_function() -> PluginFunction {
         function_name: "Get Open Workbooks".to_string(),
         description: "Get file paths of all workbooks currently open in Excel (Mac only)".to_string(),
         permissions: excel_read_permissions(),
-        arguments: "".to_string(),
-        returns: "string: JSON array of file paths".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -132,8 +132,8 @@ pub fn excel_create_chart_plugin_function() -> PluginFunction {
         function_name: "Create Chart".to_string(),
         description: "Create a chart in Excel from data range (Mac only). Chart types: line, bar, column, pie, area".to_string(),
         permissions: excel_write_permissions(),
-        arguments: "filePath: string, sheetName: string, dataRange: string, chartType: string, chartTitle: string, left?: number, top?: number, width?: number, height?: number".to_string(),
-        returns: "string: JSON result".to_string(),
+        function_define: None,
+        version: "".to_string(),
     }
 }
 
@@ -141,6 +141,7 @@ pub fn excel_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.excel".to_string(),
         package_name: "Excel".to_string(),
+        provider_id: "".to_string(),
         description: "Cross-platform Excel file operations for workflow automation.".to_string(),
         functions: vec![
             // Read operations

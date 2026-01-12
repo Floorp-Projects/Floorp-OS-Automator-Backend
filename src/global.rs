@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
 use sea_orm::{Database, DatabaseConnection};
+use std::fs;
 use std::sync::LazyLock;
 use tokio::sync::RwLock;
+use log::warn;
 
 #[derive(Debug)]
 pub struct GlobalStateData {
@@ -146,11 +148,23 @@ impl GlobalState {
     ///
     /// Returns the configured save directory or the system temp directory as fallback.
     pub async fn get_ext_plugin_save_dir(&self) -> String {
-        let data = self.data.read().await;
-        match &data.ext_plugin_save_dir {
-            Some(dir) => dir.clone(),
-            None => std::env::temp_dir().to_string_lossy().to_string(),
+        let configured = {
+            let data = self.data.read().await;
+            data.ext_plugin_save_dir.clone()
+        };
+
+        let resolved = configured.unwrap_or_else(|| {
+            std::env::temp_dir()
+                .join("sapphillon-ext-plugins")
+                .to_string_lossy()
+                .to_string()
+        });
+
+        if let Err(e) = fs::create_dir_all(&resolved) {
+            warn!("Failed to create external plugin directory {resolved}: {e:?}");
         }
+
+        resolved
     }
 
     /// Obtains the database URL by blocking within a Tokio-compatible context.
