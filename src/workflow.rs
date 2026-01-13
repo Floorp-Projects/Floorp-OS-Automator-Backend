@@ -6,10 +6,7 @@ use std::env;
 use std::error::Error;
 
 use reqwest::Client;
-use serde_json::{json, Value};
-
-
-
+use serde_json::{Value, json};
 
 /// Minimal, prompt-friendly representation of a plugin and its callable functions.
 #[derive(Debug, Clone)]
@@ -83,7 +80,7 @@ fn generate_prompt(
     available_plugins: &[PromptPlugin],
 ) -> Result<String, Box<dyn std::error::Error>> {
     let today_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let language = "日本語";
+    let language: &str = "日本語";
     let plugin_section = if available_plugins.is_empty() {
         "- (指定なし / 利用可能なプラグイン情報が提供されていません)".to_string()
     } else {
@@ -373,14 +370,14 @@ fn generate_prompt_handles_empty_plugins() -> Result<(), Box<dyn Error>> {
 
 // #[test]
 // fn test_generate_prompt() -> Result<(), Box<dyn Error>> {
-//     let prompt = generate_prompt("今日の天気はなんですか?")?;
+//     let prompt = generate_prompt("今日の天気はなんですか?", /* &[PromptPlugin] */ &[])?;
 //     println!("{}", prompt);
 //     Ok(())
 // }
 
-// #[test]
-// fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
-//     let workflow = generate_workflow("今日の天気はなんですか?")?;
-//     println!("{}", workflow);
-//     Ok(())
-// }
+#[test]
+fn test_generate_workflow() -> Result<(), Box<dyn Error>> {
+    let workflow = generate_workflow("今日の天気はなんですか?", &[])?;
+    println!("{}", workflow);
+    Ok(())
+}

@@ -456,9 +456,7 @@ impl WorkflowService for MyWorkflowService {
             "Fix the following workflow definition based on the issues described.\\n\\nDefinition:```\\n{definition}\\n```\\n\\nIssues: {description}.\\n\\nProduce an updated workflow.js implementation.",
         );
 
-        let generated = generate_workflow_async(&prompt, &[])
-            .await
-            .map_err(|err| {
+        let generated = generate_workflow_async(&prompt, &[]).await.map_err(|err| {
             error!("failed to fix workflow via generator: {err}");
             Status::internal("failed to fix workflow")
         })?;
@@ -540,14 +538,14 @@ impl WorkflowService for MyWorkflowService {
         Ok(Response::new(response))
     }
 
-        async fn generate_workflow(
-            &self,
-            request: Request<GenerateWorkflowRequest>,
-        ) -> Result<Response<Self::GenerateWorkflowStream>, Status> {
-            let req = request.into_inner();
-            if req.prompt.trim().is_empty() {
-                return Err(Status::invalid_argument("prompt must not be empty"));
-            }
+    async fn generate_workflow(
+        &self,
+        request: Request<GenerateWorkflowRequest>,
+    ) -> Result<Response<Self::GenerateWorkflowStream>, Status> {
+        let req = request.into_inner();
+        if req.prompt.trim().is_empty() {
+            return Err(Status::invalid_argument("prompt must not be empty"));
+        }
 
         info!(
             "generate_workflow request received: prompt_len={prompt_len}",
@@ -557,9 +555,9 @@ impl WorkflowService for MyWorkflowService {
         let generated = generate_workflow_async(&req.prompt, &[])
             .await
             .map_err(|err| {
-            error!("failed to generate workflow via generator: {err}");
-            Status::internal("failed to generate workflow")
-        })?;
+                error!("failed to generate workflow via generator: {err}");
+                Status::internal("failed to generate workflow")
+            })?;
 
         let workflow_id = uuid::Uuid::new_v4().to_string();
         let workflow_code_id = uuid::Uuid::new_v4().to_string();
