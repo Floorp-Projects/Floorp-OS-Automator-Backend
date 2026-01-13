@@ -5,11 +5,11 @@
 use std::env;
 use std::error::Error;
 
-use async_openai::{
-    config::OpenAIConfig,
-    types::{ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs},
-    Client,
-};
+use reqwest::Client;
+use serde_json::{json, Value};
+
+
+
 
 /// Minimal, prompt-friendly representation of a plugin and its callable functions.
 #[derive(Debug, Clone)]
@@ -264,35 +264,40 @@ pub fn llm_call(user_query: &str) -> Result<String, Box<dyn Error>> {
 /// Returns the response text produced by the model, or an error when environment variables or the API call fail.
 pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>> {
     // OpenRouter のエンドポイント
-    let api_base = &env::var("OPENAI_API_BASE")?;
-    let api_key = &env::var("OPENAI_API_KEY")?;
-    let model = &env::var("OPENAI_MODEL")?;
+    let api_base = env::var("OPENAI_API_BASE")?;
+    let api_key = env::var("OPENAI_API_KEY")?;
+    let model = env::var("OPENAI_MODEL")?;
 
-    let client = Client::with_config(
-        OpenAIConfig::new()
-            .with_api_key(api_key)
-            .with_api_base(api_base),
-    );
+    let client = Client::new();
+    let body = json!({
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": user_query
+                    }
+                ]
+            }
+        ]
+    });
+    let req_url = format!("{}/chat/completions", api_base);
+    let res = client
+        .post(&req_url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await?;
 
-    // ユーザー入力をメッセージに反映
-    let request = CreateChatCompletionRequestArgs::default()
-        .model(model)
-        .messages([ChatCompletionRequestUserMessageArgs::default()
-            .content(user_query)
-            .build()?
-            .into()])
-        .build()?;
-
-    let response = client.chat().create(request).await?;
-
-    // 最初のレスポンスの message.content を取得
-    let content = response
-        .choices
-        .first()
-        .and_then(|c| c.message.content.clone())
-        .unwrap_or_else(|| "".to_string());
-
-    Ok(content)
+    let response_data: Value = res.json().await?;
+    let content = response_data["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("LLM API Error : No content found")
+        .to_string();
+    Ok(content.to_string())
 }
 
 /// Ensures `extract_first_code` returns the inner JavaScript block when present.
@@ -362,7 +367,7 @@ fn generate_prompt_handles_empty_plugins() -> Result<(), Box<dyn Error>> {
 // fn test_llm_call() -> Result<(), Box<dyn Error>> {
 //     // async fn ではなく sync ラッパーを使う
 //     let result: String = llm_call("ロシア語でこんにちはってなんていいいますか？")?;
-//     println!("LLM result: {}", result);
+//     println!("LLM result: {:?}", result);
 //     Ok(())
 // }
 
