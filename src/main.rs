@@ -98,7 +98,9 @@ async fn main() -> Result<()> {
             // Start debug workflow scanner in debug builds only
             #[cfg(debug_assertions)]
             {
-                warn!("Debug workflow feature is enabled. JS files in 'debug_workflow/' directory will be auto-registered with full permissions.");
+                warn!(
+                    "Debug workflow feature is enabled. JS files in 'debug_workflow/' directory will be auto-registered with full permissions."
+                );
                 tokio::spawn(async {
                     debug_workflow::start_debug_workflow_scanner().await;
                 });

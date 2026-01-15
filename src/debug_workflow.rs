@@ -15,7 +15,9 @@ use log::{debug, info, warn};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tokio::time::{Duration, interval};
 
-use sapphillon_core::proto::sapphillon::v1::{AllowedPermission, Permission, PermissionLevel, PermissionType};
+use sapphillon_core::proto::sapphillon::v1::{
+    AllowedPermission, Permission, PermissionLevel, PermissionType,
+};
 
 use crate::GLOBAL_STATE;
 
