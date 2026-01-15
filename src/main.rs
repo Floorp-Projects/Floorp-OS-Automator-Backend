@@ -12,6 +12,9 @@ mod server;
 mod services;
 mod workflow;
 
+#[cfg(debug_assertions)]
+mod debug_workflow;
+
 #[allow(unused)]
 mod global;
 
@@ -91,6 +94,21 @@ async fn main() -> Result<()> {
                     error!("Server error: {e}");
                 }
             });
+
+            // Start debug workflow scanner in debug builds only
+            #[cfg(debug_assertions)]
+            {
+                std::thread::spawn(|| {
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("Failed to create debug workflow runtime");
+                    let local = tokio::task::LocalSet::new();
+                    local.block_on(&rt, async {
+                        debug_workflow::start_debug_workflow_scanner().await;
+                    });
+                });
+            }
 
             // Wait a moment for server to start
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
