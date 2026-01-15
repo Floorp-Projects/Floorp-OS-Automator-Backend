@@ -381,14 +381,26 @@ function fillForm(tabId, availableDates) {
   console.log("");
   console.log("=== Step 4: Filling the Form ===");
 
-  // Find the first available date that's not busy
-  var firstDate = availableDates[0] || new Date().toISOString().split("T")[0];
-  var secondDate =
-    availableDates[1] ||
-    availableDates[0] ||
-    new Date().toISOString().split("T")[0];
+  // Find the first and second available dates
+  var firstDate = availableDates[0] || "";
+  var secondDate = availableDates[1] || "";
 
-  console.log("Using dates: " + firstDate + ", " + secondDate);
+  if (!firstDate) {
+    console.log("WARNING: No available dates found!");
+    firstDate = "2026-01-16"; // Fallback
+  }
+  if (!secondDate) {
+    console.log(
+      "WARNING: Only one available date found, using same for second choice"
+    );
+    secondDate = firstDate;
+  }
+
+  console.log("");
+  console.log("--- Selected Dates ---");
+  console.log("  First choice:  " + firstDate);
+  console.log("  Second choice: " + secondDate);
+  console.log("");
   console.log(
     "Using identity: " + CONFIG.userName + " <" + CONFIG.userEmail + ">"
   );
@@ -413,22 +425,40 @@ function fillForm(tabId, availableDates) {
   // Fill email field (look for email input or second text input)
   console.log("Filling email: " + CONFIG.userEmail);
   try {
-    var emailInputs = floorp.tabGetElements(tabId, "input[type='email']");
-    if (emailInputs && emailInputs.length > 0) {
-      floorp.tabInput(tabId, "input[type='email']", CONFIG.userEmail);
-    }
+    floorp.tabInput(tabId, "input[type='email']", CONFIG.userEmail);
   } catch (e) {
     console.error("Failed to fill email: " + e);
   }
 
   // Fill first date
-  console.log("Filling first date...");
-  var dateInputs = floorp.tabGetElements(tabId, "input[type='date']");
-  if (dateInputs && dateInputs.length >= 1) {
+  console.log("Filling first date: " + firstDate);
+  var dateInputsRaw = floorp.tabGetElements(tabId, "input[type='date']");
+  var dateInputs = [];
+  if (dateInputsRaw) {
     try {
-      floorp.tabInput(tabId, "input[type='date']", firstDate);
+      var parsed = JSON.parse(dateInputsRaw);
+      if (parsed && parsed.elements) {
+        dateInputs = parsed.elements;
+      }
     } catch (e) {
-      console.error("Failed to fill date: " + e);
+      console.error("Failed to parse date inputs: " + e);
+    }
+  }
+  console.log("Found " + dateInputs.length + " date inputs");
+
+  if (dateInputs.length >= 1) {
+    try {
+      // Use nth-child selector for the first date input
+      floorp.tabInput(tabId, "input[type='date']:nth-of-type(1)", firstDate);
+      console.log("First date filled successfully");
+    } catch (e) {
+      console.error("Failed to fill first date: " + e);
+      // Fallback: try without nth-of-type
+      try {
+        floorp.tabInput(tabId, "input[type='date']", firstDate);
+      } catch (e2) {
+        console.error("Fallback also failed: " + e2);
+      }
     }
   }
 
@@ -443,25 +473,80 @@ function fillForm(tabId, availableDates) {
     console.error("Failed to click time slot: " + e);
   }
 
-  // Fill second date (if available)
-  if (dateInputs && dateInputs.length >= 2) {
-    console.log("Filling second date...");
-    // Need to target the second date input specifically
+  // Fill second date
+  // Based on form structure analysis:
+  // - listitem 1: Name
+  // - listitem 2: Email
+  // - listitem 3: First date (第一希望日)
+  // - listitem 4: First time slot (第一希望日・希望時間帯)
+  // - listitem 5: Second date (第二希望日)
+  // - listitem 6: Second time slot (第二希望日・希望時間帯)
+  // - listitem 7: Remarks (ご意見・要望)
+  console.log("Filling second date: " + secondDate);
+  if (dateInputs.length >= 2) {
+    var secondDateFilled = false;
+
+    // Use listitem:nth-child to target the 5th question (second date)
+    var selectors = [
+      "div[role='listitem']:nth-child(5) input[type='date']",
+      "li:nth-child(5) input[type='date']",
+      "div[role='list'] > div:nth-child(5) input[type='date']",
+      "form > div > div > div:nth-child(5) input[type='date']",
+    ];
+
+    for (var si = 0; si < selectors.length; si++) {
+      if (secondDateFilled) break;
+      try {
+        console.log("Trying selector: " + selectors[si]);
+        floorp.tabClick(tabId, selectors[si]);
+        floorp.tabInput(tabId, selectors[si], secondDate);
+        console.log("Second date filled with selector: " + selectors[si]);
+        secondDateFilled = true;
+      } catch (e) {
+        console.log("Selector failed: " + selectors[si]);
+      }
+    }
+
+    if (!secondDateFilled) {
+      console.log("WARNING: Could not fill second date with any selector");
+    }
+  } else {
+    console.log(
+      "WARNING: Less than 2 date inputs found (" +
+        dateInputs.length +
+        "), cannot fill second date"
+    );
   }
 
-  // Fill remarks (textarea)
-  console.log("Filling remarks...");
-  try {
-    var textareas = floorp.tabGetElements(tabId, "textarea");
-    if (textareas && textareas.length > 0) {
-      floorp.tabInput(
-        tabId,
-        "textarea",
-        "Floorp OS Automator による自動入力テスト"
+  // Select second time slot
+  // The second time slot radiogroup is in the 6th listitem
+  console.log("Selecting second time slot...");
+  var secondTimeSlotClicked = false;
+  var timeSlotSelectors = [
+    "div[role='listitem']:nth-child(6) div[role='radio']",
+    "div[role='listitem']:nth-child(6) div[aria-label='" +
+      CONFIG.preferredTimeSlots[0] +
+      "']",
+    "li:nth-child(6) div[role='radio']",
+    "div[role='radiogroup']:nth-of-type(2) div[role='radio']",
+  ];
+
+  for (var ti = 0; ti < timeSlotSelectors.length; ti++) {
+    if (secondTimeSlotClicked) break;
+    try {
+      console.log("Trying time slot selector: " + timeSlotSelectors[ti]);
+      floorp.tabClick(tabId, timeSlotSelectors[ti]);
+      console.log(
+        "Second time slot clicked with selector: " + timeSlotSelectors[ti]
       );
+      secondTimeSlotClicked = true;
+    } catch (e) {
+      console.log("Time slot selector failed: " + timeSlotSelectors[ti]);
     }
-  } catch (e) {
-    console.error("Failed to fill remarks: " + e);
+  }
+
+  if (!secondTimeSlotClicked) {
+    console.log("WARNING: Could not click second time slot with any selector");
   }
 
   console.log("Form filling complete!");
@@ -475,39 +560,205 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
   console.log("");
   console.log("=== Step 5: Calculating Available Dates ===");
 
-  // Get all busy dates from both calendars
-  var busyDates = {};
+  // Define the date range for scheduling (January 11-18, 2026)
+  // Use string-based date handling to avoid timezone issues
+  var dateRange = [
+    "2026-01-11",
+    "2026-01-12",
+    "2026-01-13",
+    "2026-01-14",
+    "2026-01-15",
+    "2026-01-16",
+    "2026-01-17",
+    "2026-01-18",
+  ];
 
+  console.log("Date range: 2026-01-11 to 2026-01-18");
+
+  // Define business hours for availability check (10:00 - 17:00)
+  var BUSINESS_START = 10; // 10:00 AM
+  var BUSINESS_END = 17; // 5:00 PM
+
+  console.log(
+    "Business hours: " + BUSINESS_START + ":00 - " + BUSINESS_END + ":00"
+  );
+
+  // Helper function to parse Japanese time format to hours
+  // Examples: "午後1時", "午前10:30", "午後4時30分"
+  function parseJapaneseTime(timeStr) {
+    if (!timeStr) return null;
+
+    // Check if it's all-day event
+    if (timeStr.indexOf("終日") !== -1) {
+      return { start: 0, end: 24 };
+    }
+
+    // Extract time range (e.g., "午後1時～午後4時")
+    var rangeMatch = timeStr.match(
+      /(午前|午後)?(\d{1,2})(?:時|:)(\d{0,2})?\s*[～~－\-]\s*(午前|午後)?(\d{1,2})(?:時|:)?(\d{0,2})?/
+    );
+    if (rangeMatch) {
+      var startPeriod = rangeMatch[1] || "午前";
+      var startHour = parseInt(rangeMatch[2], 10);
+      var endPeriod = rangeMatch[4] || startPeriod;
+      var endHour = parseInt(rangeMatch[5], 10);
+
+      // Convert to 24-hour format
+      if (startPeriod === "午後" && startHour !== 12) startHour += 12;
+      if (startPeriod === "午前" && startHour === 12) startHour = 0;
+      if (endPeriod === "午後" && endHour !== 12) endHour += 12;
+      if (endPeriod === "午前" && endHour === 12) endHour = 0;
+
+      return { start: startHour, end: endHour };
+    }
+
+    // If no range, try single time
+    var singleMatch = timeStr.match(/(午前|午後)?(\d{1,2})(?:時|:)/);
+    if (singleMatch) {
+      var period = singleMatch[1] || "午前";
+      var hour = parseInt(singleMatch[2], 10);
+      if (period === "午後" && hour !== 12) hour += 12;
+      if (period === "午前" && hour === 12) hour = 0;
+      return { start: hour, end: hour + 1 };
+    }
+
+    return null;
+  }
+
+  // Helper function to parse Thunderbird time format (ISO format: 2026-01-16 18:00:00)
+  function parseISOTime(startTime, endTime) {
+    if (!startTime) return null;
+
+    var startMatch = startTime.match(/(\d{2}):(\d{2})/);
+    var endMatch = endTime ? endTime.match(/(\d{2}):(\d{2})/) : null;
+
+    if (startMatch) {
+      var startHour = parseInt(startMatch[1], 10);
+      var endHour = endMatch ? parseInt(endMatch[1], 10) : startHour + 1;
+      return { start: startHour, end: endHour };
+    }
+    return null;
+  }
+
+  // Build a map of date -> array of busy time ranges
+  var busyTimesByDate = {};
+
+  // Add Thunderbird events with time info
+  console.log("");
+  console.log("--- Thunderbird events with times ---");
   for (var j = 0; j < thunderbirdEvents.length; j++) {
     var event = thunderbirdEvents[j];
     if (event.date) {
-      busyDates[event.date] = true;
+      var timeRange = parseISOTime(event.startTime, event.endTime);
+      if (!busyTimesByDate[event.date]) {
+        busyTimesByDate[event.date] = [];
+      }
+      busyTimesByDate[event.date].push({
+        title: event.title,
+        start: timeRange ? timeRange.start : 0,
+        end: timeRange ? timeRange.end : 24,
+      });
+      console.log(
+        "  " +
+          event.date +
+          ": " +
+          event.title +
+          " (" +
+          (timeRange
+            ? timeRange.start + ":00-" + timeRange.end + ":00"
+            : "all day") +
+          ")"
+      );
     }
   }
 
-  console.log("Busy dates: " + Object.keys(busyDates).join(", "));
-
-  // Generate next 14 days
-  var availableDates = [];
-  var today = new Date();
-
-  for (var i = 1; i <= 14; i++) {
-    var date = new Date(today);
-    date.setDate(date.getDate() + i);
-    var dateStr = date.toISOString().split("T")[0];
-
-    // Skip weekends
-    if (date.getDay() === 0 || date.getDay() === 6) continue;
-
-    // Skip busy dates
-    if (busyDates[dateStr]) continue;
-
-    availableDates.push(dateStr);
+  // Add Google Calendar events with time info
+  console.log("");
+  console.log("--- Google Calendar events with times ---");
+  for (var k = 0; k < googleEvents.length; k++) {
+    var gEvent = googleEvents[k];
+    if (gEvent.date) {
+      var gTimeRange = parseJapaneseTime(gEvent.time);
+      if (!busyTimesByDate[gEvent.date]) {
+        busyTimesByDate[gEvent.date] = [];
+      }
+      busyTimesByDate[gEvent.date].push({
+        title: gEvent.title,
+        start: gTimeRange ? gTimeRange.start : 0,
+        end: gTimeRange ? gTimeRange.end : 24,
+      });
+      console.log(
+        "  " +
+          gEvent.date +
+          ": " +
+          gEvent.title +
+          " (" +
+          (gTimeRange
+            ? gTimeRange.start + ":00-" + gTimeRange.end + ":00"
+            : "all day") +
+          ")"
+      );
+    }
   }
 
-  console.log(
-    "Available dates: " + availableDates.slice(0, 5).join(", ") + "..."
-  );
+  // Check each date in the range
+  var availableDates = [];
+
+  console.log("");
+  console.log("--- Checking availability ---");
+
+  for (var i = 0; i < dateRange.length; i++) {
+    var dateStr = dateRange[i];
+
+    // Parse date to check day of week (YYYY-MM-DD format)
+    var parts = dateStr.split("-");
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
+    var day = parseInt(parts[2], 10);
+    var dateObj = new Date(year, month, day);
+    var dayOfWeek = dateObj.getDay();
+
+    // Include weekends as well (no longer skipping)
+    var dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    var dayName = dayNames[dayOfWeek];
+
+    // Check if business hours are free
+    var busyTimes = busyTimesByDate[dateStr] || [];
+    var isAvailable = true;
+
+    for (var b = 0; b < busyTimes.length; b++) {
+      var busy = busyTimes[b];
+      // Check if busy time overlaps with business hours
+      // Overlap exists if: busy.start < BUSINESS_END AND busy.end > BUSINESS_START
+      if (busy.start < BUSINESS_END && busy.end > BUSINESS_START) {
+        console.log(
+          "  " +
+            dateStr +
+            " (" +
+            dayName +
+            "): BUSY during business hours (" +
+            busy.title +
+            " " +
+            busy.start +
+            ":00-" +
+            busy.end +
+            ":00)"
+        );
+        isAvailable = false;
+        break;
+      }
+    }
+
+    if (isAvailable) {
+      console.log(
+        "  " + dateStr + " (" + dayName + "): AVAILABLE (business hours free)"
+      );
+      availableDates.push(dateStr);
+    }
+  }
+
+  console.log("");
+  console.log("Available dates: " + availableDates.join(", "));
 
   return availableDates;
 }
