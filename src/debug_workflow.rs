@@ -12,7 +12,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::{debug, info, warn};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use tokio::time::{Duration, interval};
 
 use sapphillon_core::proto::sapphillon::v1::{
@@ -24,9 +24,32 @@ use crate::GLOBAL_STATE;
 /// Directory name (relative path from execution directory)
 const DEBUG_WORKFLOW_DIR: &str = "debug_workflow";
 /// Scan interval in seconds
-const SCAN_INTERVAL_SECS: u64 = 10;
+const SCAN_INTERVAL_SECS: u64 = 5;
 /// Workflow language constant for JavaScript
 const WORKFLOW_LANGUAGE_JS: i32 = 2;
+
+fn should_skip_update(
+    latest_code: Option<&entity::entity::workflow_code::Model>,
+    new_code: &str,
+) -> bool {
+    latest_code
+        .map(|code| code.code.as_str() == new_code)
+        .unwrap_or(false)
+}
+
+fn resolve_workflow_code_id_and_revision<F>(
+    latest_code: Option<&entity::entity::workflow_code::Model>,
+    new_id: F,
+) -> (String, i32)
+where
+    F: FnOnce() -> String,
+{
+    if let Some(code) = latest_code {
+        (code.id.clone(), code.code_revision)
+    } else {
+        (new_id(), 1)
+    }
+}
 
 /// Creates all-encompassing permissions that grant access to everything.
 ///
@@ -65,10 +88,7 @@ pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
     let dir_path = Path::new(DEBUG_WORKFLOW_DIR);
 
     if !dir_path.exists() {
-        debug!(
-            "Debug workflow directory does not exist: {}",
-            DEBUG_WORKFLOW_DIR
-        );
+        debug!("Debug workflow directory does not exist: {DEBUG_WORKFLOW_DIR}");
         return Ok(vec![]);
     }
 
@@ -109,35 +129,53 @@ pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
 /// Returns Ok(()) on success, or an error if database operations fail.
 pub async fn register_debug_workflow(workflow: &DebugWorkflowFile) -> Result<()> {
     use database::workflow::update_workflow_from_proto;
+    use entity::entity::workflow_code as workflow_code_entity;
     use sapphillon_core::proto::sapphillon::v1::{Workflow, WorkflowCode};
 
     let db = GLOBAL_STATE.get_db_connection().await?;
 
     // Check if workflow with this display_name already exists
     let display_name = format!("[DEBUG] {}", workflow.name);
-    let exists = entity::entity::workflow::Entity::find()
+    let existing = entity::entity::workflow::Entity::find()
         .filter(entity::entity::workflow::Column::DisplayName.eq(&display_name))
         .one(&db)
         .await?;
 
-    if exists.is_some() {
-        debug!(
-            "[DEBUG] Workflow already registered: {} - skipping",
-            display_name
-        );
-        return Ok(());
-    }
-
-    info!("[DEBUG] Registering debug workflow: {}", display_name);
-
-    let workflow_id = uuid::Uuid::new_v4().to_string();
-    let workflow_code_id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
-    let timestamp = sapphillon_core::proto::google::protobuf::Timestamp {
+    let now_ts = sapphillon_core::proto::google::protobuf::Timestamp {
         seconds: now.timestamp(),
         nanos: now.timestamp_subsec_nanos() as i32,
     };
 
+    let (workflow_id, created_at_ts, latest_code) = if let Some(existing) = existing {
+        let created_at = existing.created_at.unwrap_or(now);
+        let created_at_ts = sapphillon_core::proto::google::protobuf::Timestamp {
+            seconds: created_at.timestamp(),
+            nanos: created_at.timestamp_subsec_nanos() as i32,
+        };
+
+        let latest_code = workflow_code_entity::Entity::find()
+            .filter(workflow_code_entity::Column::WorkflowId.eq(existing.id.clone()))
+            .order_by_desc(workflow_code_entity::Column::CodeRevision)
+            .one(&db)
+            .await?;
+
+        (existing.id, created_at_ts, latest_code)
+    } else {
+        (uuid::Uuid::new_v4().to_string(), now_ts, None)
+    };
+
+    if should_skip_update(latest_code.as_ref(), &workflow.code) {
+        debug!("[DEBUG] Workflow already up to date: {display_name} - skipping");
+        return Ok(());
+    }
+
+    let (workflow_code_id, code_revision) =
+        resolve_workflow_code_id_and_revision(latest_code.as_ref(), || {
+            uuid::Uuid::new_v4().to_string()
+        });
+
+    info!("[DEBUG] Registering debug workflow: {display_name}");
     let permissions = create_all_permissions();
 
     // Build the Workflow proto with WorkflowCode containing allowed_permissions
@@ -148,26 +186,23 @@ pub async fn register_debug_workflow(workflow: &DebugWorkflowFile) -> Result<()>
         workflow_language: WORKFLOW_LANGUAGE_JS,
         workflow_code: vec![WorkflowCode {
             id: workflow_code_id,
-            code_revision: 1,
+            code_revision,
             code: workflow.code.clone(),
             language: WORKFLOW_LANGUAGE_JS,
-            created_at: Some(timestamp),
+            created_at: Some(now_ts),
             result: vec![],
             plugin_packages: vec![],
             plugin_function_ids: vec!["*".to_string()],
             allowed_permissions: permissions,
         }],
-        created_at: Some(timestamp),
-        updated_at: Some(timestamp),
+        created_at: Some(created_at_ts),
+        updated_at: Some(now_ts),
         workflow_results: vec![],
     };
 
     update_workflow_from_proto(&db, &wf_proto).await?;
 
-    info!(
-        "[DEBUG] Successfully registered debug workflow: {}",
-        display_name
-    );
+    info!("[DEBUG] Successfully registered debug workflow: {display_name}");
 
     Ok(())
 }
@@ -177,10 +212,7 @@ pub async fn register_debug_workflow(workflow: &DebugWorkflowFile) -> Result<()>
 /// This function runs in a loop, scanning the debug_workflow directory every
 /// `SCAN_INTERVAL_SECS` seconds and registering any new workflows to the database.
 pub async fn start_debug_workflow_scanner() {
-    info!(
-        "[DEBUG] Starting debug workflow scanner (interval: {}s)",
-        SCAN_INTERVAL_SECS
-    );
+    info!("[DEBUG] Starting debug workflow scanner (interval: {SCAN_INTERVAL_SECS}s)");
 
     let mut scanner_interval = interval(Duration::from_secs(SCAN_INTERVAL_SECS));
 
@@ -199,14 +231,15 @@ pub async fn start_debug_workflow_scanner() {
                 for workflow in workflows {
                     if let Err(e) = register_debug_workflow(&workflow).await {
                         warn!(
-                            "[DEBUG] Failed to register workflow '{}': {}",
-                            workflow.name, e
+                            "[DEBUG] Failed to register workflow '{workflow_name}': {error}",
+                            workflow_name = workflow.name,
+                            error = e
                         );
                     }
                 }
             }
             Err(e) => {
-                warn!("[DEBUG] Failed to scan debug_workflow directory: {}", e);
+                warn!("[DEBUG] Failed to scan debug_workflow directory: {e}");
             }
         }
     }
@@ -299,5 +332,44 @@ mod tests {
         let workflows = result.unwrap();
         assert_eq!(workflows.len(), 1);
         assert_eq!(workflows[0].name, "workflow");
+    }
+
+    #[test]
+    fn test_should_skip_update_when_same_code() {
+        let code = entity::entity::workflow_code::Model {
+            id: "code-1".to_string(),
+            workflow_id: "wf-1".to_string(),
+            code_revision: 1,
+            code: "console.log('same');".to_string(),
+            language: WORKFLOW_LANGUAGE_JS,
+            created_at: None,
+        };
+
+        assert!(should_skip_update(Some(&code), "console.log('same');"));
+        assert!(!should_skip_update(
+            Some(&code),
+            "console.log('different');"
+        ));
+        assert!(!should_skip_update(None, "console.log('same');"));
+    }
+
+    #[test]
+    fn test_resolve_workflow_code_id_and_revision() {
+        let code = entity::entity::workflow_code::Model {
+            id: "code-1".to_string(),
+            workflow_id: "wf-1".to_string(),
+            code_revision: 4,
+            code: "console.log('v4');".to_string(),
+            language: WORKFLOW_LANGUAGE_JS,
+            created_at: None,
+        };
+
+        let (id, rev) = resolve_workflow_code_id_and_revision(Some(&code), || "new".to_string());
+        assert_eq!(id, "code-1");
+        assert_eq!(rev, 4);
+
+        let (id, rev) = resolve_workflow_code_id_and_revision(None, || "new-id".to_string());
+        assert_eq!(id, "new-id");
+        assert_eq!(rev, 1);
     }
 }
