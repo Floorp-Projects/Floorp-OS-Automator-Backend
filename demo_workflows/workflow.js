@@ -764,6 +764,83 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
 }
 
 // =============================================================================
+// STEP 6: ADD EVENT TO GOOGLE CALENDAR
+// =============================================================================
+
+function addEventToGoogleCalendar(date, timeSlot, title) {
+  console.log("");
+  console.log("=== Step 6: Adding Event to Google Calendar ===");
+  console.log("Date: " + date);
+  console.log("Time: " + timeSlot);
+  console.log("Title: " + title);
+
+  // Parse the time slot (e.g., "10:00-12:00")
+  var timeParts = timeSlot.split("-");
+  var startTime = timeParts[0].replace(":", ""); // "1000"
+  var endTime = timeParts[1].replace(":", ""); // "1200"
+
+  // Format date for Google Calendar URL (YYYYMMDD)
+  var dateFormatted = date.replace(/-/g, ""); // "20260116"
+
+  // Build start and end datetime strings (YYYYMMDDTHHmmss)
+  var startDateTime = dateFormatted + "T" + startTime + "00";
+  var endDateTime = dateFormatted + "T" + endTime + "00";
+
+  console.log("Start: " + startDateTime);
+  console.log("End: " + endDateTime);
+
+  // Build Google Calendar URL with parameters
+  // Format: https://calendar.google.com/calendar/render?action=TEMPLATE&text=TITLE&dates=START/END
+  var calendarUrl =
+    "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+    "&text=" +
+    encodeURIComponent(title) +
+    "&dates=" +
+    startDateTime +
+    "/" +
+    endDateTime +
+    "&details=" +
+    encodeURIComponent("Floorp OS Automator により自動追加された予定です。");
+
+  console.log("Opening calendar URL...");
+
+  var calendarTabRaw = floorp.createTab(calendarUrl);
+  console.log("Calendar tab created (raw): " + calendarTabRaw);
+
+  // Parse the returned JSON to get the instanceId
+  var calendarTabId = calendarTabRaw;
+  try {
+    var parsed = JSON.parse(calendarTabRaw);
+    if (parsed && parsed.instanceId) {
+      calendarTabId = parsed.instanceId;
+      console.log("Parsed instanceId: " + calendarTabId);
+    }
+  } catch (e) {
+    console.log("Could not parse tab response, using raw value");
+  }
+
+  // Wait for page to load
+  console.log("Waiting for page to load...");
+  try {
+    floorp.tabWaitForElement(calendarTabId, "#xSaveBu", 15000);
+    console.log("Save button found");
+
+    // Click the save button
+    console.log("Clicking save button...");
+    floorp.tabClick(calendarTabId, "#xSaveBu");
+    console.log("Save button clicked - event saved!");
+  } catch (e) {
+    console.log("Could not auto-save: " + e);
+    console.log("Please click 'Save' button manually.");
+  }
+
+  console.log("");
+  console.log("Calendar event creation completed.");
+
+  return calendarTabId;
+}
+
+// =============================================================================
 // MAIN EXECUTION
 // =============================================================================
 
@@ -797,9 +874,24 @@ function workflow() {
   // Step 5: Fill the form
   fillForm(formTabId, availableDates);
 
+  // Get the selected dates for calendar
+  var firstDate = availableDates[0] || "2026-01-16";
+  var secondDate = availableDates[1] || firstDate;
+  var timeSlot = CONFIG.preferredTimeSlots[0]; // "10:00-12:00"
+
+  // Step 6: Add the appointment to Google Calendar
+  console.log("");
+  console.log("=== Adding Appointment to Google Calendar ===");
+  var calendarTabId = addEventToGoogleCalendar(
+    firstDate,
+    timeSlot,
+    "病院予約（第一希望）"
+  );
+
   console.log("");
   console.log("=== Workflow Complete ===");
   console.log("Form is ready for review. Submit manually if correct.");
+  console.log("Calendar event is ready to save.");
 
   var result = {
     identity: identity ? { name: identity.name, email: identity.email } : null,
@@ -813,14 +905,20 @@ function workflow() {
   console.log("=== Summary ===");
   console.log(JSON.stringify(result));
 
-  // Cleanup: destroy the form tab instance
+  // Cleanup: destroy the tab instances
   console.log("");
   console.log("=== Cleanup ===");
   try {
     floorp.destroyTabInstance(formTabId);
-    console.log("Tab instance destroyed successfully");
+    console.log("Form tab instance destroyed successfully");
   } catch (e) {
-    console.error("Failed to destroy tab instance: " + e);
+    console.error("Failed to destroy form tab instance: " + e);
+  }
+  try {
+    floorp.destroyTabInstance(calendarTabId);
+    console.log("Calendar tab instance destroyed successfully");
+  } catch (e) {
+    console.error("Failed to destroy calendar tab instance: " + e);
   }
 
   return result;
