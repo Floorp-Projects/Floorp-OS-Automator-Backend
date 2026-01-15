@@ -12,6 +12,9 @@ mod server;
 mod services;
 mod workflow;
 
+#[cfg(debug_assertions)]
+mod debug_workflow;
+
 #[allow(unused)]
 mod global;
 
@@ -91,6 +94,17 @@ async fn main() -> Result<()> {
                     error!("Server error: {e}");
                 }
             });
+
+            // Start debug workflow scanner in debug builds only
+            #[cfg(debug_assertions)]
+            {
+                warn!(
+                    "Debug workflow feature is enabled. JS files in 'debug_workflow/' directory will be auto-registered with full permissions."
+                );
+                tokio::spawn(async {
+                    debug_workflow::start_debug_workflow_scanner().await;
+                });
+            }
 
             // Wait a moment for server to start
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
