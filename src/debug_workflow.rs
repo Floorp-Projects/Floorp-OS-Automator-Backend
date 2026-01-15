@@ -30,39 +30,17 @@ const SCAN_INTERVAL_SECS: u64 = 10;
 /// # Returns
 ///
 /// Returns a vector of `PluginFunctionPermissions` with wildcard access to all plugins.
+/// Uses `*` as plugin_function_id and `PermissionType::Unspecified` to allow all operations.
 pub fn create_all_permissions() -> Vec<PluginFunctionPermissions> {
     vec![PluginFunctionPermissions {
         plugin_function_id: "*".to_string(), // Wildcard - all plugins
-        permissions: Permissions::new(vec![
-            Permission {
-                display_name: "Network Access".to_string(),
-                description: "Full network access for debug workflows".to_string(),
-                permission_type: PermissionType::NetAccess as i32,
-                permission_level: PermissionLevel::Unspecified as i32,
-                resource: vec!["*".to_string()],
-            },
-            Permission {
-                display_name: "Filesystem Read Access".to_string(),
-                description: "Full filesystem read access for debug workflows".to_string(),
-                permission_type: PermissionType::FilesystemRead as i32,
-                permission_level: PermissionLevel::Unspecified as i32,
-                resource: vec!["*".to_string()],
-            },
-            Permission {
-                display_name: "Filesystem Write Access".to_string(),
-                description: "Full filesystem write access for debug workflows".to_string(),
-                permission_type: PermissionType::FilesystemWrite as i32,
-                permission_level: PermissionLevel::Unspecified as i32,
-                resource: vec!["*".to_string()],
-            },
-            Permission {
-                display_name: "Execute Access".to_string(),
-                description: "Full execute access for debug workflows".to_string(),
-                permission_type: PermissionType::Execute as i32,
-                permission_level: PermissionLevel::Unspecified as i32,
-                resource: vec!["*".to_string()],
-            },
-        ]),
+        permissions: Permissions::new(vec![Permission {
+            display_name: "All Permissions".to_string(),
+            description: "Full access for debug workflows - allows all operations".to_string(),
+            permission_type: PermissionType::Unspecified as i32, // Unspecified = allow all
+            permission_level: PermissionLevel::Unspecified as i32,
+            resource: vec!["*".to_string()],
+        }]),
     }]
 }
 
