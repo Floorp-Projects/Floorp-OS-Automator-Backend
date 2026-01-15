@@ -865,8 +865,184 @@ function workflow() {
   // Step 4: Open Google Form and analyze structure
   console.log("");
   console.log("=== Opening Google Form ===");
-  var formTabId = floorp.createTab(CONFIG.formUrl);
-  floorp.tabWaitForNetworkIdle(formTabId);
+
+  // Check if form tab is already open
+  var formTabId = null;
+  var existingTabUsed = false;
+  try {
+    var tabsJson = floorp.listBrowserTabs();
+    console.log(
+      "[DEBUG] Raw listBrowserTabs response length: " +
+        (tabsJson ? tabsJson.length : "null")
+    );
+
+    var tabs = JSON.parse(tabsJson);
+    console.log("Found " + tabs.length + " open tabs");
+
+    // Debug: list all tabs
+    console.log("[DEBUG] --- All Open Tabs ---");
+    for (var t = 0; t < tabs.length; t++) {
+      var debugTab = tabs[t];
+      console.log(
+        "[DEBUG] Tab " +
+          t +
+          ": title='" +
+          debugTab.title +
+          "', url='" +
+          (debugTab.url ? debugTab.url.substring(0, 80) : "null") +
+          "...'"
+      );
+      console.log(
+        "[DEBUG]   browserId=" +
+          debugTab.browserId +
+          ", instanceId=" +
+          (debugTab.instanceId || "null") +
+          ", selected=" +
+          debugTab.selected
+      );
+    }
+    console.log("[DEBUG] --- End of Tab List ---");
+
+    // Look for a tab with the form URL
+    for (var i = 0; i < tabs.length; i++) {
+      var tab = tabs[i];
+      var urlMatch = tab.url && tab.url.indexOf("docs.google.com/forms") !== -1;
+      console.log(
+        "[DEBUG] Checking tab " +
+          i +
+          ": url contains 'docs.google.com/forms'? " +
+          urlMatch
+      );
+
+      if (urlMatch) {
+        console.log(
+          "[DEBUG] Found form tab candidate: title='" + tab.title + "'"
+        );
+
+        // Skip error pages or invalid tabs
+        var isErrorPage =
+          tab.title === "エラー" || tab.title === "Error" || !tab.title;
+        console.log(
+          "[DEBUG] Is error page? " +
+            isErrorPage +
+            " (title='" +
+            tab.title +
+            "')"
+        );
+
+        if (isErrorPage) {
+          console.log("[DEBUG] Skipping - title indicates error or empty");
+          continue;
+        }
+
+        console.log("Found existing form tab: " + tab.title);
+        console.log("[DEBUG] tab.instanceId = " + (tab.instanceId || "null"));
+        console.log("[DEBUG] tab.browserId = " + tab.browserId);
+
+        // If already has an instanceId, use it directly
+        if (tab.instanceId) {
+          formTabId = tab.instanceId;
+          console.log("Using existing instance: " + formTabId);
+        } else {
+          // Attach to the existing tab - attachToTab now returns instanceId directly
+          console.log(
+            "[DEBUG] Calling floorp.attachToTab with browserId: " +
+              tab.browserId
+          );
+          formTabId = floorp.attachToTab(tab.browserId);
+          console.log(
+            "[DEBUG] attachToTab returned: " +
+              formTabId +
+              " (type: " +
+              typeof formTabId +
+              ")"
+          );
+          console.log("Attached to existing tab: " + formTabId);
+        }
+
+        // Verify the tab has valid content
+        console.log(
+          "[DEBUG] Checking tab content with formTabId: " + formTabId
+        );
+        var testHtml = floorp.tabHtml(formTabId);
+        console.log(
+          "[DEBUG] tabHtml returned: " +
+            (testHtml ? testHtml.length + " chars" : "null")
+        );
+
+        if (!testHtml || testHtml.length < 1000) {
+          console.log(
+            "Tab content too short (" +
+              (testHtml ? testHtml.length : 0) +
+              " chars), skipping..."
+          );
+          console.log(
+            "[DEBUG] First 200 chars: " +
+              (testHtml ? testHtml.substring(0, 200) : "null")
+          );
+          formTabId = null;
+          continue;
+        }
+
+        existingTabUsed = true;
+        console.log("[DEBUG] Successfully using existing form tab");
+        break;
+      }
+    }
+  } catch (e) {
+    console.log("Could not check existing tabs: " + e);
+    console.log("[DEBUG] Exception stack: " + (e.stack || "no stack"));
+  }
+
+  console.log(
+    "[DEBUG] After tab search: formTabId = " +
+      (formTabId || "null") +
+      ", existingTabUsed = " +
+      existingTabUsed
+  );
+
+  // If no valid existing tab found, create a new one
+  if (!formTabId) {
+    console.log("No valid form tab found, creating new tab...");
+    console.log("[DEBUG] Calling floorp.createTab with URL: " + CONFIG.formUrl);
+    formTabId = floorp.createTab(CONFIG.formUrl);
+    console.log(
+      "[DEBUG] createTab returned: " +
+        formTabId +
+        " (type: " +
+        typeof formTabId +
+        ")"
+    );
+
+    // Wait for network idle with error handling
+    try {
+      console.log("[DEBUG] Calling tabWaitForNetworkIdle...");
+      floorp.tabWaitForNetworkIdle(formTabId);
+      console.log("[DEBUG] tabWaitForNetworkIdle completed");
+    } catch (e) {
+      console.log("Network idle wait skipped: " + e);
+    }
+    // Wait for form elements to load
+    try {
+      console.log("[DEBUG] Calling tabWaitForElement for 'form'...");
+      floorp.tabWaitForElement(formTabId, "form", 10000);
+      console.log("[DEBUG] tabWaitForElement completed");
+    } catch (e) {
+      console.log("Form element wait skipped: " + e);
+    }
+  } else {
+    console.log("Using existing form tab");
+    // Wait a bit for page to be ready
+    console.log("[DEBUG] Waiting for existing tab to be stable...");
+    try {
+      floorp.tabWaitForElement(formTabId, "form", 5000);
+      console.log("[DEBUG] Form element found in existing tab");
+    } catch (e) {
+      console.log("[DEBUG] Form element wait failed in existing tab: " + e);
+    }
+  }
+
+  console.log("[DEBUG] Final formTabId: " + formTabId);
 
   // Analyze form structure (get HTML first)
   var formData = analyzeFormStructure(formTabId);
@@ -905,14 +1081,39 @@ function workflow() {
   console.log("=== Summary ===");
   console.log(JSON.stringify(result));
 
-  // Cleanup: destroy the tab instances
+  // Cleanup: destroy the tab instances and close tabs
   console.log("");
   console.log("=== Cleanup ===");
+
+  // Only destroy form tab if we created it (not if we attached to existing)
+  if (!existingTabUsed) {
+    try {
+      floorp.closeTab(formTabId);
+      console.log("Form tab closed successfully");
+    } catch (e) {
+      console.error("Failed to close form tab: " + e);
+    }
+    try {
+      floorp.destroyTabInstance(formTabId);
+      console.log("Form tab instance destroyed successfully");
+    } catch (e) {
+      console.error("Failed to destroy form tab instance: " + e);
+    }
+  } else {
+    console.log("Form tab was pre-existing, keeping tab open");
+    try {
+      floorp.destroyTabInstance(formTabId);
+      console.log("Form tab instance destroyed (tab kept open)");
+    } catch (e) {
+      console.error("Failed to destroy form tab instance: " + e);
+    }
+  }
+
   try {
-    floorp.destroyTabInstance(formTabId);
-    console.log("Form tab instance destroyed successfully");
+    floorp.closeTab(calendarTabId);
+    console.log("Calendar tab closed successfully");
   } catch (e) {
-    console.error("Failed to destroy form tab instance: " + e);
+    console.error("Failed to close calendar tab: " + e);
   }
   try {
     floorp.destroyTabInstance(calendarTabId);
