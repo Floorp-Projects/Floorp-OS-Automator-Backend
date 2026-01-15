@@ -290,35 +290,36 @@ fn find_thunderbird_profile() -> anyhow::Result<String> {
                 return Ok(profile.to_string());
             }
         }
-        
+
         // Fallback to first profile
         if let Some(first_profile) = profile_list.first() {
             return Ok(first_profile.to_string());
         }
     }
-    
+
     Err(anyhow::anyhow!("No Thunderbird profile found"))
 }
 
 fn get_identity_from_prefs(profile: &str) -> anyhow::Result<ThunderbirdIdentity> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
     let prefs_path = format!("{}/Library/Thunderbird/Profiles/{}/prefs.js", home, profile);
-    
-    // Read name
+
+    // Search for any mail.identity.id*.fullName (not just id1)
+    // First, find all identity names and emails
     let name_output = Command::new("sh")
         .arg("-c")
-        .arg(format!("grep 'mail.identity.id1.fullName' '{}' | head -1", prefs_path))
+        .arg(format!("grep 'mail.identity.id.*\\.fullName' '{}' | head -1", prefs_path))
         .output()?;
     
     let name_line = String::from_utf8_lossy(&name_output.stdout);
     let name = extract_quoted_value(&name_line).unwrap_or_default();
     
-    // Read email
+    // Read email - search for any identity's email
     let email_output = Command::new("sh")
         .arg("-c")
-        .arg(format!("grep 'mail.identity.id1.useremail' '{}' | head -1", prefs_path))
+        .arg(format!("grep 'mail.identity.id.*\\.useremail' '{}' | head -1", prefs_path))
         .output()?;
-    
+
     let email_line = String::from_utf8_lossy(&email_output.stdout);
     let email = extract_quoted_value(&email_line).unwrap_or_default();
     
@@ -388,7 +389,7 @@ fn get_calendar_events_from_db(profile: &str, days: i64) -> anyhow::Result<Vec<C
             .arg(tmp_db)
             .arg(&query)
             .output();
-        
+
         // Clean up
         let _ = Command::new("rm").arg("-f").arg(tmp_db).output();
         let _ = Command::new("rm").arg("-f").arg(&tmp_wal).output();

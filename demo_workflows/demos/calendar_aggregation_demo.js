@@ -1,6 +1,6 @@
 // Calendar Aggregation Demo - Combined Workflow
 // This workflow:
-// 1. Reads calendar events from Thunderbird (local SQLite)
+// 1. Reads calendar events from Thunderbird (via Plugin API)
 // 2. Scrapes events from Google Calendar (web)
 // 3. Analyzes Google Form HTML structure
 // 4. Fills the form with available dates
@@ -14,12 +14,8 @@ const CONFIG = {
   formUrl:
     "https://docs.google.com/forms/d/e/1FAIpQLSfcJRyBQFYcS6sbFYaWfT1GMsk411I-Bl1ODE7oQSxpYh3nDg/viewform",
 
-  // Thunderbird profile path (macOS)
-  thunderbirdProfile: "awq9kwrc.default-release",
-
-  // User info for form
-  userName: "テスト太郎",
-  userEmail: "test@example.com",
+  // Days to check for calendar events
+  daysToCheck: 14,
 
   // Time slots to prefer
   preferredTimeSlots: [
@@ -31,61 +27,51 @@ const CONFIG = {
 };
 
 // =============================================================================
-// STEP 1: READ THUNDERBIRD CALENDAR
+// STEP 1: READ THUNDERBIRD CALENDAR (via Plugin API)
 // =============================================================================
 
 async function readThunderbirdCalendar() {
   console.log("\n=== Step 1: Reading Thunderbird Calendar ===");
 
-  const profilePath = `~/Library/Thunderbird/Profiles/${CONFIG.thunderbirdProfile}`;
-  const dbPath = `${profilePath}/calendar-data/cache.sqlite`;
-  const tempDb = "/tmp/thunderbird_calendar_temp.sqlite";
+  const events = [];
 
   try {
-    // Copy database to avoid lock issues
-    exec(`cp ${dbPath} ${tempDb}`);
+    // Use Thunderbird plugin API to get calendar events
+    const rawEvents = thunderbird.getCalendarEvents(CONFIG.daysToCheck);
+    console.log(`Found ${rawEvents.length} events in Thunderbird`);
 
-    // Query upcoming events (next 14 days)
-    const now = Date.now() * 1000;
-    const fourteenDaysLater = now + 14 * 24 * 60 * 60 * 1000000;
-
-    const query = `
-      SELECT
-        title,
-        datetime(event_start/1000000, 'unixepoch', 'localtime') as start_time,
-        datetime(event_end/1000000, 'unixepoch', 'localtime') as end_time
-      FROM cal_events
-      WHERE event_start >= ${now} AND event_start <= ${fourteenDaysLater}
-      ORDER BY event_start ASC;
-    `;
-
-    const result = exec(`sqlite3 -separator '|' ${tempDb} "${query}"`);
-
-    const events = [];
-    const lines = result
-      .trim()
-      .split("\n")
-      .filter((line) => line.length > 0);
-
-    for (const line of lines) {
-      const [title, startTime, endTime] = line.split("|");
+    for (const ev of rawEvents) {
       events.push({
-        title,
-        startTime,
-        endTime,
-        date: startTime.split(" ")[0],
+        title: ev.title,
+        startTime: ev.start_time,
+        endTime: ev.end_time,
+        date: ev.date,
         source: "thunderbird",
       });
+      console.log(`  - ${ev.title} (${ev.date} ${ev.start_time})`);
     }
-
-    exec(`rm -f ${tempDb}`);
-
-    console.log(`Found ${events.length} events in Thunderbird`);
-    return events;
   } catch (error) {
-    console.error("Error reading Thunderbird:", error);
-    return [];
+    console.error("Error reading Thunderbird calendar:", error);
   }
+
+  return events;
+}
+
+// =============================================================================
+// STEP 1.5: GET USER IDENTITY FROM THUNDERBIRD
+// =============================================================================
+
+async function getThunderbirdIdentity() {
+  console.log("\n=== Getting User Identity from Thunderbird ===");
+
+  const identity = thunderbird.getIdentity();
+  console.log(`User: ${identity.name} <${identity.email}>`);
+  console.log(`Profile: ${identity.profile}`);
+
+  CONFIG.userName = identity.name;
+  CONFIG.userEmail = identity.email;
+
+  return identity;
 }
 
 // =============================================================================
@@ -210,13 +196,14 @@ async function fillForm(tabId, availableDates) {
     new Date().toISOString().split("T")[0];
 
   console.log(`Using dates: ${firstDate}, ${secondDate}`);
+  console.log(`Using identity: ${CONFIG.userName} <${CONFIG.userEmail}>`);
 
-  // Fill name field
-  console.log("Filling name...");
+  // Fill name field (from Thunderbird identity)
+  console.log(`Filling name: ${CONFIG.userName}`);
   await floorp.type(tabId, "input[aria-labelledby='i1']", CONFIG.userName);
 
-  // Fill email field
-  console.log("Filling email...");
+  // Fill email field (from Thunderbird identity)
+  console.log(`Filling email: ${CONFIG.userEmail}`);
   await floorp.type(tabId, "input[aria-labelledby='i5']", CONFIG.userEmail);
 
   // Fill first date
@@ -301,6 +288,9 @@ async function main() {
   console.log("║  Thunderbird + Google Calendar → Form      ║");
   console.log("╚════════════════════════════════════════════╝");
 
+  // Step 0: Get user identity from Thunderbird
+  const identity = await getThunderbirdIdentity();
+
   // Step 1: Read Thunderbird calendar
   const thunderbirdEvents = await readThunderbirdCalendar();
 
@@ -329,6 +319,7 @@ async function main() {
   console.log("Form is ready for review. Submit manually if correct.");
 
   return {
+    identity: identity ? { name: identity.name, email: identity.email } : null,
     thunderbirdEvents: thunderbirdEvents.length,
     googleEvents: googleEvents.length,
     availableDates: availableDates.slice(0, 5),
