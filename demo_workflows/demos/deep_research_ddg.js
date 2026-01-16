@@ -621,7 +621,7 @@ function workflow() {
   console.log("  Saving to: " + outputPath);
 
   try {
-    var result = fs.write(outputPath, report);
+    var result = app.sapphillon.core.filesystem.write(outputPath, report);
     console.log("  ✓ Report saved successfully!");
   } catch (e) {
     console.log("  ✗ Save error: " + e);

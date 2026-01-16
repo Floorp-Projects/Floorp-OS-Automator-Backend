@@ -5,15 +5,12 @@
 // Filesystem plugin - provides simple text file IO (read) with permission checks
 use deno_core::{OpState, op2};
 use deno_error::JsErrorBox;
-use sapphillon_core::permission::{CheckPermissionResult, Permissions, check_permission};
 use sapphillon_core::plugin::{CorePluginFunction, CorePluginPackage};
 use sapphillon_core::proto::sapphillon::v1::{
-    FunctionDefine, FunctionParameter, Permission, PermissionLevel, PermissionType, PluginFunction,
-    PluginPackage,
+    FunctionDefine, FunctionParameter, PluginFunction, PluginPackage,
 };
-use sapphillon_core::runtime::OpStateWorkflowData;
 use std::fs;
-use std::sync::{Arc, Mutex};
+
 
 pub fn filesystem_read_plugin_function() -> PluginFunction {
     PluginFunction {
@@ -23,7 +20,7 @@ pub fn filesystem_read_plugin_function() -> PluginFunction {
         description:
             "Reads a text file from the local filesystem and returns its contents as a string."
                 .to_string(),
-        permissions: filesystem_read_plugin_permissions(),
+        permissions: vec![],
         function_define: Some(FunctionDefine {
             parameters: vec![FunctionParameter {
                 name: "path".to_string(),
@@ -45,7 +42,7 @@ pub fn filesystem_list_files_plugin_function() -> PluginFunction {
         function_name: "fs.list".to_string(),
         version: "".to_string(),
         description: "List files in a directory.".to_string(),
-        permissions: filesystem_list_files_plugin_permissions(),
+        permissions: vec![],
         function_define: Some(FunctionDefine {
             parameters: vec![FunctionParameter {
                 name: "path".to_string(),
@@ -121,7 +118,7 @@ pub fn filesystem_write_plugin_function() -> PluginFunction {
         function_name: "WriteFile".to_string(),
         version: "".to_string(),
         description: "Writes text to a file on the local filesystem.".to_string(),
-        permissions: filesystem_write_plugin_permissions(),
+        permissions: vec![],
         function_define: Some(FunctionDefine {
             parameters: vec![
                 FunctionParameter {
@@ -157,17 +154,10 @@ pub fn core_filesystem_write_plugin() -> CorePluginFunction {
 #[op2]
 #[string]
 fn op2_filesystem_write(
-    state: &mut OpState,
+    _state: &mut OpState,
     #[string] path: String,
     #[string] content: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    // Permission check
-    ensure_permission(
-        state,
-        &filesystem_write_plugin_function().function_id,
-        filesystem_write_plugin_permissions(),
-        &path,
-    )?;
 
     match write_file_text_filesystem_write(&path, &content) {
         Ok(_) => Ok("ok".to_string()),
@@ -178,16 +168,9 @@ fn op2_filesystem_write(
 #[op2]
 #[string]
 fn op2_filesystem_list_files(
-    state: &mut OpState,
+    _state: &mut OpState,
     #[string] path: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    // Permission check
-    ensure_permission(
-        state,
-        &filesystem_list_files_plugin_function().function_id,
-        filesystem_list_files_plugin_permissions(),
-        &path,
-    )?;
 
     match list_files_in_directory(&path) {
         Ok(s) => Ok(s),
@@ -208,39 +191,16 @@ fn write_file_text_filesystem_write(path: &str, content: &str) -> anyhow::Result
     Ok(())
 }
 
-fn filesystem_write_plugin_permissions() -> Vec<Permission> {
-    vec![Permission {
-        display_name: "Filesystem Write".to_string(),
-        description: "Allows the plugin to write files to the local filesystem.".to_string(),
-        permission_type: PermissionType::FilesystemWrite as i32,
-        permission_level: PermissionLevel::Unspecified as i32,
-        resource: vec![],
-    }]
-}
 
-fn filesystem_list_files_plugin_permissions() -> Vec<Permission> {
-    vec![Permission {
-        display_name: "Filesystem Read".to_string(),
-        description: "Allows the plugin to list files from the local filesystem.".to_string(),
-        permission_type: PermissionType::FilesystemRead as i32,
-        permission_level: PermissionLevel::Unspecified as i32,
-        resource: vec![],
-    }]
-}
+
+
 
 #[op2]
 #[string]
 fn op2_filesystem_read(
-    state: &mut OpState,
+    _state: &mut OpState,
     #[string] path: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    // Permission check
-    ensure_permission(
-        state,
-        &filesystem_read_plugin_function().function_id,
-        filesystem_read_plugin_permissions(),
-        &path,
-    )?;
 
     match read_file_text_filesystem_read(&path) {
         Ok(s) => Ok(s),
@@ -253,60 +213,13 @@ fn read_file_text_filesystem_read(path: &str) -> anyhow::Result<String> {
     Ok(s)
 }
 
-fn filesystem_read_plugin_permissions() -> Vec<Permission> {
-    vec![Permission {
-        display_name: "Filesystem Read".to_string(),
-        description: "Allows the plugin to read files from the local filesystem.".to_string(),
-        permission_type: PermissionType::FilesystemRead as i32,
-        permission_level: PermissionLevel::Unspecified as i32,
-        resource: vec![],
-    }]
-}
 
-fn ensure_permission(
-    state: &mut OpState,
-    plugin_function_id: &str,
-    required_permissions: Vec<Permission>,
-    resource: &str,
-) -> Result<(), JsErrorBox> {
-    let data = state
-        .borrow::<Arc<Mutex<OpStateWorkflowData>>>()
-        .lock()
-        .unwrap();
-    let allowed = data.get_allowed_permissions().clone().unwrap_or_default();
 
-    let required_permissions = Permissions::new(
-        required_permissions
-            .into_iter()
-            .map(|mut p| {
-                if !resource.is_empty() && p.resource.is_empty() {
-                    p.resource = vec![resource.to_string()];
-                }
-                p
-            })
-            .collect(),
-    );
-
-    let allowed_permissions = allowed
-        .into_iter()
-        .find(|p| p.plugin_function_id == plugin_function_id || p.plugin_function_id == "*")
-        .map(|p| p.permissions)
-        .unwrap_or_else(|| Permissions::new(vec![]));
-
-    match check_permission(&allowed_permissions, &required_permissions) {
-        CheckPermissionResult::Ok => Ok(()),
-        CheckPermissionResult::MissingPermission(perm) => Err(JsErrorBox::new(
-            "PermissionDenied. Missing Permissions:",
-            perm.to_string(),
-        )),
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sapphillon_core::permission::PluginFunctionPermissions;
-    use sapphillon_core::proto::sapphillon::v1::PermissionType;
+    use std::sync::Arc;
     use sapphillon_core::workflow::CoreWorkflowCode;
     use serial_test::serial;
     use std::io::Write;
@@ -376,20 +289,7 @@ mod tests {
             "const path = {tmp_path:?}; const content = app.sapphillon.core.filesystem.read(path); console.log(content);"
         );
 
-        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
-            plugin_function_id: filesystem_read_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![Permission {
-                    display_name: "Filesystem Read".to_string(),
-                    description: "Allows reading tests".to_string(),
-                    permission_type: PermissionType::FilesystemRead as i32,
-                    permission_level: PermissionLevel::Unspecified as i32,
-                    resource: vec![tmp_path.clone()],
-                }],
-            },
-        };
-
-        let workflow_permissions = vec![perm.clone()];
+        let workflow_permissions: Vec<_> = vec![];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
@@ -426,20 +326,7 @@ mod tests {
             "const path = {tmp_path:?}; app.sapphillon.core.filesystem.write(path, \"workflow-write\"); console.log(\"done\");"
         );
 
-        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
-            plugin_function_id: filesystem_write_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![Permission {
-                    display_name: "Filesystem Write".to_string(),
-                    description: "Allows writing tests".to_string(),
-                    permission_type: PermissionType::FilesystemWrite as i32,
-                    permission_level: PermissionLevel::Unspecified as i32,
-                    resource: vec![tmp_path.clone()],
-                }],
-            },
-        };
-
-        let workflow_permissions = vec![perm.clone()];
+        let workflow_permissions: Vec<_> = vec![];
         let mut workflow = CoreWorkflowCode::new(
             "test-write".to_string(),
             code.to_string(),
@@ -484,20 +371,7 @@ mod tests {
             "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.listFiles(path); console.log(content);"
         );
 
-        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
-            plugin_function_id: filesystem_list_files_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![Permission {
-                    display_name: "Filesystem Read".to_string(),
-                    description: "Allows reading tests".to_string(),
-                    permission_type: PermissionType::FilesystemRead as i32,
-                    permission_level: PermissionLevel::Unspecified as i32,
-                    resource: vec![tmp_path.clone()],
-                }],
-            },
-        };
-
-        let workflow_permissions = vec![perm.clone()];
+        let workflow_permissions: Vec<_> = vec![];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
@@ -545,15 +419,7 @@ mod tests {
             "const path = {escaped_path:?}; const content = app.sapphillon.core.filesystem.listFiles(path); console.log(content);"
         );
 
-        // Create a permission with an empty permissions list to trigger permission denial
-        let perm: PluginFunctionPermissions = PluginFunctionPermissions {
-            plugin_function_id: filesystem_list_files_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            },
-        };
-
-        let workflow_permissions = vec![perm.clone()];
+        let workflow_permissions: Vec<_> = vec![];
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
@@ -564,14 +430,21 @@ mod tests {
         );
 
         workflow.run(tokio::runtime::Handle::current());
-        println!("workflow.result: {:?}", workflow.result);
         assert_eq!(workflow.result.len(), 1);
-        // assert!(
-        //     workflow.result[0]
-        //         .result
-        //         .to_string()
-        //         .contains("PermissionDenied. Missing Permissions:")
-        // );
-        assert!(workflow.result[0].result.to_string().contains("Uncaught"))
+        let actual = &workflow.result[0].result;
+        let file1 = tmp_dir.path().join("file1.txt");
+        let file2 = tmp_dir.path().join("file2.txt");
+        let expected_files: Vec<String> = vec![
+            file1.to_str().unwrap().to_string(),
+            file2.to_str().unwrap().to_string(),
+        ];
+        let actual_files: Vec<String> = serde_json::from_str(actual.trim_end()).unwrap();
+
+        expected_files.iter().for_each(|f| {
+            assert!(actual_files.contains(f));
+        });
+        actual_files.iter().for_each(|f| {
+            assert!(expected_files.contains(f));
+        });
     }
 }
