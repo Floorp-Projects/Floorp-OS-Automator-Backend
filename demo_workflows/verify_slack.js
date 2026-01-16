@@ -12,10 +12,19 @@
  */
 
 const SLACK_URL = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
+const TEST_FILE_PATH = "/Users/user/Desktop/test-upload.txt";
+
+function sleep(ms) {
+  const start = Date.now();
+  while (Date.now() - start < ms) {}
+}
 
 function workflow() {
   console.log("=== Slack Workflow using Floorp ===");
   console.log("");
+
+  let createdTab = false;
+  let tabId = null;
 
   try {
     // Step 1: ブラウザタブから Slack を探す
@@ -38,8 +47,13 @@ function workflow() {
       console.log("No Slack tab found. Opening Slack...");
       // Slack を新しいタブで開く
       const createResult = floorp.createTab(SLACK_URL, false);
-      const createData = JSON.parse(createResult);
-      const tabId = createData.instance_id || createData.id;
+      try {
+        const createData = JSON.parse(createResult);
+        tabId = String(createData.instance_id || createData.id);
+      } catch (e) {
+        tabId = String(createResult);
+      }
+      createdTab = true;
 
       // ページ読み込みを待つ
       console.log("Waiting for Slack to load...");
@@ -57,7 +71,7 @@ function workflow() {
 
     // Step 2: 既存の Slack タブにアタッチ
     console.log("[Step 2] Attaching to Slack tab...");
-    const tabId = String(slackTab.instance_id || slackTab.id);
+    tabId = String(slackTab.instance_id || slackTab.id);
     const attachResult = floorp.attachToTab(tabId);
     console.log("Attached to tab: " + attachResult);
 
@@ -100,13 +114,26 @@ function workflow() {
     }
     console.log("Current channel: " + currentChannel);
 
-    // Step 4: メッセージを入力して送信
-    console.log("[Step 4] Sending a test message...");
+    // Step 4: ファイルアップロード + メッセージ送信（同時送信）
+    console.log("[Step 4] Uploading a file and sending a message...");
 
     const testMessage = "Hello from Floorp OS Automator! 🚀";
     const inputSelector = '[role="textbox"] p';
+    const fileInputSelector = 'input[data-qa="file_upload"]';
+    const sendButtonSelector = '[data-qa="texty_send_button"]';
 
     try {
+      // ファイル入力欄を待つ
+      floorp.tabWaitForElement(tabId, fileInputSelector, 5000);
+      console.log("Found file input");
+
+      // ファイルをアップロード
+      floorp.tabUploadFile(tabId, fileInputSelector, TEST_FILE_PATH);
+      console.log("Uploaded file: " + TEST_FILE_PATH);
+
+      // アップロード後の待機
+      sleep(1500);
+
       // メッセージ入力欄を待つ
       floorp.tabWaitForElement(tabId, inputSelector, 5000);
       console.log("Found message input");
@@ -115,15 +142,14 @@ function workflow() {
       floorp.tabSetInnerHTML(tabId, inputSelector, testMessage);
       console.log("Entered message using setInnerHTML: " + testMessage);
 
-      // Wait for 1 second to ensure editor state update
-      const start = Date.now();
-      while (Date.now() - start < 1000) {}
+      // エディタ状態の反映待ち
+      sleep(1000);
 
-      // 少し待つ
-      floorp.tabClick(tabId, '[data-qa="texty_send_button"]');
-      console.log("Message sent!");
+      // 同じタイミングで送信
+      floorp.tabClick(tabId, sendButtonSelector);
+      console.log("Message + file sent!");
     } catch (e) {
-      console.log("Could not interact with message input: " + e);
+      console.log("Could not upload file or send message: " + e);
     }
 
     // Step 5: チャンネルリストを取得
@@ -183,6 +209,25 @@ function workflow() {
       success: false,
       error: String(error),
     };
+  } finally {
+    // Step Last: インスタンス削除（必要ならタブも閉じる）
+    if (tabId) {
+      try {
+        floorp.destroyTabInstance(tabId);
+        console.log("Destroyed tab instance: " + tabId);
+      } catch (e) {
+        console.log("Could not destroy tab instance: " + e);
+      }
+
+      if (createdTab) {
+        try {
+          floorp.closeTab(tabId);
+          console.log("Closed created tab: " + tabId);
+        } catch (e) {
+          console.log("Could not close tab: " + e);
+        }
+      }
+    }
   }
 }
 

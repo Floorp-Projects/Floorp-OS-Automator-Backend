@@ -1,229 +1,233 @@
 /**
- * Slack File Upload Workflow using Floorp Browser Automation
+ * Slack Workflow using Floorp Browser Automation
  *
- * このワークフローは Floorp ブラウザを使用して Slack Web アプリに
- * ファイルをアップロードする機能をテストします。
+ * このワークフローは Floorp ブラウザを使用して Slack Web アプリから情報を取得し、
+ * メッセージを送信する機能を提供します。
  *
  * 機能:
  * - Slack タブを検出
- * - ファイルアップロードのテスト
- *
- * DOM セレクタ（精査済み）:
- * - 添付ボタン: [data-qa="shortcuts_menu_trigger__Channel"]
- * - ファイル入力: input[data-qa="file_upload"]
- * - 送信ボタン: [data-qa="texty_send_button"]
+ * - チャンネル/DM リストの取得
+ * - メッセージの読み取り
+ * - メッセージの送信
  */
 
-var SLACK_URL = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
-var TEST_FILE_PATH = "/Users/user/Desktop/test-upload.txt";
-
-function log(message) {
-  console.log(
-    "[" + new Date().toISOString().substring(11, 19) + "] " + message
-  );
-}
-
-function logDebug(label, value) {
-  console.log("[DEBUG] " + label + ": " + String(value).substring(0, 200));
-}
+const SLACK_URL = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
+const TEST_FILE_PATH = "/Users/user/Desktop/test-upload.txt";
 
 function sleep(ms) {
-  var start = Date.now();
+  const start = Date.now();
   while (Date.now() - start < ms) {}
 }
 
 function workflow() {
-  log("=== Slack File Upload Test Workflow ===");
-  log("");
+  console.log("=== Slack Workflow using Floorp ===");
+  console.log("");
+
+  let createdTab = false;
+  let tabId = null;
 
   try {
     // Step 1: ブラウザタブから Slack を探す
-    log("[Step 1] Searching for Slack tab...");
-    var tabsResponse = floorp.browserTabs();
-    logDebug("tabsResponse", tabsResponse);
+    console.log("[Step 1] Searching for Slack tab...");
+    const tabsResponse = floorp.browserTabs();
+    const tabsData = JSON.parse(tabsResponse);
+    const tabs = tabsData.tabs || tabsData;
 
-    var tabsData = JSON.parse(tabsResponse);
-    var tabs = tabsData.tabs || tabsData;
-    logDebug("tabs count", tabs.length);
-
-    var slackTab = null;
-    for (var t = 0; t < tabs.length; t++) {
-      var tab = tabs[t];
-      var url = tab.url || "";
-      if (
-        url.indexOf("slack.com") !== -1 ||
-        url.indexOf("app.slack.com") !== -1
-      ) {
+    let slackTab = null;
+    for (const tab of tabs) {
+      const url = tab.url || "";
+      if (url.includes("slack.com") || url.includes("app.slack.com")) {
         slackTab = tab;
-        log("Found Slack tab: " + tab.title);
-        logDebug("Slack tab details", JSON.stringify(tab));
+        console.log("Found Slack tab: " + tab.title);
         break;
       }
     }
 
     if (!slackTab) {
-      log("No Slack tab found. Opening Slack...");
-      var newTabId = floorp.createTab(SLACK_URL, false);
-      log("Created tab with instanceId: " + newTabId);
+      console.log("No Slack tab found. Opening Slack...");
+      // Slack を新しいタブで開く
+      const createResult = floorp.createTab(SLACK_URL, false);
+      try {
+        const createData = JSON.parse(createResult);
+        tabId = String(createData.instance_id || createData.id);
+      } catch (e) {
+        tabId = String(createResult);
+      }
+      createdTab = true;
 
-      log("Waiting for Slack to load...");
-      floorp.tabWaitForNetworkIdle(newTabId, "15000");
-      floorp.tabWaitForElement(newTabId, "[data-qa='channel_sidebar']", 10000);
+      // ページ読み込みを待つ
+      console.log("Waiting for Slack to load...");
+      // ネットワークアイドルを待機（ページ読み込み完了を保証）
+      floorp.tabWaitForNetworkIdle(tabId, "15000");
+      floorp.tabWaitForElement(tabId, "[data-qa='channel_sidebar']", 10000);
 
       slackTab = {
-        instance_id: newTabId,
+        instance_id: tabId,
         url: SLACK_URL,
         title: "Slack",
         status: "complete",
       };
     }
 
-    // Step 2: Slack タブにアタッチ
-    log("[Step 2] Attaching to Slack tab...");
-    var activeTabId = String(slackTab.instance_id || slackTab.id);
-    logDebug("activeTabId", activeTabId);
+    // Step 2: 既存の Slack タブにアタッチ
+    console.log("[Step 2] Attaching to Slack tab...");
+    tabId = String(slackTab.instance_id || slackTab.id);
+    const attachResult = floorp.attachToTab(tabId);
+    console.log("Attached to tab: " + attachResult);
 
-    var attachResult = floorp.attachToTab(activeTabId);
-    log("Attached to tab: " + attachResult);
+    // Step 3: Slack の情報を取得
+    console.log("[Step 3] Getting Slack information...");
 
-    // Step 3: DOM の確認
-    log("[Step 3] Checking DOM elements...");
-
-    // 添付ボタンの確認
-    var attachBtnSelector = '[data-qa="shortcuts_menu_trigger__Channel"]';
-    log("Checking attachment button: " + attachBtnSelector);
+    // ワークスペース名を取得
+    let workspaceName = "Unknown";
     try {
-      floorp.tabWaitForElement(activeTabId, attachBtnSelector, 5000);
-      log("✓ Attachment button found");
+      const wsResult = floorp.tabAttribute(
+        tabId,
+        ".p-client_workspace_wrapper",
+        "aria-label"
+      );
+      workspaceName = wsResult || workspaceName;
     } catch (e) {
-      log("✗ Attachment button NOT found: " + e);
-      // 代替セレクタを試す
-      attachBtnSelector = '[aria-label="添付"]';
-      log("Trying alternative selector: " + attachBtnSelector);
+      console.log("Could not get workspace name: " + e);
+    }
+    console.log("Workspace: " + workspaceName);
+
+    // 現在のチャンネル名を取得
+    let currentChannel = "Unknown";
+    try {
+      const chResult = floorp.tabElementText(
+        tabId,
+        ".p-view_header__channel_title"
+      );
+      currentChannel = chResult || currentChannel;
+    } catch (e) {
       try {
-        floorp.tabWaitForElement(activeTabId, attachBtnSelector, 3000);
-        log("✓ Attachment button found with alternative selector");
+        // 別のセレクタを試す
+        const chResult2 = floorp.tabElementText(
+          tabId,
+          ".p-channel_sidebar__channel--selected"
+        );
+        currentChannel = JSON.parse(chResult2).text || currentChannel;
       } catch (e2) {
-        log("✗ Alternative selector also failed: " + e2);
+        console.log("Could not get current channel: " + e2);
       }
     }
+    console.log("Current channel: " + currentChannel);
 
-    // ファイル入力の確認
-    var fileInputSelector = 'input[data-qa="file_upload"]';
-    log("Checking file input: " + fileInputSelector);
-    try {
-      floorp.tabWaitForElement(activeTabId, fileInputSelector, 3000);
-      log("✓ File input found");
-    } catch (e) {
-      log("✗ File input NOT found: " + e);
-    }
+    // Step 4: ファイルアップロード + メッセージ送信（同時送信）
+    console.log("[Step 4] Uploading a file and sending a message...");
 
-    // 送信ボタンの確認
-    var sendBtnSelector = '[data-qa="texty_send_button"]';
-    log("Checking send button: " + sendBtnSelector);
-    try {
-      floorp.tabWaitForElement(activeTabId, sendBtnSelector, 3000);
-      log("✓ Send button found");
-    } catch (e) {
-      log("✗ Send button NOT found: " + e);
-    }
-
-    // Step 4: ファイルアップロードのテスト
-    log("[Step 4] Testing file upload...");
-    log("File path: " + TEST_FILE_PATH);
+    const testMessage = "Hello from Floorp OS Automator! 🚀";
+    const inputSelector = '[role="textbox"] p';
+    const fileInputSelector = 'input[data-qa="file_upload"]';
+    const sendButtonSelector = '[data-qa="texty_send_button"]';
 
     try {
-      // 方法 1: 直接ファイル入力にアップロード
-      log("Method 1: Direct file input upload");
-      logDebug(
-        "Calling tabUploadFile",
-        fileInputSelector + " with " + TEST_FILE_PATH
-      );
+      // ファイル入力欄を待つ
+      floorp.tabWaitForElement(tabId, fileInputSelector, 5000);
+      console.log("Found file input");
 
-      var uploadResult = floorp.tabUploadFile(
-        activeTabId,
-        fileInputSelector,
-        TEST_FILE_PATH
-      );
-      logDebug("uploadResult", uploadResult);
-      log("✓ tabUploadFile executed");
+      // ファイルをアップロード
+      floorp.tabUploadFile(tabId, fileInputSelector, TEST_FILE_PATH);
+      console.log("Uploaded file: " + TEST_FILE_PATH);
 
       // アップロード後の待機
-      log("Waiting for upload to process...");
-      sleep(2000);
+      sleep(1500);
 
-      // ファイルプレビューが表示されたか確認
-      log("Checking for file preview...");
-      try {
-        // アップロードされたファイルのプレビュー要素を探す
-        floorp.tabWaitForElement(activeTabId, ".p-file_upload_preview", 3000);
-        log("✓ File preview appeared");
-      } catch (e) {
-        log("File preview not found (may be normal): " + e);
-      }
+      // メッセージ入力欄を待つ
+      floorp.tabWaitForElement(tabId, inputSelector, 5000);
+      console.log("Found message input");
 
-      // 送信ボタンの状態を確認
-      log("Checking send button state...");
-      try {
-        var sendBtnHtml = floorp.tabGetElement(activeTabId, sendBtnSelector);
-        logDebug("sendBtnHtml", sendBtnHtml);
+      // メッセージを入力 (setInnerHTMLを使用 - 紫色ハイライト)
+      floorp.tabSetInnerHTML(tabId, inputSelector, testMessage);
+      console.log("Entered message using setInnerHTML: " + testMessage);
 
-        if (sendBtnHtml.indexOf("disabled") === -1) {
-          log("✓ Send button is enabled");
+      // エディタ状態の反映待ち
+      sleep(1000);
 
-          // 実際に送信するか確認（コメントアウト可能）
-          log("Clicking send button...");
-          floorp.tabClick(activeTabId, sendBtnSelector);
-          log("✓ Send button clicked");
-
-          sleep(1000);
-          log("✓ File upload and send completed!");
-        } else {
-          log("Send button is still disabled");
-        }
-      } catch (e) {
-        log("Could not check send button: " + e);
-      }
+      // 同じタイミングで送信
+      floorp.tabClick(tabId, sendButtonSelector);
+      console.log("Message + file sent!");
     } catch (e) {
-      log("✗ File upload failed: " + e);
-      logDebug("Error details", e.stack || e);
-
-      // 方法 2: メニュー経由でアップロード（フォールバック）
-      log("");
-      log("Trying Method 2: Menu-based upload...");
-      try {
-        // 添付ボタンをクリック
-        log("Clicking attachment button...");
-        floorp.tabClick(activeTabId, attachBtnSelector);
-        sleep(500);
-
-        // メニューが表示されたか確認
-        log("Checking for attachment menu...");
-        floorp.tabWaitForElement(activeTabId, '[role="menu"]', 3000);
-        log("✓ Attachment menu appeared");
-
-        // 「コンピューターからアップロード」メニューアイテムを探す
-        log("Looking for upload menu item...");
-        // このセレクタは動的なので、テキストベースで探す必要があるかも
-      } catch (e2) {
-        log("Method 2 also failed: " + e2);
-      }
+      console.log("Could not upload file or send message: " + e);
     }
 
-    log("");
-    log("=== Workflow Complete ===");
+    // Step 5: チャンネルリストを取得
+    console.log("[Step 5] Getting channel list...");
+    const channels = [];
+
+    try {
+      // サイドバーのチャンネル名を持つspan要素を取得
+      // .p-channel_sidebar__channel_icon_prefix の隣にある span を取得する
+      const selector = ".p-channel_sidebar__channel_icon_prefix + span";
+      console.log(
+        `[Debug] Executing tabGetElements with selector: "${selector}"`
+      );
+
+      const resultJson = floorp.tabGetElements(tabId, selector);
+      console.log(`[Debug] Raw result JSON length: ${resultJson.length}`);
+
+      const result = JSON.parse(resultJson); // { elements: string[] }
+
+      const elementStrings = result.elements || [];
+      console.log(`[Debug] Found ${elementStrings.length} matching elements.`);
+
+      const attrRegex = /data-qa="channel_sidebar_name_([^"]+)"/;
+
+      for (let i = 0; i < elementStrings.length; i++) {
+        const html = elementStrings[i];
+        const match = html.match(attrRegex);
+        if (match) {
+          channels.push(match[1]);
+        } else {
+          if (i < 3)
+            console.log(
+              `[Debug] No regex match for element: ${html.substring(0, 100)}...`
+            );
+        }
+        if (channels.length >= 20) break;
+      }
+      console.log("Found " + channels.length + " channels");
+    } catch (e) {
+      console.log("Could not get channel list: " + e);
+    }
+
+    console.log("");
+    console.log("=== Workflow Complete ===");
 
     return {
       success: true,
-      message: "File upload test completed",
+      workspace: workspaceName,
+      currentChannel: currentChannel,
+      channelsFound: channels.length,
+      channels: channels.slice(0, 5), // 最初の5つだけ返す
+      message: "Slack information retrieved successfully",
     };
   } catch (error) {
-    log("ERROR: Workflow failed: " + error);
-    logDebug("Error stack", error.stack || error);
+    console.error("Workflow failed: " + error);
     return {
       success: false,
       error: String(error),
     };
+  } finally {
+    // Step Last: インスタンス削除（必要ならタブも閉じる）
+    if (tabId) {
+      try {
+        floorp.destroyTabInstance(tabId);
+        console.log("Destroyed tab instance: " + tabId);
+      } catch (e) {
+        console.log("Could not destroy tab instance: " + e);
+      }
+
+      if (createdTab) {
+        try {
+          floorp.closeTab(tabId);
+          console.log("Closed created tab: " + tabId);
+        } catch (e) {
+          console.log("Could not close tab: " + e);
+        }
+      }
+    }
   }
 }
 
