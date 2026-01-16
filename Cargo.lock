@@ -4083,8 +4083,8 @@ dependencies = [
 
 [[package]]
 name = "ext_plugin"
-version = "0.11.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
+version = "0.13.0"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.13.0#bd1af319ae978e099354ff39825503e7d24b26ab"
 dependencies = [
  "anyhow",
  "deno_core",
@@ -7500,7 +7500,7 @@ dependencies = [
 [[package]]
 name = "proto"
 version = "0.10.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.13.0#bd1af319ae978e099354ff39825503e7d24b26ab"
 dependencies = [
  "bytes",
  "pbjson",
@@ -8406,8 +8406,8 @@ dependencies = [
 
 [[package]]
 name = "sapphillon_core"
-version = "0.11.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.11.0#d1972581553aa5111ae9abbf9e0b9b5ac30235db"
+version = "0.13.0"
+source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.13.0#bd1af319ae978e099354ff39825503e7d24b26ab"
 dependencies = [
  "anyhow",
  "async-trait",

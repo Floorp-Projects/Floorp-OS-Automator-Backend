@@ -28,7 +28,7 @@ x-win = "5.3.3"
 tonic = { version = "0.14.1", default-features = false, features = ["codegen", "transport", "router"] }
 prost = { version = "0.14.1", default-features = false, features = ["std"] }
 prost-types = { version = "0.14.1", default-features = false }
-sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.11.0" }
+sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.13.0" }
 tonic-build = "0.14.1"
 
 sea-orm = { version = "1.1.0", features = [
