@@ -9,7 +9,7 @@
  */
 
 function workflow() {
-  var searchQuery = "Apple AirPods 3rd と AirPods Pro 2nd の比較";
+  var searchQuery = "バンブーラボ";
   var maxResults = 50;
   var outputPath = "/Users/user/Desktop/Deep_Research_Report.md";
 

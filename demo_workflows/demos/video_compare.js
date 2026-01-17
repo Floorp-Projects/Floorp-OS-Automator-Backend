@@ -12,6 +12,8 @@ function workflow() {
   var topic = "Floorp";
   var excelPath = "/Users/user/Desktop/Video_Comparison_Floorp.xlsx";
   var results = [];
+  var slackUrl = "https://app.slack.com/client/T0A62PPRD7G/C0A68CVNZFE";
+  var enableSlackUpload = true;
 
   console.log("Starting Video Comparison for topic: " + topic);
 
@@ -299,6 +301,15 @@ function workflow() {
     // Open the file
     excel.openInApp(excelPath);
     console.log("Excel file opened.");
+
+    // Optional: Upload the file to Slack after opening Excel
+    if (enableSlackUpload) {
+      try {
+        uploadFileToSlack(excelPath, slackUrl, "動画比較Excelを共有します。");
+      } catch (e) {
+        console.log("Slack Upload Error: " + e);
+      }
+    }
   } catch (e) {
     console.log("Excel Error: " + e);
   }
@@ -364,5 +375,87 @@ function sleep(tab, ms) {
   } catch (e) {
     var start = Date.now();
     while (Date.now() - start < ms) {}
+  }
+}
+
+function uploadFileToSlack(filePath, slackUrl, message) {
+  console.log("--- Uploading Excel to Slack ---");
+  var createdTab = false;
+  var tabId = null;
+
+  try {
+    // Find existing Slack tab
+    var tabsResponse = floorp.browserTabs();
+    var tabsData = JSON.parse(tabsResponse);
+    var tabs = tabsData.tabs || tabsData;
+
+    var slackTab = null;
+    for (var i = 0; i < tabs.length; i++) {
+      var url = tabs[i].url || "";
+      if (
+        url.indexOf("slack.com") !== -1 ||
+        url.indexOf("app.slack.com") !== -1
+      ) {
+        slackTab = tabs[i];
+        console.log("Found Slack tab: " + (tabs[i].title || "Slack"));
+        break;
+      }
+    }
+
+    if (!slackTab) {
+      console.log("No Slack tab found. Opening Slack...");
+      var createResult = floorp.createTab(slackUrl, false);
+      try {
+        var createData = JSON.parse(createResult);
+        tabId = String(createData.instance_id || createData.id);
+      } catch (e) {
+        tabId = String(createResult);
+      }
+      createdTab = true;
+
+      // Wait for load
+      floorp.tabWaitForNetworkIdle(tabId, "15000");
+      floorp.tabWaitForElement(tabId, "[data-qa='channel_sidebar']", 10000);
+
+      slackTab = {
+        instance_id: tabId,
+        url: slackUrl,
+        title: "Slack",
+      };
+    }
+
+    // Attach to Slack tab
+    tabId = String(slackTab.instance_id || slackTab.id);
+    floorp.attachToTab(tabId);
+
+    // Upload file + send message
+    var inputSelector = '[role="textbox"] p';
+    var fileInputSelector = 'input[data-qa="file_upload"]';
+    var sendButtonSelector = '[data-qa="texty_send_button"]';
+
+    floorp.tabWaitForElement(tabId, fileInputSelector, 5000);
+    floorp.tabUploadFile(tabId, fileInputSelector, filePath);
+    sleep(tabId, 1500);
+
+    if (message) {
+      floorp.tabWaitForElement(tabId, inputSelector, 5000);
+      floorp.tabSetInnerHTML(tabId, inputSelector, message);
+      sleep(tabId, 800);
+      // floorp.tabClick(tabId, sendButtonSelector);
+    }
+
+    console.log("Slack upload complete: " + filePath);
+  } finally {
+    if (tabId) {
+      try {
+        floorp.destroyTabInstance(tabId);
+      } catch (e) {}
+
+      if (createdTab) {
+        try {
+          floorp.closeTab(tabId);
+        } catch (e2) {}
+      }
+    }
   }
 }
