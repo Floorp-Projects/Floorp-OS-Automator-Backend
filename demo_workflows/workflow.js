@@ -21,102 +21,74 @@ function workflow() {
   console.log("Target Results: " + maxResults);
   console.log("");
 
-  // --- Phase 1: DuckDuckGo Search ---
-  console.log("━━━ Phase 1: Search & Collect URLs ━━━");
+  // --- Phase 1: Local Finder Search ---
+  console.log("━━━ Phase 1: Local Finder Search (Finder/mdfind) ━━━");
   var searchResults = [];
-  var ddgTab = null;
 
   try {
-    var ddgUrl = "https://duckduckgo.com/?q=" + encodeURIComponent(searchQuery);
-    ddgTab = floorp.createTab(ddgUrl, false);
-    floorp.tabWaitForElement(ddgTab, "article[data-testid='result']", 15000);
-    sleep(3000);
-
-    // Load more results by clicking "More Results" button multiple times
-    console.log("  Loading more results...");
-    for (var click = 0; click < 3; click++) {
+    if (
+      app &&
+      app.sapphillon &&
+      app.sapphillon.core &&
+      app.sapphillon.core.finder
+    ) {
+      console.log("  Using Finder plugin: findFilesWithMdfind");
+      var pathsJson = app.sapphillon.core.finder.findFilesWithMdfind(
+        "/Users/user/Desktop",
+        searchQuery,
+        maxResults,
+      );
+      var paths = [];
       try {
-        // Click "More Results" button
-        floorp.tabClick(ddgTab, "#more-results");
-        sleep(3000);
-        console.log("    Clicked 'More Results' - attempt " + (click + 1));
+        paths = JSON.parse(pathsJson || "[]");
       } catch (e) {
-        // Button may not be visible, try scrolling
-        try {
-          floorp.tabScrollTo(
-            ddgTab,
-            "article[data-testid='result']:last-of-type"
-          );
-          sleep(2000);
-        } catch (scrollErr) {}
+        paths = [];
       }
-    }
 
-    // Collect search results using ol > li structure
-    console.log("  Collecting search results...");
+      console.log("  Finder returned " + paths.length + " paths");
 
-    // DuckDuckGo wraps each article in a separate li, so use li:nth-child instead
-    for (var i = 1; i <= maxResults + 20; i++) {
-      if (searchResults.length >= maxResults) break;
-
-      // Use li:nth-child within the results list
-      var baseSel =
-        "ol.react-results--main > li:nth-child(" +
-        i +
-        ") article[data-testid='result']";
-      try {
-        var titleSel = baseSel + " a[data-testid='result-title-a']";
-        var title = getText(ddgTab, titleSel);
-
-        if (!title) continue;
-
-        var linkEl = floorp.tabAttribute(ddgTab, titleSel, "href");
-        var url = "";
+      for (
+        var i = 0;
+        i < paths.length && searchResults.length < maxResults;
+        i++
+      ) {
         try {
-          url = JSON.parse(linkEl).value || "";
+          var p = paths[i];
+          var content = "";
+          try {
+            content = app.sapphillon.core.finder.extractText(p) || "";
+          } catch (e) {
+            content = "";
+          }
+          var title = p.split("/").pop() || p;
+
+          searchResults.push({
+            rank: searchResults.length + 1,
+            title: title,
+            url: "file://" + p,
+            snippet: (content || "").substring(0, 300),
+            domain: "local",
+            pageContent: content,
+            pageTitle: title,
+            extractedAt: new Date().toISOString(),
+          });
+
+          console.log(
+            "  [" + searchResults.length + "] " + title + " (" + p + ")",
+          );
         } catch (e) {
-          continue;
+          console.log("  Finder item error: " + e);
         }
-
-        // Skip certain domains
-        if (
-          url.includes("youtube.com") ||
-          url.includes("twitter.com") ||
-          url.includes("facebook.com") ||
-          url.includes("instagram.com")
-        ) {
-          continue;
-        }
-
-        // Get snippet from article text
-        var snippet = "";
-        try {
-          var snipJson = floorp.tabElementText(ddgTab, baseSel);
-          snippet = JSON.parse(snipJson).text || "";
-        } catch (e) {}
-
-        searchResults.push({
-          rank: searchResults.length + 1,
-          title: cleanText(title),
-          url: url,
-          snippet: cleanText(snippet).substring(0, 300),
-          domain: extractDomain(url),
-          pageContent: "",
-          pageTitle: "",
-          extractedAt: null,
-        });
-
-        console.log(
-          "  [" + searchResults.length + "] " + title.substring(0, 50) + "..."
-        );
-      } catch (e) {}
+      }
+    } else {
+      console.log(
+        "  Finder plugin not available; no local collection performed.",
+      );
     }
-
-    console.log("  ✓ Collected " + searchResults.length + " URLs");
   } catch (e) {
-    console.log("  ✗ Search Error: " + e);
+    console.log("  Finder Error: " + e);
   } finally {
-    if (ddgTab) floorp.closeTab(ddgTab);
+    // noop
   }
 
   // --- Phase 1.5: AI Relevance Filtering ---
@@ -132,7 +104,7 @@ function workflow() {
   console.log("");
   console.log("━━━ Phase 2: Deep Content Extraction ━━━");
   console.log(
-    "  Visiting " + searchResults.length + " pages for detailed analysis..."
+    "  Visiting " + searchResults.length + " pages for detailed analysis...",
   );
   console.log("");
 
@@ -193,12 +165,12 @@ function workflow() {
       if (result.pageContent.length > 100) {
         successCount++;
         console.log(
-          "       ✓ Extracted " + result.pageContent.length + " chars"
+          "       ✓ Extracted " + result.pageContent.length + " chars",
         );
       } else {
         failCount++;
         console.log(
-          "       ⚠ Limited content (" + result.pageContent.length + " chars)"
+          "       ⚠ Limited content (" + result.pageContent.length + " chars)",
         );
       }
     } catch (e) {
@@ -231,7 +203,7 @@ function workflow() {
     var result = searchResults[i];
     var progress = "[" + (i + 1) + "/" + searchResults.length + "]";
     console.log(
-      progress + " Analyzing: " + result.title.substring(0, 40) + "..."
+      progress + " Analyzing: " + result.title.substring(0, 40) + "...",
     );
 
     try {
@@ -244,7 +216,7 @@ function workflow() {
         "Page Title: " +
           result.pageTitle +
           "\n\nContent:\n" +
-          result.pageContent.substring(0, 1500)
+          result.pageContent.substring(0, 1500),
       );
 
       analyzedResults.push({
@@ -276,7 +248,7 @@ function workflow() {
     "abstract",
     searchQuery,
     allSummaries,
-    analyzedResults.length
+    analyzedResults.length,
   );
 
   console.log("  → Overview...");
@@ -284,7 +256,7 @@ function workflow() {
     "overview",
     searchQuery,
     allSummaries,
-    analyzedResults.length
+    analyzedResults.length,
   );
 
   // Generate detailed Key Findings with multiple subsections
@@ -311,11 +283,11 @@ function workflow() {
       function () {
         return iniad_ai_mop.chat(
           "You are a JSON generator. Output ONLY valid JSON array, no markdown, no explanation.",
-          sectionStructurePrompt
+          sectionStructurePrompt,
         );
       },
       3,
-      2000
+      2000,
     );
 
     // Parse JSON response
@@ -409,7 +381,7 @@ function workflow() {
       allSummaries,
       item.id,
       item.prompt,
-      mentionedKeywords
+      mentionedKeywords,
     );
 
     findingsTexts.push({
@@ -435,7 +407,7 @@ function workflow() {
       "      ✓ " +
         sectionContent.length +
         " chars | Keywords: " +
-        newKeywords.length
+        newKeywords.length,
     );
   }
 
@@ -444,7 +416,7 @@ function workflow() {
     "discussion",
     searchQuery,
     allSummaries,
-    analyzedResults.length
+    analyzedResults.length,
   );
 
   console.log("  → Conclusions...");
@@ -452,7 +424,7 @@ function workflow() {
     "conclusions",
     searchQuery,
     allSummaries,
-    analyzedResults.length
+    analyzedResults.length,
   );
 
   // --- Phase 4: Generate Report ---
@@ -638,7 +610,7 @@ function workflow() {
       analyzedResults.length +
       " sources | Report: " +
       (report.length / 1000).toFixed(1) +
-      " KB              ║"
+      " KB              ║",
   );
   console.log("╚════════════════════════════════════════════════════════════╝");
 }
@@ -825,7 +797,7 @@ function filterRelevantResults(results, query) {
   ) {
     var batch = results.slice(
       batchStart,
-      Math.min(batchStart + batchSize, results.length)
+      Math.min(batchStart + batchSize, results.length),
     );
 
     var resultsList = batch
@@ -890,14 +862,14 @@ function filterRelevantResults(results, query) {
           }).length +
           "/" +
           batch.length +
-          " relevant"
+          " relevant",
       );
     } catch (e) {
       console.log(
         "    ⚠ Batch " +
           Math.floor(batchStart / batchSize + 1) +
           " filter error: " +
-          e.message
+          e.message,
       );
       // On error, include all from this batch
       batch.forEach(function (r) {
@@ -919,7 +891,7 @@ function filterRelevantResults(results, query) {
         scoredResults[i].score +
         "] " +
         scoredResults[i].result.title.slice(0, 40) +
-        "..."
+        "...",
     );
   }
 
@@ -998,7 +970,11 @@ function retryWithBackoff(fn, maxRetries, initialDelay) {
     } catch (e) {
       lastError = e;
       console.log(
-        "      ⚠ Attempt " + attempt + " failed, retrying in " + delay + "ms..."
+        "      ⚠ Attempt " +
+          attempt +
+          " failed, retrying in " +
+          delay +
+          "ms...",
       );
       sleep(delay);
       delay = delay * 2; // Exponential backoff
@@ -1050,7 +1026,7 @@ function generateDetailedFindingsWithRetry(
   summaries,
   sectionType,
   customPrompt,
-  mentionedKeywords
+  mentionedKeywords,
 ) {
   var MAX_RETRIES = 3;
   var content = "";
@@ -1089,7 +1065,7 @@ function generateDetailedFindingsWithRetry(
           return iniad_ai_mop.chat(systemPrompt, basePrompt);
         },
         2,
-        500
+        500,
       );
 
       // Check for empty content
@@ -1099,7 +1075,7 @@ function generateDetailedFindingsWithRetry(
             attempt +
             "/" +
             MAX_RETRIES +
-            ")..."
+            ")...",
         );
         sleep(1000);
         continue;
@@ -1108,7 +1084,7 @@ function generateDetailedFindingsWithRetry(
       // Check for truncation
       if (isContentTruncated(content)) {
         console.log(
-          "      ⚠ Truncated content detected, requesting completion..."
+          "      ⚠ Truncated content detected, requesting completion...",
         );
 
         // Try to complete the truncated content
@@ -1120,7 +1096,7 @@ function generateDetailedFindingsWithRetry(
         try {
           var completion = iniad_ai_mop.chat(
             "Complete the following Japanese text naturally. Only add the ending, no repetition.",
-            completionPrompt
+            completionPrompt,
           );
 
           if (completion && completion.length > 10) {
@@ -1244,8 +1220,8 @@ function verifyClaim(claim, sourceSummaries) {
       foundInSources.length >= 2
         ? "high"
         : foundInSources.length === 1
-        ? "medium"
-        : "low",
+          ? "medium"
+          : "low",
   };
 }
 
@@ -1363,7 +1339,7 @@ function generateFactCheckReport(findingsTexts, sourceSummaries) {
       basicResults.verified +
       "/" +
       basicResults.total +
-      " claims found in sources"
+      " claims found in sources",
   );
 
   // LLM-based deep verification (sample up to 3 sections)
@@ -1371,12 +1347,12 @@ function generateFactCheckReport(findingsTexts, sourceSummaries) {
   for (var i = 0; i < Math.min(3, findingsTexts.length); i++) {
     var sectionResults = verifyClaimsWithLLM(
       findingsTexts[i].content,
-      sourceSummaries
+      sourceSummaries,
     );
     llmResults = llmResults.concat(sectionResults);
   }
   console.log(
-    "    → LLM verification: " + llmResults.length + " claims analyzed"
+    "    → LLM verification: " + llmResults.length + " claims analyzed",
   );
 
   // Generate report section
@@ -1491,4 +1467,90 @@ function generateFactCheckReport(findingsTexts, sourceSummaries) {
   return report;
 }
 
+// --- TEST WORKFLOW: Finder Plugin (AppleScript のみ) ---
+function workflow() {
+  const testDir = "/Users/user/Desktop";
+  const query = "Floorp";
+  const maxResults = 20;
+  const outPath = testDir + "/finder_test_results.json";
+
+  console.log("╔════════════════════════════════════════════════════════════╗");
+  console.log("║           Finder Plugin Test (AppleScript Only)            ║");
+  console.log("╚════════════════════════════════════════════════════════════╝");
+  console.log("");
+  console.log("  Search Directory: " + testDir);
+  console.log("  Search Query: " + query);
+  console.log("  Max Results: " + maxResults);
+  console.log("");
+
+  const results = {
+    startedAt: new Date().toISOString(),
+    query: query,
+    directory: testDir,
+    test: null,
+  };
+
+  try {
+    // Check plugin availability
+    if (!app || !app.sapphillon || !app.sapphillon.core || !app.sapphillon.core.finder) {
+      throw new Error("Finder plugin not available (app.sapphillon.core.finder missing)");
+    }
+
+    console.log("━━━ Running findFiles (AppleScript) ━━━");
+    console.log("");
+
+    const startTime = Date.now();
+    const json = app.sapphillon.core.finder.findFiles(testDir, query, maxResults);
+    const elapsed = Date.now() - startTime;
+    const arr = JSON.parse(json || "[]");
+
+    results.test = {
+      name: "findFiles",
+      ok: true,
+      count: arr.length,
+      elapsedMs: elapsed,
+      sample: arr.slice(0, 10),
+    };
+
+    console.log("  ✓ findFiles returned " + arr.length + " results in " + elapsed + "ms");
+    console.log("");
+
+    if (arr.length > 0) {
+      console.log("━━━ File List ━━━");
+      arr.forEach(function(path, i) {
+        console.log("  " + (i + 1) + ". " + path);
+      });
+      console.log("");
+    } else {
+      console.log("  ⚠ No results found for query: " + query);
+    }
+
+  } catch (e) {
+    results.test = {
+      name: "findFiles",
+      ok: false,
+      error: String(e),
+    };
+    console.log("  ✗ Error: " + e);
+  }
+
+  // Save results
+  try {
+    results.finishedAt = new Date().toISOString();
+    const outStr = JSON.stringify(results, null, 2);
+    app.sapphillon.core.filesystem.write(outPath, outStr);
+    console.log("");
+    console.log("━━━ Results saved ━━━");
+    console.log("  → " + outPath);
+  } catch (e) {
+    console.log("  ✗ Failed to write results: " + e);
+  }
+
+  console.log("");
+  console.log("╔════════════════════════════════════════════════════════════╗");
+  console.log("║                      Test Complete                         ║");
+  console.log("╚════════════════════════════════════════════════════════════╝");
+}
+
+// Auto-run
 workflow();

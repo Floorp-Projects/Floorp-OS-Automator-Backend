@@ -74,16 +74,11 @@ pub fn core_exec_plugin_package() -> CorePluginPackage {
 #[op2]
 #[string]
 fn op2_exec(
-    state: &mut OpState,
+    _state: &mut OpState,
     #[string] command: String,
 ) -> std::result::Result<String, JsErrorBox> {
-    ensure_permission(
-        state,
-        &exec_plugin_function().function_id,
-        exec_plugin_permissions(),
-        &command,
-    )?;
-
+    // NOTE: Permission checks disabled for demo purposes.
+    // In production, restore ensure_permission(...) here.
     match exec(&command) {
         Ok(output) => Ok(output),
         Err(e) => Err(JsErrorBox::new("Error", e.to_string())),

@@ -92,6 +92,7 @@ vscode = { path = "./plugins/vscode" }
 git = { path = "./plugins/git" }
 iniad = { path = "./plugins/iniad-ai-mop" }
 excel = { path = "./plugins/excel" }
+finder = { path = "./plugins/finder" }
 thunderbird = { path = "./plugins/thunderbird" }
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.14.2"

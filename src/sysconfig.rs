@@ -17,6 +17,7 @@ use vscode::{core_vscode_plugin_package, vscode_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
 use git::{core_git_plugin_package, git_plugin_package};
 use iniad::{core_iniad_ai_mop_plugin_package, iniad_ai_mop_plugin_package};
+use finder::{core_finder_plugin_package, finder_plugin_package};
 use excel::{core_excel_plugin_package, excel_plugin_package};
 use thunderbird::{core_thunderbird_plugin_package, thunderbird_plugin_package};
 
@@ -40,6 +41,7 @@ pub fn sysconfig() -> SysConfig {
         core_plugin_package: vec![
             Arc::new(core_fetch_plugin_package()),
             Arc::new(core_filesystem_plugin_package()),
+            Arc::new(core_finder_plugin_package()),
             Arc::new(core_floorp_plugin_package()),
             Arc::new(core_vscode_plugin_package()),
             Arc::new(core_search_plugin_package()),
@@ -53,6 +55,7 @@ pub fn sysconfig() -> SysConfig {
         initial_plugins: vec![
             fetch_plugin_package(),
             filesystem_plugin_package(),
+            finder_plugin_package(),
             floorp_plugin_package(),
             vscode_plugin_package(),
             search_plugin_package(),

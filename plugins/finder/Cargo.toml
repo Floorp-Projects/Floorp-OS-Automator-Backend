@@ -1,0 +1,19 @@
+[package]
+name = "finder"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+deno_core.workspace = true
+deno_error.workspace = true
+sapphillon_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
