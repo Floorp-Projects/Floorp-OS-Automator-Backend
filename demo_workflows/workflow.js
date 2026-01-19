@@ -1492,15 +1492,26 @@ function workflow() {
 
   try {
     // Check plugin availability
-    if (!app || !app.sapphillon || !app.sapphillon.core || !app.sapphillon.core.finder) {
-      throw new Error("Finder plugin not available (app.sapphillon.core.finder missing)");
+    if (
+      !app ||
+      !app.sapphillon ||
+      !app.sapphillon.core ||
+      !app.sapphillon.core.finder
+    ) {
+      throw new Error(
+        "Finder plugin not available (app.sapphillon.core.finder missing)",
+      );
     }
 
     console.log("━━━ Running findFiles (AppleScript) ━━━");
     console.log("");
 
     const startTime = Date.now();
-    const json = app.sapphillon.core.finder.findFiles(testDir, query, maxResults);
+    const json = app.sapphillon.core.finder.findFiles(
+      testDir,
+      query,
+      maxResults,
+    );
     const elapsed = Date.now() - startTime;
     const arr = JSON.parse(json || "[]");
 
@@ -1512,19 +1523,20 @@ function workflow() {
       sample: arr.slice(0, 10),
     };
 
-    console.log("  ✓ findFiles returned " + arr.length + " results in " + elapsed + "ms");
+    console.log(
+      "  ✓ findFiles returned " + arr.length + " results in " + elapsed + "ms",
+    );
     console.log("");
 
     if (arr.length > 0) {
       console.log("━━━ File List ━━━");
-      arr.forEach(function(path, i) {
+      arr.forEach(function (path, i) {
         console.log("  " + (i + 1) + ". " + path);
       });
       console.log("");
     } else {
       console.log("  ⚠ No results found for query: " + query);
     }
-
   } catch (e) {
     results.test = {
       name: "findFiles",
