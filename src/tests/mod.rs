@@ -32,4 +32,5 @@
 //! cargo test --test external_plugin -- --ignored
 //! ```
 
+#[cfg(test)]
 mod external_plugin;

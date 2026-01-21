@@ -14,6 +14,7 @@ use tempfile::TempDir;
 /// Returns the path to the test fixtures directory.
 pub fn get_fixtures_dir() -> PathBuf {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("src");
     d.push("tests");
     d.push("fixtures");
     d

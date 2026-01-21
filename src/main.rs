@@ -21,6 +21,9 @@ mod global;
 #[cfg(test)]
 mod test_support;
 
+#[cfg(test)]
+mod tests;
+
 /// System Configuration
 #[allow(unused)]
 mod sysconfig;
