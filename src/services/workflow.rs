@@ -695,7 +695,12 @@ impl WorkflowService for MyWorkflowService {
                 allowed_permissions,
             );
 
-            workflow_core.run(Handle::current(), None, None);
+            let sysconfig = crate::sysconfig::sysconfig();
+            workflow_core.run(
+                Handle::current(),
+                sysconfig.external_plugin_runner_path,
+                Some(sysconfig.external_plugin_runner_args),
+            );
 
             if workflow_core.result.is_empty() {
                 return Err(Status::internal("workflow execution produced no result"));

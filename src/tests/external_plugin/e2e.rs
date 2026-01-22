@@ -85,7 +85,14 @@ fn test_complete_install_load_execute_flow() {
     );
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    code.run(tokio_runtime.handle().clone(), None, None);
+
+    let external_package_runner_path = get_debug_binary_path();
+
+    code.run(
+        tokio_runtime.handle().clone(),
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
+    );
 
     // Step 6: Verify results
     assert_eq!(code.result.len(), 1);

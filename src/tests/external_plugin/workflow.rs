@@ -58,7 +58,14 @@ fn test_workflow_with_external_plugin_add() {
     );
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    code.run(tokio_runtime.handle().clone(), None, None);
+
+    let external_package_runner_path = get_debug_binary_path();
+
+    code.run(
+        tokio_runtime.handle().clone(),
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
+    );
 
     assert_eq!(code.result.len(), 1);
     let res = &code.result[0];
@@ -114,7 +121,14 @@ fn test_workflow_with_external_plugin_process_data() {
     );
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    code.run(tokio_runtime.handle().clone(), None, None);
+
+    let external_package_runner_path = get_debug_binary_path();
+
+    code.run(
+        tokio_runtime.handle().clone(),
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
+    );
 
     assert_eq!(code.result.len(), 1);
     let res = &code.result[0];
@@ -174,7 +188,14 @@ fn test_workflow_without_permission_requirement() {
     );
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    code.run(tokio_runtime.handle().clone(), None, None);
+
+    let external_package_runner_path = get_debug_binary_path();
+
+    code.run(
+        tokio_runtime.handle().clone(),
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
+    );
 
     assert_eq!(code.result.len(), 1);
     let res = &code.result[0];
@@ -250,7 +271,14 @@ fn test_multiple_plugins_in_workflow() {
     );
 
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    code.run(tokio_runtime.handle().clone(), None, None);
+
+    let external_package_runner_path = get_debug_binary_path();
+
+    code.run(
+        tokio_runtime.handle().clone(),
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
+    );
 
     assert_eq!(code.result.len(), 1);
     let res = &code.result[0];

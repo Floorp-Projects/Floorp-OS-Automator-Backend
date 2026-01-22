@@ -7,6 +7,7 @@
 use sapphillon_core::deno_core;
 use sapphillon_core::plugin::CorePluginExternalPackage;
 use sapphillon_core::runtime::OpStateWorkflowData;
+use std::env;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
@@ -25,6 +26,48 @@ pub fn get_fixture_path(filename: &str) -> PathBuf {
     let mut path = get_fixtures_dir();
     path.push(filename);
     path
+}
+
+/// Returns the path to the debug binary (not the test binary).
+///
+/// Converts the test binary path (e.g., `target/debug/deps/sapphillon-abc123`)
+/// to the debug binary path (e.g., `target/debug/sapphillon`).
+///
+/// # Returns
+///
+/// * `Some(String)` - The path to the debug binary
+/// * `None` - If the conversion fails
+pub fn get_debug_binary_path() -> Option<String> {
+    let current_exe = env::current_exe().ok()?;
+
+    // テスト用バイナリのパスからdebug用バイナリのパスを構築
+    // 例: /workspaces/Sapphillon/target/debug/deps/sapphillon-abc123
+    // -> /workspaces/Sapphillon/target/debug/sapphillon
+
+    let path_str = current_exe.to_string_lossy();
+
+    // depsディレクトリを削除
+    let debug_path = if path_str.contains("/deps/") {
+        path_str.replace("/deps/", "/")
+    } else if path_str.contains("\\deps\\") {
+        path_str.replace("\\deps\\", "\\")
+    } else {
+        return None;
+    };
+
+    // バイナリ名からハッシュ部分を削除
+    // 例: sapphillon-abc123 -> sapphillon
+    let file_name = std::path::Path::new(&debug_path)
+        .file_name()?
+        .to_string_lossy();
+
+    let base_name = file_name.split('-').next().unwrap_or(&file_name);
+
+    let final_path = std::path::Path::new(&debug_path)
+        .parent()?
+        .join(base_name);
+
+    Some(final_path.to_string_lossy().into_owned())
 }
 
 /// Reads a fixture file and returns its contents as a String.
@@ -79,6 +122,8 @@ pub fn create_opstate_with_package(
     );
 
     // Create OpStateWorkflowData with the external package
+    let external_package_runner_path = get_debug_binary_path();
+
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
     let workflow_data = OpStateWorkflowData::new(
         "test_workflow",
@@ -87,8 +132,8 @@ pub fn create_opstate_with_package(
         None,
         tokio_runtime.handle().clone(),
         vec![Arc::new(package)],
-        None,
-        None,
+        external_package_runner_path,
+        Some(vec!["ext".to_string()]),
     );
 
     // Put workflow data into OpState
