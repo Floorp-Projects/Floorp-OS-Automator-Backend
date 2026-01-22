@@ -85,13 +85,12 @@ fn test_complete_install_load_execute_flow() {
     );
 
     // 既存のランタイムハンドルを取得
-    let handle = tokio::runtime::Handle::try_current()
-        .expect("Tokio runtime must be available");
+    let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
 
     let external_package_runner_path = get_debug_binary_path();
 
     code.run(
-        handle.clone(),
+        tokio_runtime.handle().clone(),
         external_package_runner_path,
         Some(vec!["ext".to_string()]),
     );
