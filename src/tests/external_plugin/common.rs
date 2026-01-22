@@ -127,9 +127,15 @@ pub fn create_opstate_with_package(
     // Create OpStateWorkflowData with the external package
     let external_package_runner_path = get_debug_binary_path();
 
-    // 既存のランタイムハンドルを取得
+    // 既存のランタイムハンドルを取得、なければ新しく作成
     let handle = tokio::runtime::Handle::try_current()
-        .expect("Tokio runtime must be available");
+        .unwrap_or_else(|_| {
+            // 新しいruntimeを作成してハンドルを返す
+            tokio::runtime::Runtime::new()
+                .expect("Failed to create tokio runtime")
+                .handle()
+                .clone()
+        });
 
     let workflow_data = OpStateWorkflowData::new(
         "test_workflow",
