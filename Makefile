@@ -21,6 +21,7 @@ help:
 test:
 	@echo "Run Rust Tests"
 	@echo "----------------------------------------------------------"
+	cargo build --workspace --all-features
 	RUST_TEST_THREADS=1 cargo test --workspace --all-features
 	@echo "----------------------------------------------------------"
 
