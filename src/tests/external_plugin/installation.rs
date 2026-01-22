@@ -38,7 +38,11 @@ fn test_plugin_installation_creates_directory_structure() {
     assert_eq!(content, plugin_content);
 
     // Verify the directory structure
-    let expected_dir = temp_dir.path().join(author_id).join(package_id).join(version);
+    let expected_dir = temp_dir
+        .path()
+        .join(author_id)
+        .join(package_id)
+        .join(version);
     assert!(expected_dir.exists(), "Plugin directory should exist");
     assert!(expected_dir.is_dir(), "Plugin path should be a directory");
 }
@@ -58,14 +62,12 @@ fn test_plugin_scan_finds_installed_plugins() {
     // Create plugin 1
     let plugin1_dir = temp_dir.path().join("author1/plugin1/1.0.0");
     std::fs::create_dir_all(&plugin1_dir).expect("Failed to create plugin1 dir");
-    std::fs::write(plugin1_dir.join("package.js"), math_plugin)
-        .expect("Failed to write plugin1");
+    std::fs::write(plugin1_dir.join("package.js"), math_plugin).expect("Failed to write plugin1");
 
     // Create plugin 2
     let plugin2_dir = temp_dir.path().join("author2/plugin2/2.0.0");
     std::fs::create_dir_all(&plugin2_dir).expect("Failed to create plugin2 dir");
-    std::fs::write(plugin2_dir.join("package.js"), error_plugin)
-        .expect("Failed to write plugin2");
+    std::fs::write(plugin2_dir.join("package.js"), error_plugin).expect("Failed to write plugin2");
 
     // Create incomplete plugin (no package.js)
     let incomplete_dir = temp_dir.path().join("author3/incomplete/1.0.0");

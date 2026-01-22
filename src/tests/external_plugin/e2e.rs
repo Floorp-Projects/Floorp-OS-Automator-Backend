@@ -11,7 +11,9 @@
 //! Run with: `cargo test --test external_plugin -- --ignored`
 
 use super::common::*;
-use sapphillon_core::plugin::{CorePluginExternalFunction, CorePluginExternalPackage, PluginPackageTrait};
+use sapphillon_core::plugin::{
+    CorePluginExternalFunction, CorePluginExternalPackage, PluginPackageTrait,
+};
 use sapphillon_core::workflow::CoreWorkflowCode;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -26,7 +28,6 @@ use tempfile::TempDir;
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_complete_install_load_execute_flow() {
     let math_plugin = read_fixture("math_plugin.js");
 
@@ -34,7 +35,7 @@ fn test_complete_install_load_execute_flow() {
     let author_id = "com.sapphillon.test";
     let package_name = "installed-plugin";
     let version = "1.0.0";
-    
+
     let (_temp_dir, package_js_path) =
         create_temp_plugin(author_id, package_name, version, &math_plugin);
 
@@ -46,8 +47,8 @@ fn test_complete_install_load_execute_flow() {
     );
 
     // Step 3: Load plugin from installed location
-    let loaded_js = std::fs::read_to_string(&package_js_path)
-        .expect("Failed to read installed plugin");
+    let loaded_js =
+        std::fs::read_to_string(&package_js_path).expect("Failed to read installed plugin");
 
     // Step 4: Create plugin package from loaded code
     let add_func = CorePluginExternalFunction::new(
@@ -108,7 +109,6 @@ fn test_complete_install_load_execute_flow() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_plugin_reinstallation_workflow() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let plugin_dir = temp_dir.path().join("author/plugin/1.0.0");
@@ -143,7 +143,7 @@ globalThis.Sapphillon = {
 
     // Load and execute initial version
     let loaded_v1 = std::fs::read_to_string(&package_path).expect("Failed to read v1");
-    
+
     let calc_func_v1 = CorePluginExternalFunction::new(
         "calc".to_string(),
         "calculate".to_string(),
@@ -210,7 +210,7 @@ globalThis.Sapphillon = {
 
     // Load and execute updated version
     let loaded_v2 = std::fs::read_to_string(&package_path).expect("Failed to read v2");
-    
+
     let calc_func_v2 = CorePluginExternalFunction::new(
         "calc".to_string(),
         "calculate".to_string(),

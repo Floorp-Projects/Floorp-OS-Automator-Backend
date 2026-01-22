@@ -113,21 +113,33 @@ pub fn scan_plugin_directory(save_dir: &str) -> Vec<String> {
     // Traverse: author-id/package-id/version/package.js
     if let Ok(author_entries) = fs::read_dir(base_path) {
         for author_entry in author_entries.flatten() {
-            if !author_entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            if !author_entry
+                .file_type()
+                .map(|t| t.is_dir())
+                .unwrap_or(false)
+            {
                 continue;
             }
             let author_id = author_entry.file_name().to_string_lossy().to_string();
 
             if let Ok(package_entries) = fs::read_dir(author_entry.path()) {
                 for package_entry in package_entries.flatten() {
-                    if !package_entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    if !package_entry
+                        .file_type()
+                        .map(|t| t.is_dir())
+                        .unwrap_or(false)
+                    {
                         continue;
                     }
                     let package_id = package_entry.file_name().to_string_lossy().to_string();
 
                     if let Ok(version_entries) = fs::read_dir(package_entry.path()) {
                         for version_entry in version_entries.flatten() {
-                            if !version_entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                            if !version_entry
+                                .file_type()
+                                .map(|t| t.is_dir())
+                                .unwrap_or(false)
+                            {
                                 continue;
                             }
                             let version = version_entry.file_name().to_string_lossy().to_string();

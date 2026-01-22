@@ -24,7 +24,6 @@ use serde_json::json;
 /// **Note:** This test requires the external plugin server binary to be built.
 /// Run with `cargo test -- --ignored` after building the ext_plugin server.
 #[test]
-#[ignore = "Requires external plugin server binary (cargo build -p ext_plugin)"]
 fn test_bridge_basic_function_execution() {
     let math_plugin = read_fixture("math_plugin.js");
     let (mut op_state, _tokio_rt) =
@@ -55,7 +54,6 @@ fn test_bridge_basic_function_execution() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_bridge_complex_object_handling() {
     let math_plugin = read_fixture("math_plugin.js");
     let (mut op_state, _tokio_rt) =
@@ -93,7 +91,6 @@ fn test_bridge_complex_object_handling() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_bridge_error_handling() {
     use std::collections::HashMap;
 
@@ -126,7 +123,6 @@ fn test_bridge_error_handling() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_bridge_unknown_function() {
     use std::collections::HashMap;
 
@@ -160,7 +156,6 @@ fn test_bridge_unknown_function() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_bridge_loose_type_handling() {
     let math_plugin = read_fixture("math_plugin.js");
     let (mut op_state, _tokio_rt) =
@@ -204,7 +199,6 @@ fn test_bridge_loose_type_handling() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_bridge_async_function_success() {
     let error_plugin = read_fixture("error_plugin.js");
     let (mut op_state, _tokio_rt) =

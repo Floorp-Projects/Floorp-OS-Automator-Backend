@@ -32,8 +32,8 @@
 //! cargo test --test external_plugin -- --ignored
 //! ```
 
-mod common;
-mod installation;
 mod bridge;
-mod workflow;
+mod common;
 mod e2e;
+mod installation;
+mod workflow;

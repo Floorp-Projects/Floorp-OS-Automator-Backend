@@ -11,7 +11,9 @@
 //! Run with: `cargo test --test external_plugin -- --ignored`
 
 use super::common::*;
-use sapphillon_core::plugin::{CorePluginExternalFunction, CorePluginExternalPackage, PluginPackageTrait};
+use sapphillon_core::plugin::{
+    CorePluginExternalFunction, CorePluginExternalPackage, PluginPackageTrait,
+};
 use sapphillon_core::workflow::CoreWorkflowCode;
 use std::sync::Arc;
 
@@ -22,7 +24,6 @@ use std::sync::Arc;
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_workflow_with_external_plugin_add() {
     let math_plugin = read_fixture("math_plugin.js");
 
@@ -77,7 +78,6 @@ fn test_workflow_with_external_plugin_add() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
 fn test_workflow_with_external_plugin_process_data() {
     let math_plugin = read_fixture("math_plugin.js");
 
@@ -139,7 +139,7 @@ fn test_workflow_with_external_plugin_process_data() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
+#[ignore = "Requires external plugin server binary (v0.15.0 compatibility issue)"]
 fn test_workflow_without_permission_requirement() {
     let file_plugin = read_fixture("file_plugin.js");
 
@@ -194,7 +194,7 @@ fn test_workflow_without_permission_requirement() {
 ///
 /// **Note:** This test requires the external plugin server binary.
 #[test]
-#[ignore = "Requires external plugin server binary"]
+#[ignore = "Requires external plugin server binary (v0.15.0 compatibility issue)"]
 fn test_multiple_plugins_in_workflow() {
     let math_plugin = read_fixture("math_plugin.js");
     let file_plugin = read_fixture("file_plugin.js");

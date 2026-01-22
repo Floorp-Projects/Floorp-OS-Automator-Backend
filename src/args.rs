@@ -101,7 +101,7 @@ impl std::fmt::Display for LogLevel {
 pub enum Command {
     /// Start the gRPC server
     Start,
-    
+
     #[command(hide = true)]
     /// Run the External Plugin Server
     Ext {
