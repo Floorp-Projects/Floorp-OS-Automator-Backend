@@ -16,6 +16,7 @@ use sapphillon_core::plugin::{
 };
 use sapphillon_core::workflow::CoreWorkflowCode;
 use std::sync::Arc;
+use std::vec;
 use tempfile::TempDir;
 
 /// Integration Test: Complete Install → Load → Execute Flow
@@ -180,9 +181,11 @@ globalThis.Sapphillon = {
         vec![],
     );
 
-    // 既存のランタイムハンドルを取得
     let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
-    code_v1.run(handle.clone(), None, None);
+    
+    let external_package_runner_path = get_debug_binary_path();
+
+    code_v1.run(handle.clone(), external_package_runner_path.clone(), Some(vec!["ext".to_string()]));
 
     assert!(
         code_v1.result[0].result.contains("20"),
@@ -248,10 +251,7 @@ globalThis.Sapphillon = {
         vec![],
     );
 
-    // 既存のランタイムハンドルを取得
-    let handle = tokio::runtime::Handle::try_current()
-        .expect("Tokio runtime must be available");
-    code_v2.run(handle.clone(), None, None);
+    code_v2.run(handle.clone(), external_package_runner_path, Some(vec!["ext".to_string()]));
 
     assert!(
         code_v2.result[0].result.contains("30"),
