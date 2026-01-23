@@ -119,7 +119,7 @@ async fn main() -> Result<()> {
         Command::Ext { server_name } => {
             info!("Starting External Plugin Server {server_name}...");
             use sapphillon_core::ext_plugin::extplugin_server;
-            extplugin_server(&server_name)?;
+            extplugin_server(&server_name).await?;
         }
     }
 

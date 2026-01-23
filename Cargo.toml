@@ -28,7 +28,7 @@ x-win = "5.3.3"
 tonic = { version = "0.14.1", default-features = false, features = ["codegen", "transport", "router"] }
 prost = { version = "0.14.1", default-features = false, features = ["std"] }
 prost-types = { version = "0.14.1", default-features = false }
-sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.16.0" }
+sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.17.0" }
 tonic-build = "0.14.1"
 
 sea-orm = { version = "1.1.0", features = [
@@ -106,4 +106,4 @@ timezone_provider = { git = "https://github.com/boa-dev/temporal.git", tag = "v0
 
 [dev-dependencies]
 tempfile = "3.24.0"
-ext_plugin = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.16.0", package = "ext_plugin" }
+ext_plugin = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.17.0", package = "ext_plugin" }

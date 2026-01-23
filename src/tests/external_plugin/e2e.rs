@@ -42,8 +42,7 @@ fn test_complete_install_load_execute_flow() {
     // Step 2: Verify installation
     assert!(
         package_js_path.exists(),
-        "Plugin should be installed at {:?}",
-        package_js_path
+        "Plugin should be installed at {package_js_path:?}"
     );
 
     // Step 3: Load plugin from installed location
@@ -182,8 +181,7 @@ globalThis.Sapphillon = {
     );
 
     // 既存のランタイムハンドルを取得
-    let handle = tokio::runtime::Handle::try_current()
-        .expect("Tokio runtime must be available");
+    let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
     code_v1.run(handle.clone(), None, None);
 
     assert!(
