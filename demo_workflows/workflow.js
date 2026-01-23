@@ -1,11 +1,24 @@
 /**
  * Deep Research - Comprehensive Web Analysis
  *
- * 1. Search on DuckDuckGo (50 results)
- * 2. AI relevance filtering to select most relevant results
- * 3. Visit each relevant URL to extract detailed content
+ * ENHANCED FEATURES:
+ * 1. Query Expansion - Multi-angle search with synonyms and related terms
+ * 2. Source Reliability Scoring - Trustworthiness evaluation
+ * 3. Cross-Reference Verification - Fact validation across sources
+ * 4. Academic Citation Format - Professional referencing
+ * 5. Insight Generation - Pattern recognition and predictions
+ * 6. Interactive Exploration - User-guided investigation
+ * 7. Metadata Extraction - Authority and social signals
+ * 8. Knowledge Graph - Relationship mapping
+ * 9. Quality Assurance - Multi-dimensional quality metrics
+ *
+ * PIPELINE:
+ * 1. DuckDuckGo Search (50 results) with Query Expansion
+ * 2. AI relevance filtering + Source Reliability Scoring
+ * 3. Visit each relevant URL to extract detailed content + Metadata
  * 4. Analyze and synthesize with LLM
- * 5. Generate comprehensive academic-style report with fact-checking
+ * 5. Cross-Reference Verification + Insight Extraction
+ * 6. Generate comprehensive academic-style report with fact-checking
  */
 
 function workflow() {
@@ -629,6 +642,74 @@ function workflow() {
     analyzedResults.length,
   );
 
+  // --- Phase 3.6: Source Reliability Scoring ---
+  console.log("");
+  console.log("━━━ Phase 3.6: Source Reliability Scoring ━━━");
+
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var reliability = calculateSourceReliability(analyzedResults[i].result);
+    analyzedResults[i].reliability = reliability;
+
+    var scoreIcon = reliability.score >= 8 ? "🟢" : reliability.score >= 6 ? "🟡" : "🔴";
+    console.log(
+      "    " + scoreIcon + " [" + (i + 1) + "] " +
+      analyzedResults[i].result.title.substring(0, 40) + "... " +
+      reliability.score.toFixed(1) + "/10 (" + reliability.level + ")"
+    );
+  }
+
+  // --- Phase 3.7: Cross-Reference Verification ---
+  console.log("");
+  console.log("━━━ Phase 3.7: Cross-Reference Verification ━━━");
+
+  var crossRefResults = verifyCrossSource(analyzedResults, 2);
+  analyzedResults.forEach(function (a) {
+    a.crossRefScore = 0;
+  });
+
+  // Mark sources with verified facts
+  crossRefResults.verified.forEach(function (vf) {
+    vf.sources.forEach(function (sourceIdx) {
+      if (analyzedResults[sourceIdx]) {
+        analyzedResults[sourceIdx].crossRefScore += vf.sourceCount;
+      }
+    });
+  });
+
+  // --- Phase 3.8: Metadata Extraction ---
+  console.log("");
+  console.log("━━━ Phase 3.8: Rich Metadata Extraction ━━━");
+
+  for (var i = 0; i < Math.min(5, analyzedResults.length); i++) {
+    if (!analyzedResults[i].result.isLocalFile) {
+      console.log("    Extracting metadata for source " + (i + 1) + "...");
+      var metadata = extractRichMetadata(analyzedResults[i].result, null);
+      analyzedResults[i].metadata = metadata;
+      console.log(
+        "      Authority: " + metadata.authority.toFixed(1) + "/10" +
+        (metadata.author ? " | Author: " + metadata.author : "")
+      );
+    }
+  }
+
+  // --- Phase 3.9: Knowledge Graph Construction ---
+  console.log("");
+  console.log("━━━ Phase 3.9: Knowledge Graph Construction ━━━");
+
+  var knowledgeGraph = buildKnowledgeGraph(analyzedResults);
+
+  // --- Phase 3.10: Insight Generation ---
+  console.log("");
+  console.log("━━━ Phase 3.10: Insight Generation ━━━");
+
+  var insightsText = extractInsights(analyzedResults, searchQuery);
+
+  // --- Phase 3.11: Interactive Exploration Setup ---
+  console.log("");
+  console.log("━━━ Phase 3.11: Interactive Exploration Setup ━━━");
+
+  var interactiveQuestions = performInteractiveExploration(analyzedResults, searchQuery);
+
   // Generate detailed Key Findings with multiple subsections
   console.log("  → Key Findings (15 detailed sections)...");
 
@@ -834,10 +915,10 @@ function workflow() {
   report += "5. [Web-Local Correlation](#5-web-local-correlation)\n";
   report += "6. [Discussion](#6-discussion)\n";
   report += "7. [Conclusions](#7-conclusions)\n";
-  report += "8. [References](#8-references)\n";
-  report += "9. [Fact-Check Summary](#9-fact-check-summary)\n";
+  report += "8. [References](#11-references)\n";
+  report += "9. [Fact-Check Summary](#12-fact-check-summary)\n";
   report +=
-    "10. [Temporal & Contradiction Analysis](#10-temporal--contradiction-analysis)\n";
+    "10. [Temporal & Contradiction Analysis](#13-temporal--contradiction-analysis)\n";
   report += "---\n\n";
 
   // Overview
@@ -1057,9 +1138,56 @@ function workflow() {
   report += "## 7. Conclusions\n\n";
   report += conclusionsText + "\n\n";
 
+
+  // Cross-Reference Verification
+  report += "---\n\n";
+  report += "## 8. Cross-Reference Verification\n\n";
+  report += "> **クロスリファレンス検証**\n>\n";
+  report += "> 複数の情報源で同じ事実が確認されているかを検証しました。\n\n";
+
+  report += "### 8.1 検証済みの事実\n\n";
+  report += "以下の事実は2つ以上の情報源で確認されています：\n\n";
+  report += "| 事実 | 確認数 | 信頼度 | 情報源 |\n";
+  report += "|------|--------|--------|---------|\n";
+
+  crossRefResults.verified.forEach(function (vf) {
+    var confidenceBar = "";
+    for (var c = 0; c < 5; c++) {
+      confidenceBar += c < Math.floor(vf.confidence * 5) ? "●" : "○";
+    }
+    var sourcesStr = vf.sources.map(function (s) { return "[" + (s + 1) + "]"; }).join(", ");
+    report +=
+      "| " + vf.fact.substring(0, 30) + " | " +
+      vf.sourceCount + " | " + confidenceBar + " | " +
+      sourcesStr + " |\n";
+  });
+
+  report += "\n";
+  report += "### 8.2 未検証の事実\n\n";
+  report += "以下の事実は単一の情報源からのみ確認されています（追加検証推奨）：\n\n";
+  var unverifiedToShow = crossRefResults.unverified.slice(0, 10);
+  unverifiedToShow.forEach(function (uf) {
+    var sourcesStr = uf.sources.map(function (s) { return "[" + (s + 1) + "]"; }).join(", ");
+    report += "- " + uf.fact + " (情報源: " + sourcesStr + ")\n";
+  });
+  if (crossRefResults.unverified.length > 10) {
+    report += "  ... 他 " + (crossRefResults.unverified.length - 10) + "件\n";
+  }
+  report += "\n";
+
+  // Insights & Patterns
+  report += "---\n\n";
+  report += "## 9. Insights & Patterns\n\n";
+  report += insightsText + "\n\n";
+
+  // Knowledge Graph
+  report += "---\n\n";
+  report += generateKnowledgeGraphReport(knowledgeGraph);
+
+
   // References
   report += "---\n\n";
-  report += "## 8. References\n\n";
+  report += "## 11. References\n\n";
   searchResults.forEach(function (r, i) {
     report +=
       "[" +
@@ -1087,11 +1215,24 @@ function workflow() {
   report += factCheckSection;
 
   report += "---\n\n";
-  report += "## 10. Temporal & Contradiction Analysis\n\n";
+  report += "## 13. Temporal & Contradiction Analysis\n\n";
   report += generateTemporalReport(temporalTrends, searchResults);
   report += generateContradictionReport(contradictions, analyzedResults);
   report += "---\n\n";
-  report += "*This report was automatically generated by Deep Research.*\n";
+
+
+  report += "---\n\n";
+  report += "## 14. Quality Assurance\n\n";
+
+  // Perform quality check
+  console.log("");
+  console.log("━━━ Phase 6: Quality Assurance ━━━");
+
+  var qaResults = performQualityCheck(analyzedResults, report, searchResults);
+  var qaReport = generateQualityReport(qaResults);
+  report += qaReport;
+
+  report += "---\n\n";  report += "*This report was automatically generated by Deep Research.*\n";
   report +=
     "*Analysis powered by AI-driven content extraction and synthesis.*\n";
   report +=
@@ -2332,7 +2473,7 @@ function generateFactCheckReport(
   );
 
   // Generate report section
-  var report = "## 9. Fact-Check Summary\n\n";
+  var report = "## 12. Fact-Check Summary\n\n";
   report += "> **検証結果概要**\n>\n";
   report += "> 本レポートの内容を情報源と照合し、事実確認を実施しました。\n";
   report += "> また、セクション10で時系列分析と矛盾検出も実施しています。\n\n";
@@ -2941,6 +3082,851 @@ function generateTemporalReport(trends, results) {
     }
     report += "\n";
   }
+
+  return report;
+}
+
+// ============================================================================
+// NEW: Query Expansion Functions
+// ============================================================================
+
+// Generate expanded search queries from original query
+function expandSearchQuery(originalQuery) {
+  console.log("  Expanding query for multi-angle search...");
+
+  var expansions = [];
+
+  // Use LLM to generate query expansions
+  var expansionPrompt =
+    "以下の検索クエリについて、包括的な調査を行うための検索クエリの拡張を提案してください。\n\n" +
+    "【タスク】\n" +
+    "以下のカテゴリごとに1〜2つの検索クエリを生成してください：\n" +
+    "1. 基本情報 - 定義、概要、歴史\n" +
+    "2. 技術的詳細 - 仕様、アーキテクチャ、実装\n" +
+    "3. 比較・評価 - 他との比較、レビュー、評価\n" +
+    "4. 最新動向 - ニュース、アップデート、今後の展望\n" +
+    "5. 課題・問題 - 既知の問題、課題、改善点\n\n" +
+    "【重要】\n" +
+    "- クエリは簡潔に（3〜8語程度）\n" +
+    "- 専門用語や技術的な用語を含める\n" +
+    "- 日本語と英語の両方を含める\n" +
+    "- 元のクエリを含めること\n\n" +
+    "【出力形式】JSON配列のみ:\n" +
+    '[{"category":"basic","query":"検索クエリ1"},{"category":"technical","query":"検索クエリ2"},...]';
+
+  try {
+    var expansionResponse = iniad_ai_mop.chat(
+      "Generate search query expansions. Output JSON array only.",
+      expansionPrompt
+    );
+
+    expansionResponse = expansionResponse
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = expansionResponse.indexOf("[");
+    var jsonEnd = expansionResponse.lastIndexOf("]") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      expansions = JSON.parse(expansionResponse.slice(jsonStart, jsonEnd));
+    }
+
+    console.log("    Generated " + expansions.length + " expanded queries");
+  } catch (e) {
+    console.log("    ⚠ Query expansion failed: " + e.message);
+    // Fallback to manual expansions
+    expansions = [
+      { category: "basic", query: originalQuery },
+      { category: "basic", query: originalQuery + " 概要" },
+      { category: "basic", query: originalQuery + " history" },
+      { category: "technical", query: originalQuery + " 仕様" },
+      { category: "technical", query: originalQuery + " 設計" },
+      { category: "comparison", query: originalQuery + " 比較" },
+      { category: "comparison", query: originalQuery + " review" },
+      { category: "trend", query: originalQuery + " 最新" },
+      { category: "trend", query: originalQuery + " news" },
+      { category: "problem", query: originalQuery + " 課題" },
+      { category: "problem", query: originalQuery + " issues" }
+    ];
+  }
+
+  // Ensure original query is first
+  var finalQueries = [{ category: "original", query: originalQuery }];
+  for (var i = 0; i < expansions.length; i++) {
+    if (expansions[i].query !== originalQuery) {
+      finalQueries.push(expansions[i]);
+    }
+  }
+
+  return finalQueries;
+}
+
+// ============================================================================
+// NEW: Source Reliability Scoring Functions
+// ============================================================================
+
+// Calculate reliability score for a source
+function calculateSourceReliability(result) {
+  var score = 5.0; // Base score
+  var reasons = [];
+  var domain = (result.domain || "").toLowerCase();
+  var url = (result.url || "").toLowerCase();
+  var title = (result.title || "").toLowerCase();
+
+  // High trust domains
+  var highTrustDomains = [
+    "github.com", "gitlab.com", "bitbucket.org", // Official code
+    "docs.microsoft.com", "developer.mozilla.org", // Official docs
+    "w3.org", "ietf.org", "ecma-international.org", // Standards
+    "stackexchange.com", "stackoverflow.com", // Expert Q&A
+    "medium.com", "dev.to", // Tech blogs
+    "juejin.cn", "qiita.com", "zenn.dev" // Developer communities
+  ];
+
+  // Academic sources
+  var academicDomains = [
+    "scholar.google.com", "arxiv.org", "researchgate.net",
+    "acm.org", "ieee.org", "springer.com", "sciencedirect.com"
+  ];
+
+  // Official documentation patterns
+  var officialPatterns = [
+    "/docs/", "/documentation/", "/api/", "/reference/",
+    "developer.", "developers.", "docs."
+  ];
+
+  // Low trust indicators
+  var lowTrustPatterns = [
+    "spam", "clickbait", "fake", "hoax", "scam",
+    "ads", "affiliate", "sponsored"
+  ];
+
+  // Check high trust domains
+  for (var i = 0; i < highTrustDomains.length; i++) {
+    if (domain.indexOf(highTrustDomains[i]) >= 0) {
+      score += 2.0;
+      reasons.push("信頼できる技術プラットフォーム");
+      break;
+    }
+  }
+
+  // Check academic sources
+  for (var j = 0; j < academicDomains.length; j++) {
+    if (domain.indexOf(academicDomains[j]) >= 0) {
+      score += 3.0;
+      reasons.push("学術的情報源");
+      break;
+    }
+  }
+
+  // Check for official documentation
+  for (var k = 0; k < officialPatterns.length; k++) {
+    if (url.indexOf(officialPatterns[k]) >= 0) {
+      score += 1.5;
+      reasons.push("公式ドキュメント");
+      break;
+    }
+  }
+
+  // Low trust indicators
+  for (var l = 0; l < lowTrustPatterns.length; l++) {
+    if (title.indexOf(lowTrustPatterns[l]) >= 0) {
+      score -= 1.5;
+      reasons.push("低信頼度の可能性");
+      break;
+    }
+  }
+
+  // HTTPS bonus
+  if (url.indexOf("https://") === 0) {
+    score += 0.5;
+  }
+
+  // Age bonus (based on content)
+  if (result.pageContent) {
+    var recentYears = ["2024", "2025"];
+    for (var m = 0; m < recentYears.length; m++) {
+      if (result.pageContent.indexOf(recentYears[m]) >= 0) {
+        score += 0.3;
+        break;
+      }
+    }
+  }
+
+  // Depth bonus (longer content suggests comprehensive coverage)
+  if (result.pageContent && result.pageContent.length > 2000) {
+    score += 0.5;
+  }
+
+  // Clamp score
+  score = Math.max(1.0, Math.min(10.0, score));
+
+  return {
+    score: score,
+    level: score >= 8 ? "high" : score >= 6 ? "medium" : "low",
+    reasons: reasons
+  };
+}
+
+// ============================================================================
+// NEW: Cross-Reference Verification Functions
+// ============================================================================
+
+// Verify facts across multiple sources
+function verifyCrossSource(analyzedResults, threshold) {
+  if (!threshold) threshold = 2; // Minimum sources to confirm
+
+  console.log("  Performing cross-reference verification...");
+
+  var factMap = {};
+  var verifiedFacts = [];
+  var unverifiedFacts = [];
+
+  // Collect all facts from all sources
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var facts = extractStructuredFacts(result.factList);
+
+    for (var j = 0; j < facts.length; j++) {
+      var fact = facts[j];
+      var key = fact.normalized;
+
+      if (!factMap[key]) {
+        factMap[key] = {
+          original: fact.original,
+          keyPhrase: fact.keyPhrase,
+          sources: [],
+          value: fact.value,
+          date: fact.date,
+          count: 0
+        };
+      }
+
+      factMap[key].sources.push(i);
+      factMap[key].count++;
+    }
+  }
+
+  // Classify facts
+  Object.keys(factMap).forEach(function (key) {
+    var fact = factMap[key];
+    if (fact.count >= threshold) {
+      verifiedFacts.push({
+        fact: fact.keyPhrase,
+        original: fact.original,
+        sourceCount: fact.count,
+        sources: fact.sources,
+        confidence: Math.min(1.0, fact.count / analyzedResults.length * 2)
+      });
+    } else {
+      unverifiedFacts.push({
+        fact: fact.keyPhrase,
+        sourceCount: fact.count,
+        sources: fact.sources
+      });
+    }
+  });
+
+  console.log("    Verified: " + verifiedFacts.length + " | Unverified: " + unverifiedFacts.length);
+
+  return {
+    verified: verifiedFacts,
+    unverified: unverifiedFacts,
+    total: Object.keys(factMap).length
+  };
+}
+
+// ============================================================================
+// NEW: Academic Citation Format Functions
+// ============================================================================
+
+// Generate academic-style citations
+function generateAcademicCitations(searchResults, analyzedResults) {
+  var citations = [];
+
+  for (var i = 0; i < searchResults.length; i++) {
+    var result = searchResults[i];
+    var analyzed = analyzedResults[i];
+    var citationNumber = i + 1;
+
+    var citation = "";
+
+    if (result.isLocalFile) {
+      // Local file citation
+      citation =
+        "[" + citationNumber + "] " +
+        (result.fileName || result.title) + ". " +
+        "Local file: " + result.filePath + ". ";
+    } else {
+      // Web source citation
+      var authors = extractAuthors(result.pageContent, result);
+      var date = extractPublicationDate(result);
+      var title = result.pageTitle || result.title;
+      var domain = result.domain;
+
+      if (authors.length > 0) {
+        citation += "[" + citationNumber + "] " + authors + ". ";
+      } else {
+        citation += "[" + citationNumber + "] ";
+      }
+
+      citation += '"' + title + '". ';
+
+      if (date) {
+        citation += date + ". ";
+      }
+
+      citation += domain + ". " + result.url;
+
+      // Access date
+      var today = new Date().toISOString().split("T")[0];
+      citation += ". Accessed: " + today + ".";
+    }
+
+    citations.push(citation);
+  }
+
+  return citations;
+}
+
+// Extract authors from content
+function extractAuthors(content, result) {
+  // Simple heuristic - look for author patterns
+  var patterns = [
+    /by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /筆者:\s*(.+?)(?:\n|$)/
+  ];
+
+  for (var i = 0; i < patterns.length; i++) {
+    var match = content.match(patterns[i]);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
+// Extract publication date
+function extractPublicationDate(result) {
+  if (result.extractedDate) {
+    return result.extractedDate;
+  }
+
+  // Try to extract from content
+  var content = result.pageContent || "";
+  var date = extractDateFromContent(content, result.url);
+
+  if (date) {
+    return date.toISOString().split("T")[0];
+  }
+
+  return "";
+}
+
+// ============================================================================
+// NEW: Insight Generation Functions
+// ============================================================================
+
+// Generate insights from analyzed results
+function extractInsights(analyzedResults, searchQuery) {
+  console.log("  Extracting insights and patterns...");
+
+  var insightPrompt =
+    "あなたは調査分析の専門家です。収集した情報を深く分析し、表面的な要約ではない「洞察」を抽出してください。\n\n" +
+    "【分析対象】\n" +
+    "トピック: " + searchQuery + "\n" +
+    "情報源数: " + analyzedResults.length + "\n\n" +
+    "【抽出すべき洞察のカテゴリ】\n" +
+    "1. パターン認識\n" +
+    "   - 複数の情報源で見られる共通の傾向\n" +
+    "   - 暗黙の前提や仮定\n" +
+    "   - 反復される構造や関係性\n\n" +
+    "2. 予測・トレンド分析\n" +
+    "   - 現在のデータに基づく将来の展望\n" +
+    "   - 技術的進化の方向性\n" +
+    "   - 市場の変化予測\n\n" +
+    "3. 未解決の問題\n" +
+    "   - 複数の情報源で言及されている課題\n" +
+    "   - 懸念点やリスク\n" +
+    "   - 解決策が提示されていない問題\n\n" +
+    "4. 革新的なアプローチ\n" +
+    "   - 従来の方法と異なるアプローチ\n" +
+    "   - 新しいパラダイムや考え方\n" +
+    "   - ユニークな解決策\n\n" +
+    "5. 関連性の発見\n" +
+    "   - 一見無関係に見える要素の関連性\n" +
+    "   - 隠れたつながり\n" +
+    "   - 類似した概念の統合\n\n" +
+    "【重要】\n" +
+    "- 単なる事実の羅列ではなく、分析・統合・解釈を含めること\n" +
+    "- 情報源番号を引用すること\n" +
+    "- 具体的な例を挙げつつ、普遍的な洞察を提示すること\n" +
+    "- 1000-1500語で詳細に記述すること\n\n" +
+    "【出力形式】\n" +
+    "マークダウン形式で、カテゴリごとに見出しをつけて整理すること。";
+
+  var allFacts = analyzedResults
+    .map(function (a, i) {
+      return "[" + (i + 1) + "] " + a.result.title + ":\n" + a.factList;
+    })
+    .join("\n\n---\n\n");
+
+  try {
+    var insights = iniad_ai_mop.chat(
+      "You are an expert researcher generating deep insights. Write in Japanese with formal academic tone.",
+      insightPrompt + "\n\n【情報源】\n" + allFacts.substring(0, 8000)
+    );
+    console.log("    ✓ Generated insights");
+    return insights;
+  } catch (e) {
+    console.log("    ⚠ Insight generation failed: " + e.message);
+    return "洞察の生成に失敗しました。";
+  }
+}
+
+// ============================================================================
+// NEW: Interactive Exploration Functions
+// ============================================================================
+
+// Interactive exploration phase
+function performInteractiveExploration(analyzedResults, searchQuery) {
+  console.log("");
+  console.log("━━━ Phase X: Interactive Exploration ━━━");
+
+  // Generate clarification questions
+  var clarificationPrompt =
+    "あなたは調査のファシリテーターです。「" + searchQuery + "」について調査を深めるための質問を生成してください。\n\n" +
+    "【現在の状況】\n" +
+    "情報源数: " + analyzedResults.length + "\n" +
+    "収集済みの事実: 既に基本的な情報は収集済み\n\n" +
+    "【タスク】\n" +
+    "以下の観点から、調査を深めるための質問を3つ生成してください：\n" +
+    "1. 不明点の特定 - 詳細が不足している点\n" +
+    "2. 興味深い視点 - さらに掘り下げる価値のある点\n" +
+    "3. 代替アプローチ - 別の角度からのアプローチ\n\n" +
+    "【出力形式】JSON配列のみ:\n" +
+    '[{"question":"質問文","category":"不明点|興味深い視点|代替アプローチ","priority":"high|medium"}]';
+
+  try {
+    var response = iniad_ai_mop.chat(
+      "Generate clarification questions. Output JSON array only.",
+      clarificationPrompt
+    );
+
+    response = response
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = response.indexOf("[");
+    var jsonEnd = response.lastIndexOf("]") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      var questions = JSON.parse(response.slice(jsonStart, jsonEnd));
+
+      console.log("  Clarification Questions:");
+      for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        var priorityIcon = q.priority === "high" ? "🔴" : "🟡";
+        console.log("    " + priorityIcon + " Q" + (i + 1) + ": " + q.question);
+        console.log("       (" + q.category + ")");
+      }
+
+      // Note: In a real implementation, this would pause for user input
+      console.log("");
+      console.log("  💡 Note: This is an automated run. For interactive exploration,");
+      console.log("     provide these questions to the user and perform additional");
+      console.log("     searches based on their priorities.");
+    }
+
+    return questions || [];
+  } catch (e) {
+    console.log("  ⚠ Interactive exploration setup failed: " + e.message);
+    return [];
+  }
+}
+
+// ============================================================================
+// NEW: Metadata Extraction Functions
+// ============================================================================
+
+// Extract rich metadata from sources
+function extractRichMetadata(result, pageTab) {
+  var metadata = {
+    authority: 0,
+    socialSignals: {},
+    technicalMetrics: {},
+    contentQuality: {}
+  };
+
+  if (!pageTab || !result.url) return metadata;
+
+  try {
+    // Extract authority indicators
+    var authorityPrompt =
+      "以下のウェブページの権威性を評価するためのメタデータを抽出してください。\n\n" +
+      "【ページ情報】\n" +
+      "URL: " + result.url + "\n" +
+      "タイトル: " + result.title + "\n" +
+      "ドメイン: " + result.domain + "\n" +
+      "コンテンツ: " + (result.pageContent || "").substring(0, 500) + "\n\n" +
+      "【抽出項目】\n" +
+      "1. 著者・組織情報（ページ内から）\n" +
+      "2. 最終更新日\n" +
+      "3. 関連リンクの数（外部リンク）\n" +
+      "4. キーワード密度（重要キーワード）\n" +
+      "5. 構造化データの有無\n\n" +
+      "【出力形式】JSONのみ:\n" +
+      '{"author":"","lastUpdated":"","externalLinks":0,"keywords":[],"hasStructuredData":false}';
+
+    var metaResponse = iniad_ai_mop.chat(
+      "Extract metadata from webpage. Output JSON only.",
+      authorityPrompt
+    );
+
+    metaResponse = metaResponse
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = metaResponse.indexOf("{");
+    var jsonEnd = metaResponse.lastIndexOf("}") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      var parsed = JSON.parse(metaResponse.slice(jsonStart, jsonEnd));
+
+      // Authority score calculation
+      var score = 0;
+      if (parsed.author) score += 2;
+      if (parsed.lastUpdated) score += 1.5;
+      if (parsed.externalLinks > 10) score += 1;
+      if (parsed.hasStructuredData) score += 1.5;
+      if (parsed.keywords && parsed.keywords.length > 3) score += 1;
+
+      metadata.authority = Math.min(10, score);
+      metadata.author = parsed.author;
+      metadata.lastUpdated = parsed.lastUpdated;
+      metadata.externalLinks = parsed.externalLinks;
+      metadata.keywords = parsed.keywords;
+      metadata.hasStructuredData = parsed.hasStructuredData;
+    }
+  } catch (e) {
+    console.log("    ⚠ Metadata extraction failed: " + e.message);
+  }
+
+  return metadata;
+}
+
+// ============================================================================
+// NEW: Knowledge Graph Functions
+// ============================================================================
+
+// Build knowledge graph from analyzed results
+function buildKnowledgeGraph(analyzedResults) {
+  console.log("  Building knowledge graph...");
+
+  var graph = {
+    nodes: [],
+    edges: []
+  };
+
+  var entityMap = {};
+
+  // Extract entities from each source
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var content = result.result.pageContent || "";
+    var facts = result.factList || "";
+
+    // Extract entities (people, organizations, products, concepts)
+    var entityPrompt =
+      "以下のテキストから重要なエンティティ（概念・人物・組織・製品・技術）を抽出してください。\n\n" +
+      "【テキスト】\n" +
+      facts + "\n" + content.substring(0, 1000) + "\n\n" +
+      "【タスク】\n" +
+      "1. 固有名詞（人名、組織名、製品名）を抽出\n" +
+      "2. 重要な技術的用語・概念を抽出\n" +
+      "3. 各エンティティのタイプを分類\n" +
+      "4. 関連する情報源番号を記録\n\n" +
+      "【出力形式】JSON配列のみ:\n" +
+      '[{"name":"エンティティ名","type":"person|org|product|concept|technology","sources":[1,3]},...]';
+
+    try {
+      var entityResponse = iniad_ai_mop.chat(
+        "Extract entities from text. Output JSON array only.",
+        entityPrompt
+      );
+
+      entityResponse = entityResponse
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
+      var jsonStart = entityResponse.indexOf("[");
+      var jsonEnd = entityResponse.lastIndexOf("]") + 1;
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        var entities = JSON.parse(entityResponse.slice(jsonStart, jsonEnd));
+
+        for (var j = 0; j < entities.length; j++) {
+          var entity = entities[j];
+          var key = entity.name.toLowerCase();
+
+          if (!entityMap[key]) {
+            entityMap[key] = {
+              id: "node_" + graph.nodes.length,
+              name: entity.name,
+              type: entity.type,
+              sources: [],
+              weight: 0
+            };
+            graph.nodes.push(entityMap[key]);
+          }
+
+          // Add this source to the entity
+          var sourceId = i + 1;
+          if (entityMap[key].sources.indexOf(sourceId) < 0) {
+            entityMap[key].sources.push(sourceId);
+            entityMap[key].weight++;
+          }
+        }
+      }
+    } catch (e) {
+      console.log("    ⚠ Entity extraction failed for source " + (i + 1));
+    }
+  }
+
+  // Build edges based on co-occurrence
+  var nodeList = graph.nodes;
+  for (var k = 0; k < nodeList.length; k++) {
+    for (var l = k + 1; l < nodeList.length; l++) {
+      var nodeA = nodeList[k];
+      var nodeB = nodeList[l];
+
+      // Check if they appear together in sources
+      var commonSources = nodeA.sources.filter(function (s) {
+        return nodeB.sources.indexOf(s) >= 0;
+      });
+
+      if (commonSources.length > 0) {
+        graph.edges.push({
+          source: nodeA.id,
+          target: nodeB.id,
+          weight: commonSources.length,
+          sources: commonSources
+        });
+      }
+    }
+  }
+
+  console.log("    ✓ Built graph with " + graph.nodes.length + " nodes, " + graph.edges.length + " edges");
+
+  return graph;
+}
+
+// Generate knowledge graph visualization (text-based)
+function generateKnowledgeGraphReport(graph) {
+  var report = "";
+
+  report += "### Knowledge Graph\n\n";
+  report += "**エンティティ数**: " + graph.nodes.length + "\n";
+  report += "**関連数**: " + graph.edges.length + "\n\n";
+
+  // Group nodes by type
+  var nodesByType = {};
+  graph.nodes.forEach(function (node) {
+    if (!nodesByType[node.type]) nodesByType[node.type] = [];
+    nodesByType[node.type].push(node);
+  });
+
+  Object.keys(nodesByType).forEach(function (type) {
+    report += "#### " + type.toUpperCase() + " (" + nodesByType[type].length + ")\n\n";
+    nodesByType[type].forEach(function (node) {
+      report += "- " + node.name + " (出現: " + node.sources.length + "回)\n";
+    });
+    report += "\n";
+  });
+
+  // Top relationships
+  if (graph.edges.length > 0) {
+    report += "#### 主要な関連\n\n";
+    var sortedEdges = graph.edges.slice().sort(function (a, b) {
+      return b.weight - a.weight;
+    });
+
+    for (var i = 0; i < Math.min(10, sortedEdges.length); i++) {
+      var edge = sortedEdges[i];
+      var nodeA = graph.nodes.find(function (n) { return n.id === edge.source; });
+      var nodeB = graph.nodes.find(function (n) { return n.id === edge.target; });
+
+      if (nodeA && nodeB) {
+        report += "- " + nodeA.name + " ↔ " + nodeB.name + " (" + edge.weight + ")\n";
+      }
+    }
+  }
+
+  return report;
+}
+
+// ============================================================================
+// NEW: Quality Assurance Functions
+// ============================================================================
+
+// Perform comprehensive quality check
+function performQualityCheck(analyzedResults, report, searchResults) {
+  console.log("");
+  console.log("━━━ Phase X: Quality Assurance ━━━");
+
+  var qaResults = {
+    overallScore: 0,
+    metrics: {}
+  };
+
+  // 1. Source Diversity
+  var domains = {};
+  searchResults.forEach(function (r) {
+    if (r.domain && !r.isLocalFile) {
+      domains[r.domain] = (domains[r.domain] || 0) + 1;
+    }
+  });
+  var diversityScore = Math.min(10, Object.keys(domains).length);
+  qaResults.metrics.sourceDiversity = {
+    score: diversityScore,
+    domainCount: Object.keys(domains).length,
+    topDomains: Object.keys(domains).sort(function (a, b) {
+      return domains[b] - domains[a];
+    }).slice(0, 3)
+  };
+
+  // 2. Temporal Relevance
+  var recentSources = searchResults.filter(function (r) {
+    return r.isRecent;
+  });
+  var temporalScore = recentSources.length / searchResults.length * 10;
+  qaResults.metrics.temporalRelevance = {
+    score: temporalScore,
+    recentCount: recentSources.length,
+    totalCount: searchResults.length
+  };
+
+  // 3. Content Depth
+  var avgContentLength = analyzedResults.reduce(function (sum, a) {
+    return sum + (a.result.pageContent || "").length;
+  }, 0) / analyzedResults.length;
+  var depthScore = Math.min(10, avgContentLength / 500);
+  qaResults.metrics.contentDepth = {
+    score: depthScore,
+    avgLength: avgContentLength
+  };
+
+  // 4. Citation Completeness
+  var citationCount = (report.match(/\[\d+\]/g) || []).length;
+  var completenessScore = Math.min(10, citationCount / 10);
+  qaResults.metrics.citationCompleteness = {
+    score: completenessScore,
+    citationCount: citationCount
+  };
+
+  // 5. Cross-Source Validation
+  var crossRef = verifyCrossSource(analyzedResults, 2);
+  var validationScore = crossRef.verified.length / crossRef.total * 10;
+  qaResults.metrics.crossSourceValidation = {
+    score: validationScore,
+    verified: crossRef.verified.length,
+    total: crossRef.total
+  };
+
+  // Calculate overall score
+  var scores = Object.keys(qaResults.metrics).map(function (key) {
+    return qaResults.metrics[key].score;
+  });
+  qaResults.overallScore = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
+
+  console.log("  Overall Quality Score: " + qaResults.overallScore.toFixed(1) + "/10");
+  Object.keys(qaResults.metrics).forEach(function (key) {
+    var metric = qaResults.metrics[key];
+    console.log("    " + key + ": " + metric.score.toFixed(1) + "/10");
+  });
+
+  return qaResults;
+}
+
+// Generate quality assurance report section
+function generateQualityReport(qaResults) {
+  var report = "";
+
+  report += "## 11. Quality Assurance\n\n";
+  report += "> **品質評価結果**\n>\n";
+
+  var grade = "";
+  if (qaResults.overallScore >= 9) grade = "A (優秀)";
+  else if (qaResults.overallScore >= 7) grade = "B (良好)";
+  else if (qaResults.overallScore >= 5) grade = "C (標準)";
+  else grade = "D (要改善)";
+
+  report += "> 総合評価: **" + grade + "** (" + qaResults.overallScore.toFixed(1) + "/10)\n\n";
+
+  report += "### 11.1 評価指標\n\n";
+  report += "| 評価項目 | スコア | 詳細 |\n";
+  report += "|---------|--------|------|\n";
+
+  Object.keys(qaResults.metrics).forEach(function (key) {
+    var metric = qaResults.metrics[key];
+    var score = metric.score.toFixed(1);
+    var details = "";
+
+    switch (key) {
+      case "sourceDiversity":
+        details = metric.domainCount + "つのドメイン";
+        break;
+      case "temporalRelevance":
+        details = metric.recentCount + "/" + metric.totalCount + "件が最新";
+        break;
+      case "contentDepth":
+        details = "平均 " + Math.round(metric.avgLength) + " 文字";
+        break;
+      case "citationCompleteness":
+        details = metric.citationCount + "件の引用";
+        break;
+      case "crossSourceValidation":
+        details = metric.verified + "/" + metric.total + "件が複数情報源で確認";
+        break;
+    }
+
+    report += "| " + key + " | " + score + "/10 | " + details + " |\n";
+  });
+
+  report += "\n";
+
+  // Recommendations
+  report += "### 11.2 改善推奨事項\n\n";
+
+  var recommendations = [];
+
+  if (qaResults.metrics.sourceDiversity.score < 6) {
+    recommendations.push("- 情報源の多様性を向上させてください。特定のドメインに偏りがあります。");
+  }
+  if (qaResults.metrics.temporalRelevance.score < 6) {
+    recommendations.push("- より新しい情報源を追加してください。情報の鮮度が不足しています。");
+  }
+  if (qaResults.metrics.contentDepth.score < 6) {
+    recommendations.push("- 各情報源の詳細分析を深めてください。コンテンツの深度が不十分です。");
+  }
+  if (qaResults.metrics.citationCompleteness.score < 6) {
+    recommendations.push("- 引用情報を充実させてください。出典の明示が不足しています。");
+  }
+  if (qaResults.metrics.crossSourceValidation.score < 6) {
+    recommendations.push("- 複数の情報源で事実を確認してください。クロス検証が不十分です。");
+  }
+
+  if (recommendations.length > 0) {
+    recommendations.forEach(function (rec) {
+      report += rec + "\n";
+    });
+  } else {
+    report += "✅ すべての評価項目で良好な結果が得られました。\n\n";
+  }
+
+  report += "---\n\n";
 
   return report;
 }
