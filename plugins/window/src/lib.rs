@@ -231,7 +231,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of a title.
         // We just check that we got some result (either a title or an error message).
@@ -263,7 +263,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         // In headless environments (CI, containers), we may get an error instead of window titles.
         // Accept either a JSON array (success) or an error message (headless environment).

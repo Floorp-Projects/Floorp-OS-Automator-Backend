@@ -281,7 +281,7 @@ mod tests {
             allowed_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
 
         let actual = &workflow.result[0].result;
@@ -325,7 +325,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
 
         let expected = fetch(&url).unwrap() + "\n";
@@ -369,7 +369,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
 
         let expected = post(&url, r#"{"title":"test"}"#).unwrap() + "\n";

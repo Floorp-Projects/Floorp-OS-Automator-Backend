@@ -86,6 +86,16 @@ pub struct DebugWorkflowFile {
 /// or an error if directory reading fails.
 pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
     let dir_path = Path::new(DEBUG_WORKFLOW_DIR);
+    eprintln!("[scan_debug_workflow_dir] DEBUG_WORKFLOW_DIR: {DEBUG_WORKFLOW_DIR}");
+    eprintln!("[scan_debug_workflow_dir] dir_path: {dir_path:?}");
+    eprintln!(
+        "[scan_debug_workflow_dir] dir_path.exists(): {}",
+        dir_path.exists()
+    );
+    eprintln!(
+        "[scan_debug_workflow_dir] dir_path.is_dir(): {}",
+        dir_path.is_dir()
+    );
 
     if !dir_path.exists() {
         debug!("Debug workflow directory does not exist: {DEBUG_WORKFLOW_DIR}");
@@ -94,9 +104,29 @@ pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
 
     let mut workflows = Vec::new();
 
-    for entry in fs::read_dir(dir_path)? {
-        let entry = entry?;
+    eprintln!("[scan_debug_workflow_dir] Attempting to read directory...");
+    let entries = match fs::read_dir(dir_path) {
+        Ok(entries) => {
+            eprintln!("[scan_debug_workflow_dir] Successfully opened directory for reading");
+            entries
+        }
+        Err(e) => {
+            eprintln!("[scan_debug_workflow_dir] Failed to read directory: {e:?}");
+            eprintln!("[scan_debug_workflow_dir] Error kind: {:?}", e.kind());
+            return Err(e.into());
+        }
+    };
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("[scan_debug_workflow_dir] Failed to read entry: {e:?}");
+                return Err(e.into());
+            }
+        };
         let path = entry.path();
+        eprintln!("[scan_debug_workflow_dir] Processing entry: {path:?}");
 
         if path.extension().and_then(|e| e.to_str()) == Some("js") {
             let file_name = path
@@ -105,7 +135,14 @@ pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let code = fs::read_to_string(&path)?;
+            eprintln!("[scan_debug_workflow_dir] Reading JS file: {path:?}");
+            let code = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[scan_debug_workflow_dir] Failed to read file {path:?}: {e:?}");
+                    return Err(e.into());
+                }
+            };
 
             workflows.push(DebugWorkflowFile {
                 name: file_name,
@@ -115,6 +152,10 @@ pub fn scan_debug_workflow_dir() -> Result<Vec<DebugWorkflowFile>> {
         }
     }
 
+    eprintln!(
+        "[scan_debug_workflow_dir] Found {} workflows",
+        workflows.len()
+    );
     Ok(workflows)
 }
 
@@ -280,12 +321,38 @@ mod tests {
 
         // Change to temp directory for test
         let original_dir = std::env::current_dir().unwrap();
+        eprintln!("Original directory: {original_dir:?}");
+        eprintln!("Temp directory: {:?}", temp_dir.path());
+        eprintln!("Debug directory: {debug_dir:?}");
+        eprintln!("Debug directory exists: {}", debug_dir.exists());
+        eprintln!("Test file exists: {}", test_file.exists());
+
         std::env::set_current_dir(temp_dir.path()).unwrap();
+
+        let current_dir_after_change = std::env::current_dir().unwrap();
+        eprintln!("Current directory after change: {current_dir_after_change:?}");
+        eprintln!("DEBUG_WORKFLOW_DIR constant: {DEBUG_WORKFLOW_DIR}");
+
+        let debug_workflow_path = Path::new(DEBUG_WORKFLOW_DIR);
+        eprintln!("Debug workflow path from constant: {debug_workflow_path:?}");
+        eprintln!(
+            "Debug workflow path exists: {}",
+            debug_workflow_path.exists()
+        );
+        eprintln!(
+            "Debug workflow path is_dir: {}",
+            debug_workflow_path.is_dir()
+        );
 
         let result = scan_debug_workflow_dir();
 
         // Restore original directory
         std::env::set_current_dir(original_dir).unwrap();
+
+        if let Err(ref e) = result {
+            eprintln!("Error from scan_debug_workflow_dir: {e:?}");
+            eprintln!("Error chain: {e}");
+        }
 
         assert!(result.is_ok());
         let workflows = result.unwrap();

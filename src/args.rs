@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025 Yuta Takahashi
 // SPDX-License-Identifier: MPL-2.0 OR GPL-3.0-or-later
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum, command};
 use log::LevelFilter;
 
 #[derive(Parser, Debug)]
@@ -101,4 +101,12 @@ impl std::fmt::Display for LogLevel {
 pub enum Command {
     /// Start the gRPC server
     Start,
+
+    #[command(hide = true)]
+    /// Run the External Plugin Server
+    Ext {
+        /// Name of the external plugin server to register.
+        #[arg(value_name = "SERVER_NAME")]
+        server_name: String,
+    },
 }

@@ -21,6 +21,9 @@ mod global;
 #[cfg(test)]
 mod test_support;
 
+#[cfg(test)]
+mod tests;
+
 /// System Configuration
 #[allow(unused)]
 mod sysconfig;
@@ -112,6 +115,11 @@ async fn main() -> Result<()> {
             // Keep server running
             info!("Server running on [::1]:50051. Press Ctrl+C to stop.");
             server_handle.await?;
+        }
+        Command::Ext { server_name } => {
+            info!("Starting External Plugin Server {server_name}...");
+            use sapphillon_core::ext_plugin::extplugin_server;
+            extplugin_server(&server_name).await?;
         }
     }
 

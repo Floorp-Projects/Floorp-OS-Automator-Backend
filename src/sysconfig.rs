@@ -4,6 +4,7 @@
 
 use sapphillon_core::plugin::{CorePluginPackage, PluginPackageTrait};
 use sapphillon_core::proto::sapphillon::v1::PluginPackage;
+use std::env;
 use std::fmt;
 use std::sync::Arc;
 
@@ -48,6 +49,11 @@ pub fn sysconfig() -> SysConfig {
         ],
 
         initial_workflows: vec![],
+        // Prefer launching external plugins via the current executable when available.
+        external_plugin_runner_path: env::current_exe()
+            .ok()
+            .map(|path| path.to_string_lossy().into_owned()),
+        external_plugin_runner_args: vec!["ext".to_string()],
     }
 }
 
@@ -69,6 +75,8 @@ pub struct SysConfig {
     pub initial_plugins: Vec<PluginPackage>,
 
     pub initial_workflows: Vec<InitialWorkflow>,
+    pub external_plugin_runner_path: Option<String>,
+    pub external_plugin_runner_args: Vec<String>,
 }
 
 impl fmt::Debug for SysConfig {
@@ -84,6 +92,14 @@ impl fmt::Debug for SysConfig {
             )
             .field("initial_plugins", &self.initial_plugins)
             .field("initial_workflows", &self.initial_workflows)
+            .field(
+                "external_plugin_runner_path",
+                &self.external_plugin_runner_path,
+            )
+            .field(
+                "external_plugin_runner_args",
+                &self.external_plugin_runner_args,
+            )
             .finish()
     }
 }
