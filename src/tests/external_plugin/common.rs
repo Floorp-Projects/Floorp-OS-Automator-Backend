@@ -130,8 +130,7 @@ pub fn create_opstate_with_package(
         handle
     } else {
         // 新しい runtime を作成し、OPSTATE に格納してライフタイムを延長する
-        let runtime = tokio::runtime::Runtime::new()
-            .expect("Failed to create tokio runtime");
+        let runtime = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         let handle = runtime.handle().clone();
         // Keep the runtime alive by storing it in opstate
         op_state.put(Arc::new(runtime));
