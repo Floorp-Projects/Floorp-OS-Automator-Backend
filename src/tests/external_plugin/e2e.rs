@@ -8,7 +8,8 @@
 //! installation through execution. They require the external plugin server
 //! binary to be built and accessible.
 //!
-//! Run with: `cargo test --test external_plugin -- --ignored`
+//! These are in-crate tests under `src/tests/external_plugin`. Run them with, for example:
+//! `cargo test external_plugin::e2e`
 
 use super::common::*;
 use sapphillon_core::plugin::{

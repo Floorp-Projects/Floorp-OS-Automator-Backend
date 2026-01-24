@@ -5,15 +5,15 @@
 ## ディレクトリ構造
 
 ```
-tests/
-├── external_plugin/           # テストモジュール
+src/tests/
+├── mod.rs                    # テストモジュール定義
+├── external_plugin/          # 外部プラグインテストモジュール
 │   ├── mod.rs                # モジュール定義
 │   ├── common.rs             # 共通ヘルパー関数
 │   ├── installation.rs       # インストール・ファイルシステムテスト
 │   ├── bridge.rs             # rsjs_bridge_core実行テスト
 │   ├── workflow.rs           # ワークフロー実行テスト
 │   └── e2e.rs                # エンドツーエンドテスト
-├── external_plugin_tests.rs  # テストエントリーポイント
 └── fixtures/                  # テスト用プラグインフィクスチャ
     ├── math_plugin.js        # 数学演算プラグイン
     ├── error_plugin.js       # エラーハンドリングテスト用プラグイン
@@ -76,7 +76,7 @@ tests/
 ### 外部依存なしのテストを実行
 
 ```bash
-cargo test --test external_plugin_tests
+cargo test --lib external_plugin
 ```
 
 これにより、`installation.rs`内のすべてのテストが実行されます（6テスト）。
@@ -88,7 +88,7 @@ cargo test --test external_plugin_tests
 cargo build --release -p ext_plugin
 
 # 2. 無視されたテストを実行
-cargo test --test external_plugin_tests -- --ignored
+cargo test --lib external_plugin -- --ignored
 ```
 
 これにより、`bridge.rs`、`workflow.rs`、`e2e.rs`内のすべてのテストが実行されます（12テスト）。
@@ -97,7 +97,7 @@ cargo test --test external_plugin_tests -- --ignored
 
 ```bash
 # 外部プラグインサーバーをビルド後
-cargo test --test external_plugin_tests -- --include-ignored
+cargo test --lib external_plugin -- --include-ignored
 ```
 
 ## フィクスチャファイル
@@ -162,5 +162,5 @@ test result: ok. 6 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out
 
 - `installation.rs`のテストは外部依存なしで実行可能
 - `bridge.rs`、`workflow.rs`、`e2e.rs`のテストは外部プラグインサーバーバイナリが必要
-- フィクスチャファイルはJavaScript形式で`tests/fixtures/`に配置
+- フィクスチャファイルはJavaScript形式で`src/tests/fixtures/`に配置
 - すべてのヘルパー関数は`common.rs`に集約

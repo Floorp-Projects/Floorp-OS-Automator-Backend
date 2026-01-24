@@ -126,13 +126,17 @@ pub fn create_opstate_with_package(
     let external_package_runner_path = get_debug_binary_path();
 
     // 既存のランタイムハンドルを取得、なければ新しく作成
-    let handle = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
-        // 新しいruntimeを作成してハンドルを返す
-        tokio::runtime::Runtime::new()
-            .expect("Failed to create tokio runtime")
-            .handle()
-            .clone()
-    });
+    let handle = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        handle
+    } else {
+        // 新しい runtime を作成し、OPSTATE に格納してライフタイムを延長する
+        let runtime = tokio::runtime::Runtime::new()
+            .expect("Failed to create tokio runtime");
+        let handle = runtime.handle().clone();
+        // Keep the runtime alive by storing it in opstate
+        op_state.put(Arc::new(runtime));
+        handle
+    };
 
     let workflow_data = OpStateWorkflowData::new(
         "test_workflow",

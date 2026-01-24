@@ -57,7 +57,8 @@ fn test_workflow_with_external_plugin_add() {
         vec![],
     );
 
-    let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let handle = runtime.handle().clone();
 
     let external_package_runner_path = get_debug_binary_path();
 
@@ -121,7 +122,8 @@ fn test_workflow_with_external_plugin_process_data() {
     );
 
     // 既存のランタイムハンドルを取得
-    let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let handle = runtime.handle().clone();
 
     let external_package_runner_path = get_debug_binary_path();
 
@@ -187,7 +189,8 @@ fn test_workflow_without_permission_requirement() {
         vec![],
     );
 
-    let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let handle = runtime.handle().clone();
 
     let external_package_runner_path = get_debug_binary_path();
 
@@ -269,7 +272,8 @@ fn test_multiple_plugins_in_workflow() {
         vec![],
     );
 
-    let handle = tokio::runtime::Runtime::new().unwrap().handle().clone();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let handle = runtime.handle().clone();
 
     let external_package_runner_path = get_debug_binary_path();
 
