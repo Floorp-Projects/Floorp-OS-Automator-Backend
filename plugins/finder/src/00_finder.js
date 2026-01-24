@@ -3,7 +3,39 @@
 // ============================================================
 
 // Embedded AppleScript (same as finder_search.applescript)
-var FINDER_SEARCH_APPLESCRIPT = `on run argv
+// バックグラウンド検索（Finder UI を使わず mdfind のみ）- 高速で安定
+var FINDER_SEARCH_APPLESCRIPT_BACKGROUND = `on run argv
+	if (count of argv) is less than 2 then
+		return ""
+	end if
+
+	set targetPath to item 1 of argv
+	set searchKeyword to item 2 of argv
+
+	set filterCommand to " | grep -vE '\\\\.(xcodeproj|app|xcworkspace|framework|bundle|plugin)/'"
+	set shellCommand to "mdfind -onlyin " & quoted form of targetPath & " -name " & quoted form of searchKeyword & filterCommand
+
+	-- 結果の整形と返却（UI操作なし）
+	try
+		set searchResult to do shell script shellCommand
+		if searchResult is "" then
+			return ""
+		else
+			set originalDelimiters to AppleScript's text item delimiters
+			set AppleScript's text item delimiters to return
+			set pathList to text items of searchResult
+			set AppleScript's text item delimiters to linefeed
+			set cleanResult to pathList as text
+			set AppleScript's text item delimiters to originalDelimiters
+			return cleanResult
+		end if
+	on error
+		return ""
+	end try
+end run`;
+
+// Finder UI を使用した検索（既存のウィンドウ/タブを再利用）
+var FINDER_SEARCH_APPLESCRIPT_UI = `on run argv
 	if (count of argv) is less than 2 then
 		return ""
 	end if
@@ -28,13 +60,22 @@ var FINDER_SEARCH_APPLESCRIPT = `on run argv
 	set filterCommand to " | grep -vE '\\\\.(xcodeproj|app|xcworkspace|framework|bundle|plugin)/'"
 	set shellCommand to "mdfind -onlyin " & quoted form of targetPath & " -name " & quoted form of searchKeyword & filterCommand
 
-	-- Finder UI操作
+	-- Finder UI操作（既存のウィンドウ/タブを再利用）
 	tell application "Finder"
 		activate
 		try
 			set targetFolder to POSIX file targetPath as alias
-			open targetFolder
-		on error
+
+			-- 既存のウィンドウがあるかチェック
+			if (count of Finder windows) > 0 then
+				-- 既存のウィンドウを使用（新規タブを開かない）
+				set target of front Finder window to targetFolder
+			else
+				-- ウィンドウがない場合のみ新規ウィンドウを開く
+				open targetFolder
+			end if
+			delay 0.3
+		on error errMsg
 			return ""
 		end try
 	end tell
@@ -42,7 +83,7 @@ var FINDER_SEARCH_APPLESCRIPT = `on run argv
 	tell application "System Events"
 		tell process "Finder"
 			set frontmost to true
-			delay 0.4
+			delay 0.2
 			keystroke "f" using {command down}
 			delay 0.3
 			set uiSearchQuery to "name:" & searchKeyword
@@ -72,6 +113,9 @@ var FINDER_SEARCH_APPLESCRIPT = `on run argv
 		return ""
 	end try
 end run`;
+
+// デフォルトでバックグラウンド検索を使用（高速・安定）
+var FINDER_SEARCH_APPLESCRIPT = FINDER_SEARCH_APPLESCRIPT_BACKGROUND;
 
 // AppleScript を実行してファイル検索
 function findFiles(rootPath, query, maxResults) {
