@@ -202,7 +202,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let result_str = workflow.result[0].result.trim();
         assert_eq!(result_str, "test_workflow");
@@ -233,7 +233,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         assert!(

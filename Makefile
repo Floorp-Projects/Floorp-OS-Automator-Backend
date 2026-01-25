@@ -1,18 +1,37 @@
-.PHONY: rust_test, rust_build, rust_check_format, rust_fix_format, gen_empty_db, migrate_generate, entity_generate
+.PHONY: test, build, fmt, fix_fmt, gen_empty_db, migrate_generate, entity_generate, run, grpcui, migrate, help
 
-rust_test:
+help:
+	@echo "Available make targets:"
+	@echo
+	@echo "  test             Run Rust tests"
+	@echo "  build            Build Rust project"
+	@echo "  fmt              Check Rust formatting and run clippy (non-failing)"
+	@echo "  fix_fmt          Fix formatting and apply clippy fixes"
+	@echo "  release          Build in release mode"
+	@echo "  full_test        Run build, fmt, test and release"
+	@echo "  gen_empty_db     Create empty sqlite DB at ./db/sqlite.db"
+	@echo "  migrate_generate Generate a SeaORM migration (NAME=... required)"
+	@echo "  migrate          Run SeaORM migrations against sqlite://db/sqlite.db"
+	@echo "  entity_generate  Generate SeaORM entities from database"
+	@echo "  run              Run the Rust application (debug mode)"
+	@echo "  grpcui           Run grpcui against localhost:50051"
+	@echo
+	@echo "Usage: make <target> [VARIABLE=value]"
+
+test:
 	@echo "Run Rust Tests"
 	@echo "----------------------------------------------------------"
+	cargo build --workspace --all-features
 	RUST_TEST_THREADS=1 cargo test --workspace --all-features
 	@echo "----------------------------------------------------------"
 
-rust_build:
+build:
 	@echo "Build Rust Project"
 	@echo "----------------------------------------------------------"
 	cargo build --workspace --all-features
 	@echo "----------------------------------------------------------"
 
-rust_check_format:
+fmt:
 	@echo "Check Rust Format"
 	@echo "----------------------------------------------------------"
 	cargo fmt --all --check || true
@@ -20,13 +39,22 @@ rust_check_format:
 	cargo clippy --workspace || true
 	@echo "----------------------------------------------------------"
 
-rust_fix_format:
+fix_fmt:
 	@echo "Fix Rust Format"
 	@echo "----------------------------------------------------------"
 	cargo fmt --all || true
 	@echo "----------------------------------------------------------"
 	cargo clippy --workspace --fix --allow-dirty || true
 	@echo "----------------------------------------------------------"
+
+release:
+	@echo "Build Rust Project in Release Mode"
+	@echo "----------------------------------------------------------"
+	cargo build --workspace --all-features --release
+	@echo "----------------------------------------------------------"
+
+full_test: build fmt test release
+	@echo "Full Rust Test Completed"
 
 gen_empty_db:
 	@echo "Generate empty SQLite database"
@@ -60,4 +88,16 @@ entity_generate:
 	sea-orm-cli generate entity -u "sqlite://db/sqlite.db" -o ./entity/src/entity
 	@echo "----------------------------------------------------------"
 
+run:
+	@echo "Run the Rust Application"
+	@echo "auto make dubug folder and put system data."
+	@echo "----------------------------------------------------------"
+	mkdir -p ./debug/plugins
+	cargo run -- --loglevel debug --db-url "sqlite://./debug/sqlite.db" --ext-plugin-save-dir ./debug/plugins start
+	@echo "----------------------------------------------------------"
 
+grpcui:
+	@echo "Run gRPC UI for the Rust Application"
+	@echo "----------------------------------------------------------"
+	grpcui -plaintext localhost:50051
+	@echo "----------------------------------------------------------"

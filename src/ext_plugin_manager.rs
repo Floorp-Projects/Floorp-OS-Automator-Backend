@@ -62,11 +62,7 @@ pub async fn install_ext_plugin(
     // Register in database
     create_ext_plugin_package(db, plugin_package_id.clone(), install_dir)
         .await
-        .with_context(|| {
-            format!(
-                "Failed to register plugin in database: {plugin_package_id}"
-            )
-        })?;
+        .with_context(|| format!("Failed to register plugin in database: {plugin_package_id}"))?;
 
     log::info!("Installed external plugin: {plugin_package_id}");
 
@@ -107,11 +103,7 @@ pub async fn uninstall_ext_plugin(db: &DatabaseConnection, plugin_package_id: &s
     // Remove from database
     delete_ext_plugin_package(db, plugin_package_id)
         .await
-        .with_context(|| {
-            format!(
-                "Failed to delete plugin from database: {plugin_package_id}"
-            )
-        })?;
+        .with_context(|| format!("Failed to delete plugin from database: {plugin_package_id}"))?;
 
     log::info!("Uninstalled external plugin: {plugin_package_id}");
 
@@ -163,8 +155,8 @@ pub fn scan_ext_plugin_dir(save_dir: &str) -> Result<HashSet<String>> {
     }
 
     // Traverse: author-id/package-id/ver/package.js
-    for author_entry in fs::read_dir(base_path)
-        .with_context(|| format!("Failed to read directory: {save_dir}"))?
+    for author_entry in
+        fs::read_dir(base_path).with_context(|| format!("Failed to read directory: {save_dir}"))?
     {
         let author_entry = author_entry?;
         if !author_entry.file_type()?.is_dir() {

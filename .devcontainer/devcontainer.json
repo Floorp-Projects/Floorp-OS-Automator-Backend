@@ -16,7 +16,8 @@
 				"Swellaby.vscode-rust-test-adapter",
 				"GitHub.copilot-chat",
 				"GitHub.copilot",
-				"RooVeterinaryInc.roo-cline"
+				"RooVeterinaryInc.roo-cline",
+				"kilocode.kilo-code"
 			]
 		}
 	}

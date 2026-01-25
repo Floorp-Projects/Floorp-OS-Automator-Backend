@@ -299,7 +299,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let expected = std::fs::read_to_string(&tmp_path).unwrap() + "\n";
         let actual = &workflow.result[0].result;
@@ -336,7 +336,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         // workflow prints "done\n"
         let actual = &workflow.result[0].result;
@@ -381,7 +381,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         // The expected result is a JSON string of a list of files, followed by a newline.
@@ -429,7 +429,7 @@ mod tests {
             workflow_permissions,
         );
 
-        workflow.run(tokio::runtime::Handle::current());
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         let file1 = tmp_dir.path().join("file1.txt");
