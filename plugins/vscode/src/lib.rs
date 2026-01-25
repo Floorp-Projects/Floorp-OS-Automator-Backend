@@ -767,8 +767,8 @@ mod tests {
     use sapphillon_core::proto::sapphillon::v1::PermissionType;
     use sapphillon_core::workflow::CoreWorkflowCode;
 
-    #[test]
-    fn test_vscode_open_folder_in_workflow() {
+    #[tokio::test]
+    async fn test_vscode_open_folder_in_workflow() {
         // Create a temp directory
         let tmp_dir = std::env::temp_dir();
         let tmp_path = tmp_dir.to_str().unwrap().to_string();
@@ -778,59 +778,39 @@ mod tests {
             "const path = {escaped_path:?}; const result = vscode.open_folder(path); console.log(result);"
         );
 
-        let perm = PluginFunctionPermissions {
-            plugin_function_id: vscode_open_folder_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![Permission {
-                    display_name: "VSCode Access".to_string(),
-                    description: "Allows VSCode control".to_string(),
-                    permission_type: PermissionType::Execute as i32,
-                    permission_level: PermissionLevel::Unspecified as i32,
-                    resource: vec![],
-                }],
-            },
-        };
-
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_vscode_plugin_package()],
+            vec![Arc::new(core_vscode_plugin_package())],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            vec![],
+            vec![],
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         // The result might be "ok" if VSCode is installed, or an error if not
         // We just check that we got some result
         assert!(!workflow.result[0].result.is_empty());
     }
 
-    #[test]
-    fn test_permission_denied_in_workflow() {
+    #[tokio::test]
+    async fn test_permission_denied_in_workflow() {
         let code = r#"
             vscode.open_folder("/tmp");
         "#;
 
         // Use empty permissions list to trigger permission denial
-        let perm = PluginFunctionPermissions {
-            plugin_function_id: vscode_open_folder_plugin_function().function_id,
-            permissions: sapphillon_core::permission::Permissions {
-                permissions: vec![],
-            },
-        };
-
         let mut workflow = CoreWorkflowCode::new(
             "test".to_string(),
             code.to_string(),
-            vec![core_vscode_plugin_package()],
+            vec![Arc::new(core_vscode_plugin_package())],
             1,
-            Some(perm.clone()),
-            Some(perm),
+            vec![],
+            vec![],
         );
 
-        workflow.run();
+        workflow.run(tokio::runtime::Handle::current(), None, None);
         assert_eq!(workflow.result.len(), 1);
         let actual = &workflow.result[0].result;
         assert!(
