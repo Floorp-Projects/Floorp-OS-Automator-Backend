@@ -21,10 +21,137 @@
  * 6. Generate comprehensive academic-style report with fact-checking
  */
 
+// ============================================================================
+// 動的パス・ディレクトリ検出ユーティリティ
+// ============================================================================
+
+// ホームディレクトリを動的に取得
+function getHomeDir() {
+  try {
+    if (
+      app &&
+      app.sapphillon &&
+      app.sapphillon.core &&
+      app.sapphillon.core.exec
+    ) {
+      var result = app.sapphillon.core.exec.exec("echo $HOME");
+      if (result) {
+        return result.toString().trim();
+      }
+    }
+  } catch (e) {}
+  return "/Users/user"; // フォールバック
+}
+
+// 存在するディレクトリのみをフィルタリング
+function filterExistingDirs(dirs) {
+  var existing = [];
+  for (var i = 0; i < dirs.length; i++) {
+    try {
+      // ls コマンドで存在確認
+      var result = app.sapphillon.core.exec.exec(
+        "test -d " + JSON.stringify(dirs[i]) + " && echo 'exists'",
+      );
+      if (result && result.toString().trim() === "exists") {
+        existing.push(dirs[i]);
+      }
+    } catch (e) {
+      // ディレクトリが存在しない場合はスキップ
+    }
+  }
+  return existing;
+}
+
+// LLM を使用して検索クエリに適した検索ディレクトリを推薦
+function suggestSearchDirectories(query, homeDir) {
+  // デフォルトの検索ディレクトリ（一般的な場所）
+  var defaultDirs = [
+    homeDir + "/Desktop",
+    homeDir + "/Documents",
+    homeDir + "/Downloads",
+  ];
+
+  // 開発関連ディレクトリを探索
+  var devDirs = [];
+  var potentialDevPaths = [
+    homeDir + "/dev",
+    homeDir + "/dev-source",
+    homeDir + "/Developer",
+    homeDir + "/Projects",
+    homeDir + "/repos",
+    homeDir + "/git",
+    homeDir + "/src",
+    homeDir + "/code",
+    homeDir + "/workspace",
+  ];
+
+  // 存在する開発ディレクトリを取得
+  devDirs = filterExistingDirs(potentialDevPaths);
+
+  // LLM を使用してクエリに基づいてディレクトリを推薦
+  try {
+    if (
+      typeof iniad_ai_mop !== "undefined" &&
+      typeof iniad_ai_mop.chat === "function"
+    ) {
+      console.log("  [LLM] Analyzing query to suggest search directories...");
+
+      var systemPrompt =
+        "あなたはファイル検索の専門家です。\n" +
+        "ユーザーの検索クエリから、どのような種類のディレクトリを優先的に検索すべきかを判断してください。\n\n" +
+        "以下の形式で JSON を出力してください（他のテキストは出力しないでください）:\n" +
+        '{"priority": "development|documents|general", "keywords": ["関連キーワード1", "関連キーワード2"]}\n\n' +
+        "- development: ソースコード、プログラミング、ソフトウェア開発関連\n" +
+        "- documents: ドキュメント、レポート、資料関連\n" +
+        "- general: 一般的な検索（すべてのディレクトリを均等に検索）";
+
+      var userPrompt = "検索クエリ: " + query;
+
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+
+      if (aiResponse) {
+        try {
+          // JSON を抽出（余分なテキストがある場合に対応）
+          var jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            var suggestion = JSON.parse(jsonMatch[0]);
+            console.log("  [LLM] Suggested priority: " + suggestion.priority);
+
+            if (suggestion.priority === "development" && devDirs.length > 0) {
+              // 開発ディレクトリを優先
+              return devDirs.concat(defaultDirs);
+            } else if (suggestion.priority === "documents") {
+              // ドキュメントディレクトリを優先
+              return [
+                homeDir + "/Documents",
+                homeDir + "/Desktop",
+                homeDir + "/Downloads",
+              ].concat(devDirs);
+            }
+          }
+        } catch (parseErr) {
+          console.log("  [LLM] Parse error, using default directories");
+        }
+      }
+    }
+  } catch (llmErr) {
+    console.log("  [LLM] Error: " + (llmErr.message || llmErr));
+  }
+
+  // フォールバック: 開発ディレクトリ + デフォルト
+  if (devDirs.length > 0) {
+    return devDirs.concat(defaultDirs);
+  }
+  return defaultDirs;
+}
+
 function workflow() {
   var searchQuery = "Floorp";
   var maxResults = 50;
-  var outputPath = "/Users/user/Desktop/Deep_Research_Report.md";
+
+  // ホームディレクトリを動的に取得
+  var homeDir = getHomeDir();
+  var outputPath = homeDir + "/Desktop/Deep_Research_Report.md";
 
   console.log("╔════════════════════════════════════════════════════════════╗");
   console.log("║           Deep Research - Comprehensive Analysis           ║");
@@ -32,6 +159,7 @@ function workflow() {
   console.log("");
   console.log("Search Query: " + searchQuery);
   console.log("Target Results: " + maxResults);
+  console.log("Home Directory: " + homeDir);
   console.log("");
 
   // --- Phase 1: DuckDuckGo Search ---
@@ -135,16 +263,55 @@ function workflow() {
   // --- Phase 1B: Local Finder Search ---
   console.log("");
   console.log("━━━ Phase 1B: Local File Search ━━━");
+  console.log("  [DEBUG] Search Query: '" + searchQuery + "'");
 
   var localResults = [];
-  var localMaxResults = 30; // 増加して検索精度向上
+  var localMaxResults = 100; // 大幅に増加して多くのファイルを取得
 
-  // 複数のディレクトリを検索（優先度順）
-  var searchDirectories = [
-    "/Users/user/",
-  ];
+  // 複数のディレクトリを検索（動的に決定）
+  // LLM を使用して検索クエリに適したディレクトリを推薦
+  var searchDirectories = suggestSearchDirectories(searchQuery, homeDir);
+
+  // 存在するディレクトリのみをフィルタリング
+  searchDirectories = filterExistingDirs(searchDirectories);
+
+  console.log("  [DEBUG] Search directories: " + searchDirectories.length);
+  for (var i = 0; i < searchDirectories.length; i++) {
+    console.log("    [" + (i + 1) + "] " + searchDirectories[i]);
+  }
 
   try {
+    // Finder プラグインの存在確認（詳細デバッグ）
+    console.log("");
+    console.log("  [DEBUG] Checking Finder plugin availability...");
+    console.log("    app exists: " + (typeof app !== "undefined"));
+    console.log(
+      "    app.sapphillon exists: " +
+        (app && typeof app.sapphillon !== "undefined"),
+    );
+    console.log(
+      "    app.sapphillon.core exists: " +
+        (app && app.sapphillon && typeof app.sapphillon.core !== "undefined"),
+    );
+    console.log(
+      "    app.sapphillon.core.finder exists: " +
+        (app &&
+          app.sapphillon &&
+          app.sapphillon.core &&
+          typeof app.sapphillon.core.finder !== "undefined"),
+    );
+    if (
+      app &&
+      app.sapphillon &&
+      app.sapphillon.core &&
+      app.sapphillon.core.finder
+    ) {
+      console.log(
+        "    finder.findFiles type: " +
+          typeof app.sapphillon.core.finder.findFiles,
+      );
+    }
+
     if (
       app &&
       app.sapphillon &&
@@ -152,99 +319,220 @@ function workflow() {
       app.sapphillon.core.finder &&
       typeof app.sapphillon.core.finder.findFiles === "function"
     ) {
+      console.log("  [DEBUG] ✓ Finder plugin is available");
+      console.log("");
+
       var allFoundPaths = [];
 
       // 各ディレクトリを順番に検索
+      // 優先度の高いディレクトリ（最初の2つ）にはより多くの結果を割り当てる
       for (var dirIdx = 0; dirIdx < searchDirectories.length; dirIdx++) {
         var searchDir = searchDirectories[dirIdx];
-        console.log("  Searching in: " + searchDir + " for: " + searchQuery);
+        // 最初のディレクトリは50件、2番目は30件、残りは均等配分
+        var maxPerDir;
+        if (dirIdx === 0) {
+          maxPerDir = 50; // 最優先ディレクトリ
+        } else if (dirIdx === 1) {
+          maxPerDir = 30; // 2番目の優先ディレクトリ
+        } else {
+          maxPerDir = Math.ceil(
+            (localMaxResults - 80) / (searchDirectories.length - 2),
+          );
+        }
+        console.log(
+          "  ┌─ Directory [" +
+            (dirIdx + 1) +
+            "/" +
+            searchDirectories.length +
+            "]: " +
+            searchDir,
+        );
+        console.log(
+          "  │  Query: '" + searchQuery + "', MaxResults: " + maxPerDir,
+        );
 
         try {
           var finderStartTime = Date.now();
+          console.log("  │  [DEBUG] Calling finder.findFiles...");
+
           var pathsJson = app.sapphillon.core.finder.findFiles(
             searchDir,
             searchQuery,
-            Math.ceil(localMaxResults / searchDirectories.length),
+            maxPerDir,
           );
           var finderElapsed = Date.now() - finderStartTime;
+
+          console.log(
+            "  │  [DEBUG] findFiles returned in " + finderElapsed + "ms",
+          );
+          console.log("  │  [DEBUG] Response type: " + typeof pathsJson);
+          console.log(
+            "  │  [DEBUG] Response length: " +
+              (pathsJson ? pathsJson.length : "null/undefined"),
+          );
+
+          // レスポンスの先頭を表示（デバッグ用）
+          if (pathsJson && typeof pathsJson === "string") {
+            var previewLen = Math.min(pathsJson.length, 500);
+            console.log(
+              "  │  [DEBUG] Response preview: " +
+                pathsJson.substring(0, previewLen),
+            );
+            if (pathsJson.length > 500) {
+              console.log(
+                "  │  [DEBUG] ... (truncated, total " +
+                  pathsJson.length +
+                  " chars)",
+              );
+            }
+          }
 
           // JSON パース
           var foundPaths = [];
           if (pathsJson && typeof pathsJson === "string") {
             try {
               foundPaths = JSON.parse(pathsJson);
+              console.log("  │  [DEBUG] JSON parse successful");
+              console.log("  │  [DEBUG] Parsed type: " + typeof foundPaths);
+              console.log(
+                "  │  [DEBUG] Is array: " + Array.isArray(foundPaths),
+              );
+
               if (!Array.isArray(foundPaths)) {
-                console.log("    ⚠ Finder returned non-array: " + typeof foundPaths);
+                console.log(
+                  "  │  ⚠ Finder returned non-array: " + typeof foundPaths,
+                );
                 foundPaths = [];
+              } else {
+                // 見つかったパスを表示
+                console.log("  │  [DEBUG] Found paths:");
+                for (var pi = 0; pi < foundPaths.length; pi++) {
+                  console.log("  │    [" + (pi + 1) + "] " + foundPaths[pi]);
+                }
               }
             } catch (parseErr) {
-              console.log("    ⚠ JSON parse error: " + parseErr.message);
-              console.log("    Raw response (first 200 chars): " + String(pathsJson).substring(0, 200));
+              console.log("  │  ⚠ JSON parse error: " + parseErr.message);
+              console.log(
+                "  │  Raw response (first 200 chars): " +
+                  String(pathsJson).substring(0, 200),
+              );
               foundPaths = [];
             }
+          } else if (pathsJson === null || pathsJson === undefined) {
+            console.log("  │  ⚠ Finder returned null/undefined");
+            foundPaths = [];
           } else {
-            console.log("    ⚠ Finder returned invalid response: " + typeof pathsJson);
+            console.log(
+              "  │  ⚠ Finder returned invalid response type: " +
+                typeof pathsJson,
+            );
             foundPaths = [];
           }
 
           console.log(
-            "    ✓ Found " +
+            "  └─ Result: " +
               foundPaths.length +
               " files in " +
               finderElapsed +
               "ms",
           );
+          console.log("");
 
           // 重複を避けて追加
-          foundPaths.forEach(function(path) {
+          foundPaths.forEach(function (path) {
             if (allFoundPaths.indexOf(path) === -1) {
               allFoundPaths.push(path);
             }
           });
         } catch (dirErr) {
-          console.log("    ✗ Error searching " + searchDir + ": " + dirErr.message);
+          console.log("  └─ ✗ Error: " + (dirErr.message || dirErr));
+          console.log("");
         }
       }
 
       var foundPaths = allFoundPaths;
+      console.log("  ════════════════════════════════════════");
       console.log(
-        "  ✓ Total: " +
-          foundPaths.length +
-          " unique local files found",
+        "  ✓ Total: " + foundPaths.length + " unique local files found",
       );
+      console.log("  ════════════════════════════════════════");
 
       // Readable text file extensions
       var readableExtensions = [
         ".txt",
         ".md",
         ".js",
+        ".jsx",
         ".ts",
+        ".tsx",
+        ".mjs",
+        ".mts",
+        ".cjs",
+        ".cts",
         ".json",
+        ".jsonc",
         ".html",
+        ".htm",
         ".css",
+        ".scss",
+        ".sass",
+        ".less",
         ".xml",
+        ".xhtml",
         ".yaml",
         ".yml",
         ".sh",
+        ".bash",
+        ".zsh",
+        ".fish",
         ".py",
         ".rb",
         ".rs",
         ".c",
         ".cpp",
+        ".cc",
+        ".cxx",
         ".h",
+        ".hpp",
+        ".hxx",
         ".java",
         ".go",
         ".swift",
         ".kt",
+        ".kts",
         ".toml",
         ".ini",
         ".cfg",
         ".conf",
+        ".config",
         ".log",
         ".csv",
+        ".tsv",
         ".plist",
         ".entitlements",
         ".strings",
+        ".svg", // アイコン・図
+        ".vue", // Vue.js
+        ".svelte", // Svelte
+        ".astro", // Astro
+        ".graphql", // GraphQL
+        ".gql", // GraphQL
+        ".sql", // SQL
+        ".prisma", // Prisma
+        ".env", // 環境変数
+        ".env.example", // 環境変数テンプレート
+        ".gitignore", // Git設定
+        ".eslintrc", // ESLint設定
+        ".prettierrc", // Prettier設定
+        ".editorconfig", // エディタ設定
+        "Makefile", // Makefile（拡張子なし対応用）
+        "Dockerfile", // Docker
+        "Cargo.toml", // Rust
+        "deno.json", // Deno
+        "package.json", // Node.js
+        "README", // README
+        "LICENSE", // ライセンス
+        "CHANGELOG", // 変更履歴
       ];
 
       for (var f = 0; f < foundPaths.length; f++) {
@@ -298,6 +586,40 @@ function workflow() {
             isReadable = true;
             break;
           }
+          // 拡張子なしファイル名の場合もチェック（README, Makefile など）
+          if (readableExtensions[ext].indexOf(".") === -1) {
+            if (
+              fileName === readableExtensions[ext] ||
+              fileName.startsWith(readableExtensions[ext] + ".")
+            ) {
+              isReadable = true;
+              break;
+            }
+          }
+        }
+
+        // 拡張子なしでも特定のファイル名は読み込み可能
+        var specialFiles = [
+          "README",
+          "LICENSE",
+          "CHANGELOG",
+          "Makefile",
+          "Dockerfile",
+          "Containerfile",
+          ".gitignore",
+          ".eslintrc",
+          ".prettierrc",
+        ];
+        if (!isReadable && extension === "") {
+          for (var sf = 0; sf < specialFiles.length; sf++) {
+            if (
+              fileName === specialFiles[sf] ||
+              fileName.startsWith(specialFiles[sf])
+            ) {
+              isReadable = true;
+              break;
+            }
+          }
         }
 
         // Only add readable text files to search results
@@ -326,9 +648,19 @@ function workflow() {
               var rawContent = app.sapphillon.core.filesystem.read(filePath);
               if (rawContent && typeof rawContent === "string") {
                 fileContent = rawContent;
-                // 大きすぎるファイルは切り詰める
-                if (fileContent.length > 5000) {
-                  fileContent = fileContent.substring(0, 5000) + "\n\n[... truncated ...]";
+                // 大きすぎるファイルは切り詰める（10000文字に増加）
+                if (fileContent.length > 10000) {
+                  // 先頭と末尾を保持して中間を省略
+                  var headPart = fileContent.substring(0, 7000);
+                  var tailPart = fileContent.substring(
+                    fileContent.length - 2000,
+                  );
+                  fileContent =
+                    headPart +
+                    "\n\n[... " +
+                    (fileContent.length - 9000) +
+                    " chars truncated ...]\n\n" +
+                    tailPart;
                 }
               } else if (rawContent === null || rawContent === undefined) {
                 readError = "Read returned null/undefined";
@@ -337,7 +669,9 @@ function workflow() {
               }
             } else {
               readError = "filesystem.read function not available";
-              console.log("    ⚠ filesystem.read not available for: " + fileName);
+              console.log(
+                "    ⚠ filesystem.read not available for: " + fileName,
+              );
             }
           } catch (readErr) {
             readError = String(readErr.message || readErr);
@@ -346,8 +680,13 @@ function workflow() {
           }
         }
 
-        // Generate file description based on path and extension
-        fileDescription = describeLocalFile(filePath, extension, fileContent);
+        // Generate file description using LLM (dynamic, query-aware)
+        fileDescription = describeLocalFile(
+          filePath,
+          extension,
+          fileContent,
+          searchQuery,
+        );
 
         // ファイルが読み込めた場合のみ結果に追加
         if (fileContent.length > 0 || !readError) {
@@ -377,23 +716,53 @@ function workflow() {
           });
 
           console.log(
-            "  [LOCAL] ✓ " +
-              fileName +
-              " (" + fileContent.length + " chars)",
+            "  [LOCAL] ✓ " + fileName + " (" + fileContent.length + " chars)",
           );
         } else {
           console.log(
-            "  [LOCAL] ✗ " +
-              fileName +
-              " - " + (readError || "empty content"),
+            "  [LOCAL] ✗ " + fileName + " - " + (readError || "empty content"),
           );
         }
       }
     } else {
       console.log("  ⚠ Finder plugin not available, skipping local search");
+      console.log("  [DEBUG] Plugin check details:");
+      console.log("    - app: " + (typeof app !== "undefined"));
+      console.log(
+        "    - app.sapphillon: " +
+          (app && typeof app.sapphillon !== "undefined"),
+      );
+      console.log(
+        "    - app.sapphillon.core: " +
+          (app && app.sapphillon && typeof app.sapphillon.core !== "undefined"),
+      );
+      console.log(
+        "    - app.sapphillon.core.finder: " +
+          (app &&
+            app.sapphillon &&
+            app.sapphillon.core &&
+            typeof app.sapphillon.core.finder !== "undefined"),
+      );
+      if (app && app.sapphillon && app.sapphillon.core) {
+        console.log(
+          "    - Available core plugins: " +
+            Object.keys(app.sapphillon.core).join(", "),
+        );
+      }
     }
   } catch (finderErr) {
     console.log("  ✗ Finder Error: " + finderErr);
+    console.log("  [DEBUG] Error details:");
+    console.log(
+      "    - Error type: " +
+        (finderErr ? finderErr.constructor.name : "unknown"),
+    );
+    console.log(
+      "    - Error message: " + (finderErr ? finderErr.message : "none"),
+    );
+    if (finderErr && finderErr.stack) {
+      console.log("    - Stack trace: " + finderErr.stack.substring(0, 500));
+    }
   }
 
   console.log("  ✓ Added " + localResults.length + " local sources");
@@ -633,14 +1002,22 @@ function workflow() {
   console.log("");
   console.log("━━━ Phase 3.3: Technical Facts Validation ━━━");
 
-  var technicalFacts = verifyTechnicalFactsGeneric(analyzedResults, searchQuery);
+  var technicalFacts = verifyTechnicalFactsGeneric(
+    analyzedResults,
+    searchQuery,
+  );
   analyzedResults.technicalFactValidation = technicalFacts;
 
   if (technicalFacts.conflictsDetected) {
     console.log("  ⚠ Technical facts conflicts detected:");
-    Object.keys(technicalFacts.categories).forEach(function(cat) {
+    Object.keys(technicalFacts.categories).forEach(function (cat) {
       if (technicalFacts.categories[cat].conflicts.length > 0) {
-        console.log("    - " + cat + ": " + technicalFacts.categories[cat].conflicts.join(", "));
+        console.log(
+          "    - " +
+            cat +
+            ": " +
+            technicalFacts.categories[cat].conflicts.join(", "),
+        );
       }
     });
   } else {
@@ -658,7 +1035,10 @@ function workflow() {
     var aiDetection = detectAIGenerationGeneric(
       analyzedResults[i].result.pageContent,
       analyzedResults[i].factList,
-      { title: analyzedResults[i].result.title, domain: analyzedResults[i].result.domain }
+      {
+        title: analyzedResults[i].result.title,
+        domain: analyzedResults[i].result.domain,
+      },
     );
     analyzedResults[i].aiGenerationRisk = aiDetection;
 
@@ -666,15 +1046,19 @@ function workflow() {
       highRiskCount++;
       console.log(
         "    ⚠ High risk: " +
-        analyzedResults[i].result.title.substring(0, 30) +
-        " (score: " + aiDetection.totalScore.toFixed(2) + ")"
+          analyzedResults[i].result.title.substring(0, 30) +
+          " (score: " +
+          aiDetection.totalScore.toFixed(2) +
+          ")",
       );
     } else if (aiDetection.riskLevel === "medium") {
       mediumRiskCount++;
     }
   }
 
-  console.log("  ✓ High risk: " + highRiskCount + " | Medium risk: " + mediumRiskCount);
+  console.log(
+    "  ✓ High risk: " + highRiskCount + " | Medium risk: " + mediumRiskCount,
+  );
 
   // Build FACT-BASED summaries (not abstractive summaries)
   console.log("");
@@ -758,14 +1142,26 @@ function workflow() {
   console.log("━━━ Phase 3.6: Source Reliability Scoring (Enhanced) ━━━");
 
   for (var i = 0; i < analyzedResults.length; i++) {
-    var reliability = calculateSourceReliabilityEnhanced(analyzedResults[i].result, analyzedResults);
+    var reliability = calculateSourceReliabilityEnhanced(
+      analyzedResults[i].result,
+      analyzedResults,
+    );
     analyzedResults[i].reliability = reliability;
 
-    var scoreIcon = reliability.score >= 8 ? "🟢" : reliability.score >= 6 ? "🟡" : "🔴";
+    var scoreIcon =
+      reliability.score >= 8 ? "🟢" : reliability.score >= 6 ? "🟡" : "🔴";
     console.log(
-      "    " + scoreIcon + " [" + (i + 1) + "] " +
-      analyzedResults[i].result.title.substring(0, 40) + "... " +
-      reliability.score.toFixed(1) + "/10 (" + reliability.level + ")"
+      "    " +
+        scoreIcon +
+        " [" +
+        (i + 1) +
+        "] " +
+        analyzedResults[i].result.title.substring(0, 40) +
+        "... " +
+        reliability.score.toFixed(1) +
+        "/10 (" +
+        reliability.level +
+        ")",
     );
   }
 
@@ -797,8 +1193,10 @@ function workflow() {
       var metadata = extractRichMetadata(analyzedResults[i].result, null);
       analyzedResults[i].metadata = metadata;
       console.log(
-        "      Authority: " + metadata.authority.toFixed(1) + "/10" +
-        (metadata.author ? " | Author: " + metadata.author : "")
+        "      Authority: " +
+          metadata.authority.toFixed(1) +
+          "/10" +
+          (metadata.author ? " | Author: " + metadata.author : ""),
       );
     }
   }
@@ -819,7 +1217,10 @@ function workflow() {
   console.log("");
   console.log("━━━ Phase 3.11: Interactive Exploration Setup ━━━");
 
-  var interactiveQuestions = performInteractiveExploration(analyzedResults, searchQuery);
+  var interactiveQuestions = performInteractiveExploration(
+    analyzedResults,
+    searchQuery,
+  );
 
   // Generate detailed Key Findings with multiple subsections
   console.log("  → Key Findings (15 detailed sections)...");
@@ -951,10 +1352,15 @@ function workflow() {
     );
 
     // 重複文の検出と除去
-    var cleanedContent = removeDuplicateSentences(sectionContent, allGeneratedSentences);
+    var cleanedContent = removeDuplicateSentences(
+      sectionContent,
+      allGeneratedSentences,
+    );
     var duplicatesRemoved = sectionContent.length - cleanedContent.length;
     if (duplicatesRemoved > 50) {
-      console.log("      → Removed " + duplicatesRemoved + " chars of duplicate content");
+      console.log(
+        "      → Removed " + duplicatesRemoved + " chars of duplicate content",
+      );
     }
     sectionContent = cleanedContent;
 
@@ -966,7 +1372,7 @@ function workflow() {
 
     // 生成した文を追跡リストに追加
     var sentences = extractSentences(sectionContent);
-    sentences.forEach(function(s) {
+    sentences.forEach(function (s) {
       if (s.length > 20 && allGeneratedSentences.indexOf(s) < 0) {
         allGeneratedSentences.push(s);
       }
@@ -978,7 +1384,7 @@ function workflow() {
 
     // 具体例・固有名詞を抽出して追跡
     var examples = extractExamplesAndNames(sectionContent);
-    examples.forEach(function(ex) {
+    examples.forEach(function (ex) {
       if (usedExamples.indexOf(ex) < 0) {
         usedExamples.push(ex);
       }
@@ -1046,45 +1452,88 @@ function workflow() {
 
   // Quality Metrics Summary (NEW)
   console.log("  Generating quality metrics...");
-  var qualityMetrics = calculateQualityMetricsGeneric(analyzedResults, contradictions, searchQuery);
-  
+  var qualityMetrics = calculateQualityMetricsGeneric(
+    analyzedResults,
+    contradictions,
+    searchQuery,
+  );
+
   report += "> **Quality Metrics Summary**\n>\n";
   report += "> **Data Collection:**\n>\n";
-  report += "> - Total sources: " + qualityMetrics.dataCollection.totalSources + "\n>\n";
-  report += "> - Web sources: " + qualityMetrics.dataCollection.webSources + "\n>\n";
-  report += "> - Local sources: " + qualityMetrics.dataCollection.localSources + "\n>\n";
-  report += "> - Avg. content length: " + qualityMetrics.dataCollection.averageContentLength + " chars\n>\n";
+  report +=
+    "> - Total sources: " +
+    qualityMetrics.dataCollection.totalSources +
+    "\n>\n";
+  report +=
+    "> - Web sources: " + qualityMetrics.dataCollection.webSources + "\n>\n";
+  report +=
+    "> - Local sources: " +
+    qualityMetrics.dataCollection.localSources +
+    "\n>\n";
+  report +=
+    "> - Avg. content length: " +
+    qualityMetrics.dataCollection.averageContentLength +
+    " chars\n>\n";
   report += ">\n";
   report += "> **Content Quality:**\n>\n";
-  report += "> - High reliability (≥8/10): " + qualityMetrics.contentQuality.highReliabilityCount + "\n>\n";
-  report += "> - Medium reliability (6-8/10): " + qualityMetrics.contentQuality.mediumReliabilityCount + "\n>\n";
-  report += "> - Low reliability (<6/10): " + qualityMetrics.contentQuality.lowReliabilityCount + "\n>\n";
-  report += "> - Average reliability: " + qualityMetrics.contentQuality.averageReliability + "/10\n>\n";
+  report +=
+    "> - High reliability (≥8/10): " +
+    qualityMetrics.contentQuality.highReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Medium reliability (6-8/10): " +
+    qualityMetrics.contentQuality.mediumReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Low reliability (<6/10): " +
+    qualityMetrics.contentQuality.lowReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Average reliability: " +
+    qualityMetrics.contentQuality.averageReliability +
+    "/10\n>\n";
   report += ">\n";
   report += "> **AI Generation Risk:**\n>\n";
-  report += "> - High risk: " + qualityMetrics.aiGenerationRisk.highRiskCount + "\n>\n";
-  report += "> - Medium risk: " + qualityMetrics.aiGenerationRisk.mediumRiskCount + "\n>\n";
-  report += "> - Low risk: " + qualityMetrics.aiGenerationRisk.lowRiskCount + "\n";
-  
+  report +=
+    "> - High risk: " + qualityMetrics.aiGenerationRisk.highRiskCount + "\n>\n";
+  report +=
+    "> - Medium risk: " +
+    qualityMetrics.aiGenerationRisk.mediumRiskCount +
+    "\n>\n";
+  report +=
+    "> - Low risk: " + qualityMetrics.aiGenerationRisk.lowRiskCount + "\n";
+
   if (qualityMetrics.technicalConsistency.hasConflicts) {
     report += ">\n";
     report += "> ⚠ **Technical Conflicts Detected:**\n>\n";
-    report += "> Conflicting information found in: " + qualityMetrics.technicalConsistency.conflictCategories.join(", ") + "\n>\n";
+    report +=
+      "> Conflicting information found in: " +
+      qualityMetrics.technicalConsistency.conflictCategories.join(", ") +
+      "\n>\n";
   }
-  
+
   if (qualityMetrics.contradictions.total > 0) {
     report += ">\n";
     report += "> ⚠ **Contradictions:**\n>\n";
     report += "> - Total: " + qualityMetrics.contradictions.total + "\n>\n";
-    report += "> - High severity: " + qualityMetrics.contradictions.highSeverity + "\n>\n";
-    report += "> - Medium severity: " + qualityMetrics.contradictions.mediumSeverity + "\n>\n";
+    report +=
+      "> - High severity: " +
+      qualityMetrics.contradictions.highSeverity +
+      "\n>\n";
+    report +=
+      "> - Medium severity: " +
+      qualityMetrics.contradictions.mediumSeverity +
+      "\n>\n";
   }
-  
-  report += "> **Warning:** This report contains " + qualityMetrics.aiGenerationRisk.highRiskCount +
-             " sources with high AI generation risk. " +
-             (qualityMetrics.technicalConsistency.hasConflicts ? 
-              "Technical claims may have conflicts. " : "") +
-             "Always verify critical information against official sources.\n>\n";
+
+  report +=
+    "> **Warning:** This report contains " +
+    qualityMetrics.aiGenerationRisk.highRiskCount +
+    " sources with high AI generation risk. " +
+    (qualityMetrics.technicalConsistency.hasConflicts
+      ? "Technical claims may have conflicts. "
+      : "") +
+    "Always verify critical information against official sources.\n>\n";
   report += "---\n\n";
 
   // Executive Summary Box
@@ -1198,12 +1647,20 @@ function workflow() {
         report += "#### [" + a.result.rank + "] " + a.result.title + "\n\n";
         if (a.result.isLocalFile) {
           report += "- **パス**: `" + a.result.filePath + "`\n";
-          report += "- **種類**: " + (a.result.fileExtension || "不明") + "\n";
+          report += "- **種類**: " + (a.result.fileExtension || "不明") + "\n\n";
+          // ローカルファイルの場合は、LLM生成の詳細説明（snippet）を使用
+          // snippet には describeLocalFileWithAI の結果が保存されている
+          if (a.result.snippet && a.result.snippet.length > 100) {
+            report += a.result.snippet + "\n\n";
+          } else {
+            // フォールバック: Phase 3 のファクト抽出結果を使用
+            report += "**分析**: " + a.summary + "\n\n";
+          }
         } else {
           report +=
             "- **URL**: [" + a.result.domain + "](" + a.result.url + ")\n";
+          report += "- **分析**: " + a.summary + "\n\n";
         }
-        report += "- **分析**: " + a.summary + "\n\n";
       });
     }
   });
@@ -1335,7 +1792,6 @@ function workflow() {
   report += "## 7. Conclusions\n\n";
   report += conclusionsText + "\n\n";
 
-
   // Cross-Reference Verification
   report += "---\n\n";
   report += "## 8. Cross-Reference Verification\n\n";
@@ -1352,19 +1808,34 @@ function workflow() {
     for (var c = 0; c < 5; c++) {
       confidenceBar += c < Math.floor(vf.confidence * 5) ? "●" : "○";
     }
-    var sourcesStr = vf.sources.map(function (s) { return "[" + (s + 1) + "]"; }).join(", ");
+    var sourcesStr = vf.sources
+      .map(function (s) {
+        return "[" + (s + 1) + "]";
+      })
+      .join(", ");
     report +=
-      "| " + vf.fact.substring(0, 30) + " | " +
-      vf.sourceCount + " | " + confidenceBar + " | " +
-      sourcesStr + " |\n";
+      "| " +
+      vf.fact.substring(0, 30) +
+      " | " +
+      vf.sourceCount +
+      " | " +
+      confidenceBar +
+      " | " +
+      sourcesStr +
+      " |\n";
   });
 
   report += "\n";
   report += "### 8.2 未検証の事実\n\n";
-  report += "以下の事実は単一の情報源からのみ確認されています（追加検証推奨）：\n\n";
+  report +=
+    "以下の事実は単一の情報源からのみ確認されています（追加検証推奨）：\n\n";
   var unverifiedToShow = crossRefResults.unverified.slice(0, 10);
   unverifiedToShow.forEach(function (uf) {
-    var sourcesStr = uf.sources.map(function (s) { return "[" + (s + 1) + "]"; }).join(", ");
+    var sourcesStr = uf.sources
+      .map(function (s) {
+        return "[" + (s + 1) + "]";
+      })
+      .join(", ");
     report += "- " + uf.fact + " (情報源: " + sourcesStr + ")\n";
   });
   if (crossRefResults.unverified.length > 10) {
@@ -1380,7 +1851,6 @@ function workflow() {
   // Knowledge Graph
   report += "---\n\n";
   report += generateKnowledgeGraphReport(knowledgeGraph);
-
 
   // References
   report += "---\n\n";
@@ -1417,7 +1887,6 @@ function workflow() {
   report += generateContradictionReport(contradictions, analyzedResults);
   report += "---\n\n";
 
-
   report += "---\n\n";
   report += "## 14. Quality Assurance\n\n";
 
@@ -1440,10 +1909,18 @@ function workflow() {
   var citationValidation = validateSourceReferences(report, analyzedResults);
 
   // コンテンツ品質の検証
-  var contentIssues = performContentValidation(report, searchQuery, analyzedResults);
+  var contentIssues = performContentValidation(
+    report,
+    searchQuery,
+    analyzedResults,
+  );
 
   // 検証結果をレポートに追加
-  report += generateMetadataValidationReport(metadataValidation, citationValidation, contentIssues);
+  report += generateMetadataValidationReport(
+    metadataValidation,
+    citationValidation,
+    contentIssues,
+  );
 
   report += "---\n\n";
   report += "*This report was automatically generated by Deep Research.*\n";
@@ -1496,7 +1973,9 @@ function generateAnalysis(type, topic, summaries, count) {
   var prompt = "";
 
   // ソース情報の先頭部分を抽出（overview等で使用）
-  var topSources = summaries ? summaries.split("\n").slice(0, 15).join("\n") : "";
+  var topSources = summaries
+    ? summaries.split("\n").slice(0, 15).join("\n")
+    : "";
 
   switch (type) {
     case "abstract":
@@ -2018,38 +2497,165 @@ function performRecursiveSearch(originalQuery, currentFacts, existingResults) {
 // Get file type category from extension
 function getFileType(extension) {
   var ext = (extension || "").toLowerCase();
-  
-  var codeExtensions = [".js", ".ts", ".py", ".rb", ".rs", ".go", ".java", ".c", ".cpp", ".h", ".swift", ".kt"];
-  var configExtensions = [".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".plist", ".xml"];
+
+  var codeExtensions = [
+    ".js",
+    ".ts",
+    ".py",
+    ".rb",
+    ".rs",
+    ".go",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".swift",
+    ".kt",
+  ];
+  var configExtensions = [
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".plist",
+    ".xml",
+  ];
   var docExtensions = [".md", ".txt", ".log", ".csv"];
   var webExtensions = [".html", ".css", ".htm"];
   var shellExtensions = [".sh", ".bash", ".zsh"];
-  
+
   if (codeExtensions.indexOf(ext) >= 0) return "source_code";
   if (configExtensions.indexOf(ext) >= 0) return "config";
   if (docExtensions.indexOf(ext) >= 0) return "document";
   if (webExtensions.indexOf(ext) >= 0) return "web";
   if (shellExtensions.indexOf(ext) >= 0) return "script";
-  
+
   return "other";
 }
 
-// Generate a description of a local file based on its path, extension, and content
-function describeLocalFile(filePath, extension, content) {
+// ============================================================================
+// LLM-based Local File Description Generation
+// ============================================================================
+
+// LLM を使ってローカルファイルの説明を動的に生成する
+// 検索クエリに基づいて、ファイルがどのように関連しているかを分析
+function describeLocalFileWithAI(filePath, extension, content, searchQuery) {
   var fileName = filePath.split("/").pop() || filePath;
   var pathParts = filePath.split("/");
   var parentFolder =
     pathParts.length > 1 ? pathParts[pathParts.length - 2] : "";
 
-  // Determine file type description
+  // コンテンツのプレビュー（LLM に渡す用、最大2000文字）
+  var contentPreview = "";
+  if (content && content.length > 0) {
+    contentPreview = content.substring(0, 2000);
+    if (content.length > 2000) {
+      contentPreview += "\n... (以下省略、合計 " + content.length + " 文字)";
+    }
+  }
+
+  // LLM 用のシステムプロンプト
+  var systemPrompt =
+    "あなたはローカルファイルを分析する専門家です。\n" +
+    "与えられたファイル情報から、そのファイルがユーザーの検索クエリにどのように関連しているかを分析し、\n" +
+    "自然で読みやすい日本語で説明を生成してください。\n\n" +
+    "以下の形式で出力してください：\n\n" +
+    "1. **発見場所と概要**: このファイルがどこで見つかり、何のファイルなのかを1-2文で説明\n" +
+    "2. **検索クエリとの関連性**: ユーザーの検索クエリ「" +
+    searchQuery +
+    "」との関連性を具体的に説明（なぜこのファイルが検索結果に含まれたか）\n" +
+    "3. **機能的な役割**: このファイルがプロジェクトやシステム全体でどのような役割を果たしているか（推測可）\n" +
+    "4. **重要なポイント**: ファイルの内容から読み取れる重要な情報やインサイト\n\n" +
+    "注意事項：\n" +
+    "- 検索クエリがソフトウェア名の場合は、そのソフトウェアとの関連を説明\n" +
+    "- 検索クエリが一般的なトピック（例: 機械学習、料理、旅行など）の場合は、ファイルがそのトピックにどう関連するかを説明\n" +
+    "- 技術的な詳細は適度に含めるが、読みやすさを重視\n" +
+    "- 推測は「可能性があります」「と思われます」などの表現を使う\n" +
+    "- 出力は Markdown 形式で";
+
+  // LLM 用のユーザープロンプト
+  var userPrompt =
+    "以下のローカルファイルを分析してください。\n\n" +
+    "**検索クエリ**: " +
+    searchQuery +
+    "\n\n" +
+    "**ファイル情報**:\n" +
+    "- ファイル名: " +
+    fileName +
+    "\n" +
+    "- 拡張子: " +
+    (extension || "(なし)") +
+    "\n" +
+    "- フルパス: " +
+    filePath +
+    "\n" +
+    "- 親フォルダ: " +
+    parentFolder +
+    "\n" +
+    "- ファイルサイズ: " +
+    (content ? content.length : 0) +
+    " 文字\n\n" +
+    "**ファイル内容（プレビュー）**:\n```\n" +
+    (contentPreview || "(内容なし)") +
+    "\n```\n\n" +
+    "上記の情報から、このファイルの説明を生成してください。";
+
+  try {
+    // LLM 呼び出し
+    if (
+      typeof iniad_ai_mop !== "undefined" &&
+      typeof iniad_ai_mop.chat === "function"
+    ) {
+      console.log("    [LLM] Analyzing: " + fileName);
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+
+      if (aiResponse && aiResponse.length > 0) {
+        // LLM レスポンスにファイル情報を追加
+        var fullDescription = "---\n\n";
+        fullDescription += "### " + fileName + "\n\n";
+        fullDescription += "📍 **パス**: `" + filePath + "`\n\n";
+        fullDescription += aiResponse;
+        fullDescription += "\n\n---";
+        return fullDescription;
+      }
+    }
+  } catch (llmErr) {
+    console.log(
+      "    [LLM] Error analyzing " +
+        fileName +
+        ": " +
+        (llmErr.message || llmErr),
+    );
+  }
+
+  // LLM が使えない場合やエラー時はフォールバック
+  return describeLocalFileFallback(filePath, extension, content, searchQuery);
+}
+
+// フォールバック用の静的説明生成（LLM が使えない場合）
+function describeLocalFileFallback(filePath, extension, content, searchQuery) {
+  var fileName = filePath.split("/").pop() || filePath;
+  var pathParts = filePath.split("/");
+  var parentFolder =
+    pathParts.length > 1 ? pathParts[pathParts.length - 2] : "";
+
+  // ファイル種別の説明
   var fileTypeDescriptions = {
     ".js": "JavaScript ソースコード",
+    ".jsx": "React JSX コンポーネント",
     ".ts": "TypeScript ソースコード",
-    ".json": "JSON データファイル",
+    ".tsx": "React TSX コンポーネント",
+    ".mts": "TypeScript ESモジュール",
+    ".mjs": "JavaScript ESモジュール",
+    ".json": "JSON 設定/データファイル",
     ".md": "Markdown ドキュメント",
     ".txt": "テキストファイル",
     ".html": "HTML ウェブページ",
     ".css": "CSS スタイルシート",
+    ".scss": "SCSS スタイルシート",
     ".py": "Python スクリプト",
     ".rs": "Rust ソースコード",
     ".swift": "Swift ソースコード",
@@ -2073,49 +2679,69 @@ function describeLocalFile(filePath, extension, content) {
     ".cfg": "設定ファイル",
     ".conf": "設定ファイル",
     ".strings": "ローカライズ文字列ファイル",
+    ".svg": "SVG ベクター画像",
+    ".vue": "Vue.js コンポーネント",
+    ".svelte": "Svelte コンポーネント",
   };
 
   var typeDesc = fileTypeDescriptions[extension] || "ファイル";
 
-  // Build description
-  var description = "ローカル" + typeDesc + ": " + fileName;
+  // 自然言語での説明を構築
+  var description = "---\n\n";
+  description += "### " + fileName + "\n\n";
+  description += "📍 **パス**: `" + filePath + "`\n\n";
 
-  // Add path context
-  if (parentFolder) {
-    description += " (場所: " + parentFolder + "/)";
-  }
+  // 1. 発見場所と概要
+  description += "**発見場所と概要**: ";
+  description +=
+    "`" + parentFolder + "/` フォルダ内で発見された " + typeDesc + " です。";
 
-  // Add content summary if available
-  if (content && content.length > 0) {
-    var contentPreview = content.substring(0, 200).replace(/\s+/g, " ").trim();
-    if (content.length > 200) {
-      contentPreview += "...";
+  // 検索クエリとの関連性（ファイル名やパスに含まれているか）
+  if (searchQuery) {
+    var queryLower = searchQuery.toLowerCase();
+    var pathLower = filePath.toLowerCase();
+    var contentLower = content ? content.toLowerCase() : "";
+
+    if (
+      pathLower.indexOf(queryLower) > -1 ||
+      contentLower.indexOf(queryLower) > -1
+    ) {
+      description += "\n\n**検索クエリとの関連性**: ";
+      description +=
+        "このファイルは検索クエリ「" + searchQuery + "」に関連しています。";
+
+      if (pathLower.indexOf(queryLower) > -1) {
+        description += " ファイルパスに検索キーワードが含まれています。";
+      }
+      if (contentLower.indexOf(queryLower) > -1) {
+        description += " ファイル内容に検索キーワードが含まれています。";
+      }
     }
-    description += " | 内容プレビュー: " + contentPreview;
   }
 
-  // Detect project type from path
-  if (filePath.indexOf("/node_modules/") > -1) {
-    description += " [Node.js 依存関係]";
-  } else if (filePath.indexOf("/.git/") > -1) {
-    description += " [Git リポジトリ]";
-  } else if (filePath.indexOf("/src/") > -1) {
-    description += " [ソースコード]";
-  } else if (
-    filePath.indexOf("/docs/") > -1 ||
-    filePath.indexOf("/doc/") > -1
-  ) {
-    description += " [ドキュメント]";
-  } else if (
-    filePath.indexOf("/test/") > -1 ||
-    filePath.indexOf("/tests/") > -1
-  ) {
-    description += " [テストコード]";
-  } else if (filePath.indexOf("/config/") > -1) {
-    description += " [設定]";
+  // 内容プレビュー
+  if (content && content.length > 0) {
+    description +=
+      "\n\n**内容プレビュー** (" + content.length + " 文字):\n```\n";
+    var contentPreview = content.substring(0, 400).trim();
+    if (content.length > 400) {
+      contentPreview += "\n... (省略)";
+    }
+    description += contentPreview + "\n```";
   }
 
+  description += "\n\n---";
   return description;
+}
+
+// メインのファイル説明生成関数（LLM を優先的に使用）
+function describeLocalFile(filePath, extension, content, searchQuery) {
+  // searchQuery がある場合は LLM ベースの分析を使用
+  if (searchQuery) {
+    return describeLocalFileWithAI(filePath, extension, content, searchQuery);
+  }
+  // searchQuery がない場合はフォールバック
+  return describeLocalFileFallback(filePath, extension, content, "");
 }
 
 // ============================================================================
@@ -2125,6 +2751,26 @@ function describeLocalFile(filePath, extension, content) {
 // Filter search results for relevance to the query using AI
 function filterRelevantResults(results, query) {
   if (results.length === 0) return results;
+
+  // Separate local files from web results - local files always pass through
+  var localFiles = results.filter(function (r) {
+    return r.isLocalFile === true;
+  });
+  var webResults = results.filter(function (r) {
+    return r.isLocalFile !== true;
+  });
+
+  console.log("  [DEBUG] Total results: " + results.length);
+  console.log("  [DEBUG] Local files (auto-included): " + localFiles.length);
+  console.log("  [DEBUG] Web results to filter: " + webResults.length);
+
+  // If only local files, return them directly
+  if (webResults.length === 0) {
+    return localFiles;
+  }
+
+  // Replace results with only web results for AI filtering
+  results = webResults;
 
   var systemPrompt =
     "あなたは検索結果の関連性を評価する専門家です。\n\n" +
@@ -2254,9 +2900,22 @@ function filterRelevantResults(results, query) {
     );
   }
 
-  return scoredResults.map(function (sr) {
+  // Extract web results and add local files back
+  var filteredWebResults = scoredResults.map(function (sr) {
     return sr.result;
   });
+
+  // Add local files at the end (they always pass through)
+  if (localFiles.length > 0) {
+    console.log(
+      "  [DEBUG] Adding " + localFiles.length + " local files to results",
+    );
+    localFiles.forEach(function (lf) {
+      console.log("    [LOCAL] " + lf.title);
+    });
+  }
+
+  return filteredWebResults.concat(localFiles);
 }
 
 // ============================================================================
@@ -2350,13 +3009,17 @@ function retryWithBackoff(fn, maxRetries, initialDelay) {
 // 文を抽出する
 function extractSentences(content) {
   if (!content) return [];
-  
+
   // 日本語の句点「。」と英語のピリオド「.」で分割
   var sentences = content.split(/(?<=[。.!?])\s*/);
-  
+
   return sentences
-    .map(function(s) { return s.trim(); })
-    .filter(function(s) { return s.length > 10; });
+    .map(function (s) {
+      return s.trim();
+    })
+    .filter(function (s) {
+      return s.length > 10;
+    });
 }
 
 // 重複文を除去する
@@ -2364,51 +3027,51 @@ function removeDuplicateSentences(content, existingSentences) {
   if (!content || !existingSentences || existingSentences.length === 0) {
     return content;
   }
-  
+
   var sentences = extractSentences(content);
   var cleanedSentences = [];
   var removedCount = 0;
-  
-  sentences.forEach(function(sentence) {
+
+  sentences.forEach(function (sentence) {
     var isDuplicate = false;
     var normalizedSentence = normalizeSentence(sentence);
-    
+
     // 既存の文との類似度をチェック
     for (var i = 0; i < existingSentences.length; i++) {
       var existingNormalized = normalizeSentence(existingSentences[i]);
-      
+
       // 完全一致または高い類似度
       if (normalizedSentence === existingNormalized) {
         isDuplicate = true;
         break;
       }
-      
+
       // 部分一致（80%以上の重複）
       if (calculateSimilarity(normalizedSentence, existingNormalized) > 0.8) {
         isDuplicate = true;
         break;
       }
     }
-    
+
     if (isDuplicate) {
       removedCount++;
     } else {
       cleanedSentences.push(sentence);
     }
   });
-  
+
   return cleanedSentences.join("");
 }
 
 // 文を正規化する（比較用）
 function normalizeSentence(sentence) {
   if (!sentence) return "";
-  
+
   return sentence
-    .replace(/\s+/g, "")           // 空白を除去
-    .replace(/[「」『』【】（）()]/g, "")  // 括弧を除去
-    .replace(/[、,。.]/g, "")      // 句読点を除去
-    .replace(/\[\d+\]/g, "")       // 引用番号を除去
+    .replace(/\s+/g, "") // 空白を除去
+    .replace(/[「」『』【】（）()]/g, "") // 括弧を除去
+    .replace(/[、,。.]/g, "") // 句読点を除去
+    .replace(/\[\d+\]/g, "") // 引用番号を除去
     .toLowerCase();
 }
 
@@ -2416,99 +3079,210 @@ function normalizeSentence(sentence) {
 function calculateSimilarity(str1, str2) {
   if (!str1 || !str2) return 0;
   if (str1 === str2) return 1;
-  
+
   var longer = str1.length > str2.length ? str1 : str2;
   var shorter = str1.length > str2.length ? str2 : str1;
-  
+
   if (longer.length === 0) return 1;
-  
+
   // 短い方が長い方に含まれているかチェック
   if (longer.indexOf(shorter) >= 0) {
     return shorter.length / longer.length;
   }
-  
+
   // 共通の部分文字列の割合を計算（簡易版）
   var matches = 0;
   var chunkSize = 10; // 10文字単位でチェック
-  
+
   for (var i = 0; i <= shorter.length - chunkSize; i += chunkSize) {
     var chunk = shorter.substring(i, i + chunkSize);
     if (longer.indexOf(chunk) >= 0) {
       matches += chunkSize;
     }
   }
-  
+
   return matches / shorter.length;
 }
 
 // コンテンツから要点を抽出する
 function extractKeyPoints(content) {
   if (!content) return "";
-  
+
   var points = [];
-  
+
   // 最初の2文を要点として抽出
   var sentences = extractSentences(content);
   if (sentences.length > 0) {
     points.push(sentences[0].substring(0, 100));
   }
-  
+
   // 「特に」「重要なのは」「注目すべき」などを含む文を抽出
   var importantPatterns = [
     /特に[^。]+。/g,
     /重要な[^。]+。/g,
     /注目すべき[^。]+。/g,
     /主な[^。]+。/g,
-    /具体的には[^。]+。/g
+    /具体的には[^。]+。/g,
   ];
-  
-  importantPatterns.forEach(function(pattern) {
+
+  importantPatterns.forEach(function (pattern) {
     var matches = content.match(pattern);
     if (matches) {
-      matches.slice(0, 1).forEach(function(m) {
+      matches.slice(0, 1).forEach(function (m) {
         if (m.length < 150 && points.indexOf(m) < 0) {
           points.push(m.substring(0, 80));
         }
       });
     }
   });
-  
+
   return points.slice(0, 3).join(" / ");
 }
 
 // 具体例や固有名詞を抽出する
 function extractExamplesAndNames(content) {
   if (!content) return [];
-  
+
   var examples = [];
-  
+
   // 「」内の固有名詞
   var quoted = content.match(/「([^」]{2,30})」/g) || [];
-  quoted.forEach(function(q) {
+  quoted.forEach(function (q) {
     var name = q.replace(/[「」]/g, "");
     if (examples.indexOf(name) < 0) {
       examples.push(name);
     }
   });
-  
+
   // 英語の固有名詞（大文字始まり）
   var englishNames = content.match(/\b[A-Z][a-zA-Z]{2,20}\b/g) || [];
-  englishNames.forEach(function(name) {
+  englishNames.forEach(function (name) {
     // 一般的な単語を除外
-    var commonWords = ["The", "This", "That", "These", "Those", "When", "Where", "What", "Which", "How", "Why", "And", "But", "For", "Not", "All", "Can", "Had", "Has", "Have", "Its", "May", "New", "Now", "Old", "See", "Two", "Way", "Who", "Any", "Each", "From", "Get", "Got", "Her", "Him", "His", "Into", "Just", "Like", "Made", "Make", "More", "Most", "Must", "Over", "Such", "Take", "Than", "Them", "Then", "Very", "Well", "With", "Also", "Back", "Been", "Come", "Could", "Did", "Down", "Even", "First", "Good", "Great", "Here", "High", "However", "Important", "Know", "Last", "Little", "Long", "Look", "Many", "Much", "Need", "Never", "Next", "Only", "Other", "Our", "Own", "Part", "People", "Place", "Point", "Right", "Same", "Should", "Small", "Some", "State", "Still", "System", "Think", "Through", "Under", "Used", "Using", "Want", "While", "Will", "Within", "Without", "Work", "World", "Would", "Year", "Years"];
+    var commonWords = [
+      "The",
+      "This",
+      "That",
+      "These",
+      "Those",
+      "When",
+      "Where",
+      "What",
+      "Which",
+      "How",
+      "Why",
+      "And",
+      "But",
+      "For",
+      "Not",
+      "All",
+      "Can",
+      "Had",
+      "Has",
+      "Have",
+      "Its",
+      "May",
+      "New",
+      "Now",
+      "Old",
+      "See",
+      "Two",
+      "Way",
+      "Who",
+      "Any",
+      "Each",
+      "From",
+      "Get",
+      "Got",
+      "Her",
+      "Him",
+      "His",
+      "Into",
+      "Just",
+      "Like",
+      "Made",
+      "Make",
+      "More",
+      "Most",
+      "Must",
+      "Over",
+      "Such",
+      "Take",
+      "Than",
+      "Them",
+      "Then",
+      "Very",
+      "Well",
+      "With",
+      "Also",
+      "Back",
+      "Been",
+      "Come",
+      "Could",
+      "Did",
+      "Down",
+      "Even",
+      "First",
+      "Good",
+      "Great",
+      "Here",
+      "High",
+      "However",
+      "Important",
+      "Know",
+      "Last",
+      "Little",
+      "Long",
+      "Look",
+      "Many",
+      "Much",
+      "Need",
+      "Never",
+      "Next",
+      "Only",
+      "Other",
+      "Our",
+      "Own",
+      "Part",
+      "People",
+      "Place",
+      "Point",
+      "Right",
+      "Same",
+      "Should",
+      "Small",
+      "Some",
+      "State",
+      "Still",
+      "System",
+      "Think",
+      "Through",
+      "Under",
+      "Used",
+      "Using",
+      "Want",
+      "While",
+      "Will",
+      "Within",
+      "Without",
+      "Work",
+      "World",
+      "Would",
+      "Year",
+      "Years",
+    ];
     if (commonWords.indexOf(name) < 0 && examples.indexOf(name) < 0) {
       examples.push(name);
     }
   });
-  
+
   // 数値を含む表現（バージョン番号等）
   var versions = content.match(/v?\d+\.\d+(?:\.\d+)?/g) || [];
-  versions.forEach(function(v) {
+  versions.forEach(function (v) {
     if (examples.indexOf(v) < 0) {
       examples.push(v);
     }
   });
-  
+
   return examples.slice(0, 30);
 }
 
@@ -3396,67 +4170,104 @@ function calculateContradictionSeverity(valueA, valueB) {
 function verifyTechnicalFactsGeneric(analyzedResults, searchQuery) {
   var technicalCategories = {
     baseTechnology: {
-      patterns: ["base", "based on", "engine", "framework", "powered by", "ベース", "基盤", "エンジン"],
+      patterns: [
+        "base",
+        "based on",
+        "engine",
+        "framework",
+        "powered by",
+        "ベース",
+        "基盤",
+        "エンジン",
+      ],
       detectedValues: {},
-      conflicts: []
+      conflicts: [],
     },
     programmingLanguages: {
-      patterns: ["written in", "language", "coded in", "implemented", "言語", "プログラミング"],
+      patterns: [
+        "written in",
+        "language",
+        "coded in",
+        "implemented",
+        "言語",
+        "プログラミング",
+      ],
       detectedValues: {},
-      conflicts: []
+      conflicts: [],
     },
     versionInfo: {
       patterns: ["version", "ver\\.", "v\\d+", "release", "バージョン"],
       detectedValues: {},
-      conflicts: []
-    }
+      conflicts: [],
+    },
   };
 
   // Extract technical facts from each source
-  analyzedResults.forEach(function(a, idx) {
+  analyzedResults.forEach(function (a, idx) {
     var content = a.factList + " " + a.summary;
     var sourceTitle = a.result.title;
 
     // Extract base technology
-    technicalCategories.baseTechnology.patterns.forEach(function(pattern) {
-      var regex = new RegExp(pattern + "[:\\s]+([A-Z][A-Za-z0-9\\s\\-]+)", "gi");
+    technicalCategories.baseTechnology.patterns.forEach(function (pattern) {
+      var regex = new RegExp(
+        pattern + "[:\\s]+([A-Z][A-Za-z0-9\\s\\-]+)",
+        "gi",
+      );
       var matches = content.match(regex);
       if (matches) {
-        matches.forEach(function(m) {
-          var tech = m.split(/[:\s]+/).pop().trim();
+        matches.forEach(function (m) {
+          var tech = m
+            .split(/[:\s]+/)
+            .pop()
+            .trim();
           if (tech && tech.length > 2) {
             var techKey = tech.toLowerCase();
             if (!technicalCategories.baseTechnology.detectedValues[techKey]) {
               technicalCategories.baseTechnology.detectedValues[techKey] = [];
             }
-            technicalCategories.baseTechnology.detectedValues[techKey].push(idx);
+            technicalCategories.baseTechnology.detectedValues[techKey].push(
+              idx,
+            );
           }
         });
       }
     });
 
     // Extract programming languages
-    var langRegex = /(written in|language|coded in|implemented|言語).*?[:\s]+([A-Za-z+#]+)/gi;
+    var langRegex =
+      /(written in|language|coded in|implemented|言語).*?[:\s]+([A-Za-z+#]+)/gi;
     var langMatches = content.match(langRegex);
     if (langMatches) {
-      langMatches.forEach(function(m) {
-        var lang = m.split(/[:\s]+/).pop().trim();
+      langMatches.forEach(function (m) {
+        var lang = m
+          .split(/[:\s]+/)
+          .pop()
+          .trim();
         if (lang && lang.length > 1) {
           var langKey = lang.toLowerCase();
-          if (!technicalCategories.programmingLanguages.detectedValues[langKey]) {
-            technicalCategories.programmingLanguages.detectedValues[langKey] = [];
+          if (
+            !technicalCategories.programmingLanguages.detectedValues[langKey]
+          ) {
+            technicalCategories.programmingLanguages.detectedValues[langKey] =
+              [];
           }
-          technicalCategories.programmingLanguages.detectedValues[langKey].push(idx);
+          technicalCategories.programmingLanguages.detectedValues[langKey].push(
+            idx,
+          );
         }
       });
     }
 
     // Extract version information
-    var versionRegex = /version[:\s]*([0-9.]+)|v([0-9.]+)|バージョン[:\s]*([0-9.]+)/gi;
+    var versionRegex =
+      /version[:\s]*([0-9.]+)|v([0-9.]+)|バージョン[:\s]*([0-9.]+)/gi;
     var versionMatches = content.match(versionRegex);
     if (versionMatches) {
-      versionMatches.forEach(function(m) {
-        var ver = m.replace(/version[:\s]*/gi, "").replace(/^v/i, "").replace(/バージョン[:\s]*/gi, "");
+      versionMatches.forEach(function (m) {
+        var ver = m
+          .replace(/version[:\s]*/gi, "")
+          .replace(/^v/i, "")
+          .replace(/バージョン[:\s]*/gi, "");
         if (ver && ver.length > 1) {
           if (!technicalCategories.versionInfo.detectedValues[ver]) {
             technicalCategories.versionInfo.detectedValues[ver] = [];
@@ -3468,25 +4279,28 @@ function verifyTechnicalFactsGeneric(analyzedResults, searchQuery) {
   });
 
   // Detect conflicts (multiple different values exist)
-  Object.keys(technicalCategories).forEach(function(category) {
+  Object.keys(technicalCategories).forEach(function (category) {
     var values = Object.keys(technicalCategories[category].detectedValues);
     if (values.length > 1) {
       technicalCategories[category].conflicts = values;
     }
   });
 
-  var hasConflicts = Object.keys(technicalCategories).some(function(cat) {
+  var hasConflicts = Object.keys(technicalCategories).some(function (cat) {
     return technicalCategories[cat].conflicts.length > 0;
   });
 
   return {
     categories: technicalCategories,
     conflictsDetected: hasConflicts,
-    summary: hasConflicts ?
-      "Conflicts detected in: " + Object.keys(technicalCategories).filter(function(cat) {
-        return technicalCategories[cat].conflicts.length > 0;
-      }).join(", ") :
-      "No conflicts detected"
+    summary: hasConflicts
+      ? "Conflicts detected in: " +
+        Object.keys(technicalCategories)
+          .filter(function (cat) {
+            return technicalCategories[cat].conflicts.length > 0;
+          })
+          .join(", ")
+      : "No conflicts detected",
   };
 }
 
@@ -3502,8 +4316,8 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
       specificity: { score: 0, issues: [] },
       vagueness: { score: 0, issues: [] },
       repetition: { score: 0, issues: [] },
-      coherence: { score: 0, issues: [] }
-    }
+      coherence: { score: 0, issues: [] },
+    },
   };
 
   // 1. Specificity check
@@ -3513,10 +4327,10 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
     { pattern: /\d+\s*(%|percent|件|個|人|kb|mb|gb)/i, name: "数値データ" },
     { pattern: /version[:\s]*[0-9.]+/i, name: "バージョン番号" },
     { pattern: /[A-Z][a-z]+\s+[A-Z][a-z]+/, name: "固有名詞" },
-    { pattern: /https?:\/\/[^\s]+/, name: "URL" }
+    { pattern: /https?:\/\/[^\s]+/, name: "URL" },
   ];
 
-  specificityChecks.forEach(function(check) {
+  specificityChecks.forEach(function (check) {
     if (check.pattern.test(content)) {
       foundSpecificities++;
     }
@@ -3525,7 +4339,11 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
   if (foundSpecificities < 3) {
     indicators.categories.specificity.score = 0.4;
     indicators.categories.specificity.issues.push(
-      "具体的な詳細が不足 (" + foundSpecificities + "/" + specificityChecks.length + ")"
+      "具体的な詳細が不足 (" +
+        foundSpecificities +
+        "/" +
+        specificityChecks.length +
+        ")",
     );
   }
 
@@ -3538,27 +4356,33 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
     /〜らしい/g,
     /考えられる/g,
     /推測される/g,
-    /と思われる/g
+    /と思われる/g,
   ];
 
   var vagueCount = 0;
-  vaguePatterns.forEach(function(pattern) {
+  vaguePatterns.forEach(function (pattern) {
     var matches = factList.match(pattern);
     if (matches) vagueCount += matches.length;
   });
 
   var statementCount = factList.split("\n").length || 1;
   var vagueRatio = vagueCount / statementCount;
-  
+
   if (vagueRatio > 0.3) {
     indicators.categories.vagueness.score = 0.3;
     indicators.categories.vagueness.issues.push(
-      "曖昧表現の割合が高い (" + (vagueRatio * 100).toFixed(1) + "%, " + vagueCount + "/" + statementCount + ")"
+      "曖昧表現の割合が高い (" +
+        (vagueRatio * 100).toFixed(1) +
+        "%, " +
+        vagueCount +
+        "/" +
+        statementCount +
+        ")",
     );
   }
 
   // 3. Repetition check
-  var sentences = content.split(/[。！？.!?]/).filter(function(s) {
+  var sentences = content.split(/[。！？.!?]/).filter(function (s) {
     return s.trim().length > 10;
   });
 
@@ -3579,9 +4403,7 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
     var maxRepetition = Math.max.apply(null, Object.values(repeatedPhrases));
     if (maxRepetition > 2) {
       indicators.categories.repetition.score = 0.2;
-      indicators.categories.repetition.issues.push(
-        "フレーズの反復が見られる"
-      );
+      indicators.categories.repetition.issues.push("フレーズの反復が見られる");
     }
   }
 
@@ -3590,31 +4412,36 @@ function detectAIGenerationGeneric(content, factList, sourceMetadata) {
   var hasContradictions = factList.match(/しかし|だが|逆に|一方で/g);
 
   if (bulletCount > 0) {
-    var bulletContradictionRatio = (hasContradictions ? hasContradictions.length : 0) / bulletCount;
+    var bulletContradictionRatio =
+      (hasContradictions ? hasContradictions.length : 0) / bulletCount;
     if (bulletContradictionRatio > 0.2) {
       indicators.categories.coherence.score = 0.2;
-      indicators.categories.coherence.issues.push(
-        "文量に対して矛盾表現が多い"
-      );
+      indicators.categories.coherence.issues.push("文量に対して矛盾表現が多い");
     }
   }
 
   // Calculate total score
-  Object.keys(indicators.categories).forEach(function(cat) {
+  Object.keys(indicators.categories).forEach(function (cat) {
     indicators.totalScore += indicators.categories[cat].score;
   });
 
   return {
-    riskLevel: indicators.totalScore > 0.5 ? "high" : 
-                indicators.totalScore > 0.3 ? "medium" : "low",
+    riskLevel:
+      indicators.totalScore > 0.5
+        ? "high"
+        : indicators.totalScore > 0.3
+          ? "medium"
+          : "low",
     totalScore: indicators.totalScore,
     categories: indicators.categories,
     summary: Object.keys(indicators.categories)
-      .filter(function(cat) { return indicators.categories[cat].score > 0; })
-      .map(function(cat) {
+      .filter(function (cat) {
+        return indicators.categories[cat].score > 0;
+      })
+      .map(function (cat) {
         return cat + ": " + indicators.categories[cat].issues.join(", ");
       })
-      .join("; ")
+      .join("; "),
   };
 }
 
@@ -3643,13 +4470,13 @@ function calculateSourceReliabilityEnhanced(result, allResults) {
     "dev.to": 1.0,
     "qiita.com": 1.5,
     "zenn.dev": 1.5,
-    "juejin.cn": 1.0
+    "juejin.cn": 1.0,
   };
 
   var domain = (result.domain || "").toLowerCase();
   var url = (result.url || "").toLowerCase();
 
-  Object.keys(domainTrustScores).forEach(function(d) {
+  Object.keys(domainTrustScores).forEach(function (d) {
     if (domain.includes(d)) {
       score += domainTrustScores[d];
       factors.push("信頼できるドメイン");
@@ -3685,8 +4512,7 @@ function calculateSourceReliabilityEnhanced(result, allResults) {
     }
 
     // Check for structured content (headings, lists)
-    var hasStructure = 
-      result.pageContent.match(/#+\s|<h[1-6]>|<ul>|<ol>/gi);
+    var hasStructure = result.pageContent.match(/#+\s|<h[1-6]>|<ul>|<ol>/gi);
     if (hasStructure && hasStructure.length > 3) {
       score += 0.3;
       factors.push("構造化された内容");
@@ -3707,7 +4533,8 @@ function calculateSourceReliabilityEnhanced(result, allResults) {
 
   // 5. Timestamp freshness (if available)
   if (result.extractedAt) {
-    var daysOld = (new Date() - new Date(result.extractedAt)) / (1000 * 60 * 60 * 24);
+    var daysOld =
+      (new Date() - new Date(result.extractedAt)) / (1000 * 60 * 60 * 24);
     if (daysOld < 7) {
       score += 0.3;
       factors.push("最近抽出");
@@ -3722,11 +4549,11 @@ function calculateSourceReliabilityEnhanced(result, allResults) {
 
   return {
     score: parseFloat(normalizedScore.toFixed(2)),
-    level: normalizedScore >= 8 ? "high" : 
-           normalizedScore >= 6 ? "medium" : "low",
+    level:
+      normalizedScore >= 8 ? "high" : normalizedScore >= 6 ? "medium" : "low",
     factors: factors,
     penalties: penalties,
-    rawScore: score
+    rawScore: score,
   };
 }
 
@@ -3735,70 +4562,90 @@ function calculateSourceReliabilityEnhanced(result, allResults) {
 // ============================================================================
 
 // Calculate comprehensive quality metrics (generic, topic-independent)
-function calculateQualityMetricsGeneric(analyzedResults, contradictions, searchQuery) {
-  var aiHighRisk = analyzedResults.filter(function(a) {
+function calculateQualityMetricsGeneric(
+  analyzedResults,
+  contradictions,
+  searchQuery,
+) {
+  var aiHighRisk = analyzedResults.filter(function (a) {
     return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "high";
   }).length;
-  var aiMediumRisk = analyzedResults.filter(function(a) {
+  var aiMediumRisk = analyzedResults.filter(function (a) {
     return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "medium";
   }).length;
-  var aiLowRisk = analyzedResults.filter(function(a) {
+  var aiLowRisk = analyzedResults.filter(function (a) {
     return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "low";
   }).length;
 
   return {
     dataCollection: {
       totalSources: analyzedResults.length,
-      webSources: analyzedResults.filter(function(a) { 
-        return !a.result.isLocalFile; 
+      webSources: analyzedResults.filter(function (a) {
+        return !a.result.isLocalFile;
       }).length,
-      localSources: analyzedResults.filter(function(a) { 
-        return a.result.isLocalFile; 
+      localSources: analyzedResults.filter(function (a) {
+        return a.result.isLocalFile;
       }).length,
       averageContentLength: (
-        analyzedResults.reduce(function(sum, a) {
+        analyzedResults.reduce(function (sum, a) {
           return sum + (a.result.pageContent ? a.result.pageContent.length : 0);
         }, 0) / analyzedResults.length
-      ).toFixed(0)
+      ).toFixed(0),
     },
     contentQuality: {
-      highReliabilityCount: analyzedResults.filter(function(a) {
+      highReliabilityCount: analyzedResults.filter(function (a) {
         return a.reliability && a.reliability.score >= 8;
       }).length,
-      mediumReliabilityCount: analyzedResults.filter(function(a) {
-        return a.reliability && a.reliability.score >= 6 && a.reliability.score < 8;
+      mediumReliabilityCount: analyzedResults.filter(function (a) {
+        return (
+          a.reliability && a.reliability.score >= 6 && a.reliability.score < 8
+        );
       }).length,
-      lowReliabilityCount: analyzedResults.filter(function(a) {
+      lowReliabilityCount: analyzedResults.filter(function (a) {
         return a.reliability && a.reliability.score < 6;
       }).length,
       averageReliability: (
-        analyzedResults.reduce(function(sum, a) {
+        analyzedResults.reduce(function (sum, a) {
           return sum + (a.reliability ? a.reliability.score : 5);
         }, 0) / analyzedResults.length
-      ).toFixed(1)
+      ).toFixed(1),
     },
     aiGenerationRisk: {
       highRiskCount: aiHighRisk,
       mediumRiskCount: aiMediumRisk,
-      lowRiskCount: aiLowRisk
+      lowRiskCount: aiLowRisk,
     },
     technicalConsistency: {
-      hasConflicts: 
+      hasConflicts:
         analyzedResults.technicalFactValidation &&
-        Object.keys(analyzedResults.technicalFactValidation.categories).some(function(cat) {
-          return analyzedResults.technicalFactValidation.categories[cat].conflicts.length > 0;
-        }),
-      conflictCategories: 
-        analyzedResults.technicalFactValidation ?
-          Object.keys(analyzedResults.technicalFactValidation.categories).filter(function(cat) {
-            return analyzedResults.technicalFactValidation.categories[cat].conflicts.length > 0;
-          }) : []
+        Object.keys(analyzedResults.technicalFactValidation.categories).some(
+          function (cat) {
+            return (
+              analyzedResults.technicalFactValidation.categories[cat].conflicts
+                .length > 0
+            );
+          },
+        ),
+      conflictCategories: analyzedResults.technicalFactValidation
+        ? Object.keys(
+            analyzedResults.technicalFactValidation.categories,
+          ).filter(function (cat) {
+            return (
+              analyzedResults.technicalFactValidation.categories[cat].conflicts
+                .length > 0
+            );
+          })
+        : [],
     },
     contradictions: {
       total: contradictions.length,
-      highSeverity: contradictions.filter(function(c) { return c.severity === "high"; }).length,
-      mediumSeverity: contradictions.filter(function(c) { return c.severity === "medium"; }).length
-    }
+      highSeverity: contradictions.filter(function (c) {
+        return c.severity === "high";
+      }).length,
+      mediumSeverity: contradictions.filter(function (c) {
+        return c.severity === "medium";
+      }).length,
+    },
   };
 }
 
@@ -3985,7 +4832,7 @@ function expandSearchQuery(originalQuery) {
   try {
     var expansionResponse = iniad_ai_mop.chat(
       "Generate search query expansions. Output JSON array only.",
-      expansionPrompt
+      expansionPrompt,
     );
 
     expansionResponse = expansionResponse
@@ -4014,7 +4861,7 @@ function expandSearchQuery(originalQuery) {
       { category: "trend", query: originalQuery + " 最新" },
       { category: "trend", query: originalQuery + " news" },
       { category: "problem", query: originalQuery + " 課題" },
-      { category: "problem", query: originalQuery + " issues" }
+      { category: "problem", query: originalQuery + " issues" },
     ];
   }
 
@@ -4043,30 +4890,55 @@ function calculateSourceReliability(result) {
 
   // High trust domains
   var highTrustDomains = [
-    "github.com", "gitlab.com", "bitbucket.org", // Official code
-    "docs.microsoft.com", "developer.mozilla.org", // Official docs
-    "w3.org", "ietf.org", "ecma-international.org", // Standards
-    "stackexchange.com", "stackoverflow.com", // Expert Q&A
-    "medium.com", "dev.to", // Tech blogs
-    "juejin.cn", "qiita.com", "zenn.dev" // Developer communities
+    "github.com",
+    "gitlab.com",
+    "bitbucket.org", // Official code
+    "docs.microsoft.com",
+    "developer.mozilla.org", // Official docs
+    "w3.org",
+    "ietf.org",
+    "ecma-international.org", // Standards
+    "stackexchange.com",
+    "stackoverflow.com", // Expert Q&A
+    "medium.com",
+    "dev.to", // Tech blogs
+    "juejin.cn",
+    "qiita.com",
+    "zenn.dev", // Developer communities
   ];
 
   // Academic sources
   var academicDomains = [
-    "scholar.google.com", "arxiv.org", "researchgate.net",
-    "acm.org", "ieee.org", "springer.com", "sciencedirect.com"
+    "scholar.google.com",
+    "arxiv.org",
+    "researchgate.net",
+    "acm.org",
+    "ieee.org",
+    "springer.com",
+    "sciencedirect.com",
   ];
 
   // Official documentation patterns
   var officialPatterns = [
-    "/docs/", "/documentation/", "/api/", "/reference/",
-    "developer.", "developers.", "docs."
+    "/docs/",
+    "/documentation/",
+    "/api/",
+    "/reference/",
+    "developer.",
+    "developers.",
+    "docs.",
   ];
 
   // Low trust indicators
   var lowTrustPatterns = [
-    "spam", "clickbait", "fake", "hoax", "scam",
-    "ads", "affiliate", "sponsored"
+    "spam",
+    "clickbait",
+    "fake",
+    "hoax",
+    "scam",
+    "ads",
+    "affiliate",
+    "sponsored",
   ];
 
   // Check high trust domains
@@ -4132,7 +5004,7 @@ function calculateSourceReliability(result) {
   return {
     score: score,
     level: score >= 8 ? "high" : score >= 6 ? "medium" : "low",
-    reasons: reasons
+    reasons: reasons,
   };
 }
 
@@ -4166,7 +5038,7 @@ function verifyCrossSource(analyzedResults, threshold) {
           sources: [],
           value: fact.value,
           date: fact.date,
-          count: 0
+          count: 0,
         };
       }
 
@@ -4184,23 +5056,28 @@ function verifyCrossSource(analyzedResults, threshold) {
         original: fact.original,
         sourceCount: fact.count,
         sources: fact.sources,
-        confidence: Math.min(1.0, fact.count / analyzedResults.length * 2)
+        confidence: Math.min(1.0, (fact.count / analyzedResults.length) * 2),
       });
     } else {
       unverifiedFacts.push({
         fact: fact.keyPhrase,
         sourceCount: fact.count,
-        sources: fact.sources
+        sources: fact.sources,
       });
     }
   });
 
-  console.log("    Verified: " + verifiedFacts.length + " | Unverified: " + unverifiedFacts.length);
+  console.log(
+    "    Verified: " +
+      verifiedFacts.length +
+      " | Unverified: " +
+      unverifiedFacts.length,
+  );
 
   return {
     verified: verifiedFacts,
     unverified: unverifiedFacts,
-    total: Object.keys(factMap).length
+    total: Object.keys(factMap).length,
   };
 }
 
@@ -4222,9 +5099,14 @@ function generateAcademicCitations(searchResults, analyzedResults) {
     if (result.isLocalFile) {
       // Local file citation
       citation =
-        "[" + citationNumber + "] " +
-        (result.fileName || result.title) + ". " +
-        "Local file: " + result.filePath + ". ";
+        "[" +
+        citationNumber +
+        "] " +
+        (result.fileName || result.title) +
+        ". " +
+        "Local file: " +
+        result.filePath +
+        ". ";
     } else {
       // Web source citation
       var authors = extractAuthors(result.pageContent, result);
@@ -4263,7 +5145,7 @@ function extractAuthors(content, result) {
   var patterns = [
     /by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
     /author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
-    /筆者:\s*(.+?)(?:\n|$)/
+    /筆者:\s*(.+?)(?:\n|$)/,
   ];
 
   for (var i = 0; i < patterns.length; i++) {
@@ -4304,8 +5186,12 @@ function extractInsights(analyzedResults, searchQuery) {
   var insightPrompt =
     "あなたは調査分析の専門家です。収集した情報を深く分析し、表面的な要約ではない「洞察」を抽出してください。\n\n" +
     "【分析対象】\n" +
-    "トピック: " + searchQuery + "\n" +
-    "情報源数: " + analyzedResults.length + "\n\n" +
+    "トピック: " +
+    searchQuery +
+    "\n" +
+    "情報源数: " +
+    analyzedResults.length +
+    "\n\n" +
     "【抽出すべき洞察のカテゴリ】\n" +
     "1. パターン認識\n" +
     "   - 複数の情報源で見られる共通の傾向\n" +
@@ -4346,23 +5232,25 @@ function extractInsights(analyzedResults, searchQuery) {
   for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       var insights = retryWithBackoff(
-        function() {
+        function () {
           return iniad_ai_mop.chat(
             "You are an expert researcher generating deep insights. Write in Japanese with formal academic tone. " +
-            "【言語制約】すべての出力は日本語で記述してください。",
-            insightPrompt + "\n\n【情報源】\n" + allFacts.substring(0, 8000)
+              "【言語制約】すべての出力は日本語で記述してください。",
+            insightPrompt + "\n\n【情報源】\n" + allFacts.substring(0, 8000),
           );
         },
         2,
-        1000
+        1000,
       );
-      
+
       if (insights && insights.length > 100) {
         console.log("    ✓ Generated insights");
         return insights;
       }
     } catch (e) {
-      console.log("    ⚠ Insight generation attempt " + attempt + " failed: " + e.message);
+      console.log(
+        "    ⚠ Insight generation attempt " + attempt + " failed: " + e.message,
+      );
       if (attempt < MAX_RETRIES) {
         sleep(2000 * attempt);
       }
@@ -4377,7 +5265,8 @@ function extractInsights(analyzedResults, searchQuery) {
 // フォールバックインサイト生成（LLMなしで既存データから構築）
 function generateFallbackInsights(analyzedResults, searchQuery) {
   var fallbackContent = "## 洞察分析（自動生成）\n\n";
-  fallbackContent += "*注: 詳細なAI分析が利用できなかったため、収集データに基づく自動要約を表示しています。*\n\n";
+  fallbackContent +=
+    "*注: 詳細なAI分析が利用できなかったため、収集データに基づく自動要約を表示しています。*\n\n";
 
   // カテゴリ別の集計
   var categoryMap = {};
@@ -4388,17 +5277,17 @@ function generateFallbackInsights(analyzedResults, searchQuery) {
     technical: "技術情報",
     academic: "学術・研究",
     community: "コミュニティ",
-    other: "その他"
+    other: "その他",
   };
 
-  analyzedResults.forEach(function(a) {
+  analyzedResults.forEach(function (a) {
     var cat = a.category || "other";
     if (!categoryMap[cat]) {
       categoryMap[cat] = [];
     }
     categoryMap[cat].push({
       title: a.result.title,
-      url: a.result.url
+      url: a.result.url,
     });
   });
 
@@ -4406,17 +5295,20 @@ function generateFallbackInsights(analyzedResults, searchQuery) {
   fallbackContent += "### 情報源の分布\n\n";
   for (var cat in categoryMap) {
     var catName = categoryNames[cat] || cat;
-    fallbackContent += "- **" + catName + "**: " + categoryMap[cat].length + "件の情報源\n";
+    fallbackContent +=
+      "- **" + catName + "**: " + categoryMap[cat].length + "件の情報源\n";
   }
   fallbackContent += "\n";
 
   // 主要な情報源のリスト
   fallbackContent += "### 主要な情報源\n\n";
   var topSources = analyzedResults.slice(0, 10);
-  topSources.forEach(function(a, i) {
-    fallbackContent += (i + 1) + ". **" + a.result.title + "**\n";
+  topSources.forEach(function (a, i) {
+    fallbackContent += i + 1 + ". **" + a.result.title + "**\n";
     if (a.factList) {
-      var firstFact = a.factList.split("\n").filter(function(f) { return f.trim().length > 0; })[0];
+      var firstFact = a.factList.split("\n").filter(function (f) {
+        return f.trim().length > 0;
+      })[0];
       if (firstFact) {
         fallbackContent += "   - " + firstFact.substring(0, 150) + "...\n";
       }
@@ -4426,15 +5318,25 @@ function generateFallbackInsights(analyzedResults, searchQuery) {
 
   // 検索クエリに関するパターン
   fallbackContent += "### パターン認識\n\n";
-  fallbackContent += "「" + searchQuery + "」に関して、" + analyzedResults.length + "件の情報源を収集しました。";
+  fallbackContent +=
+    "「" +
+    searchQuery +
+    "」に関して、" +
+    analyzedResults.length +
+    "件の情報源を収集しました。";
   if (categoryMap.official && categoryMap.official.length > 0) {
-    fallbackContent += "公式情報源が" + categoryMap.official.length + "件含まれており、信頼性の高いデータが得られています。";
+    fallbackContent +=
+      "公式情報源が" +
+      categoryMap.official.length +
+      "件含まれており、信頼性の高いデータが得られています。";
   }
   fallbackContent += "\n\n";
 
   fallbackContent += "### 今後の調査推奨事項\n\n";
-  fallbackContent += "- 詳細なAI分析を実行するため、ネットワーク接続を確認してください\n";
-  fallbackContent += "- 追加の検索クエリを使用して情報を拡充することを推奨します\n";
+  fallbackContent +=
+    "- 詳細なAI分析を実行するため、ネットワーク接続を確認してください\n";
+  fallbackContent +=
+    "- 追加の検索クエリを使用して情報を拡充することを推奨します\n";
 
   return fallbackContent;
 }
@@ -4450,9 +5352,13 @@ function performInteractiveExploration(analyzedResults, searchQuery) {
 
   // Generate clarification questions
   var clarificationPrompt =
-    "あなたは調査のファシリテーターです。「" + searchQuery + "」について調査を深めるための質問を生成してください。\n\n" +
+    "あなたは調査のファシリテーターです。「" +
+    searchQuery +
+    "」について調査を深めるための質問を生成してください。\n\n" +
     "【現在の状況】\n" +
-    "情報源数: " + analyzedResults.length + "\n" +
+    "情報源数: " +
+    analyzedResults.length +
+    "\n" +
     "収集済みの事実: 既に基本的な情報は収集済み\n\n" +
     "【タスク】\n" +
     "以下の観点から、調査を深めるための質問を3つ生成してください：\n" +
@@ -4465,7 +5371,7 @@ function performInteractiveExploration(analyzedResults, searchQuery) {
   try {
     var response = iniad_ai_mop.chat(
       "Generate clarification questions. Output JSON array only.",
-      clarificationPrompt
+      clarificationPrompt,
     );
 
     response = response
@@ -4488,8 +5394,12 @@ function performInteractiveExploration(analyzedResults, searchQuery) {
 
       // Note: In a real implementation, this would pause for user input
       console.log("");
-      console.log("  💡 Note: This is an automated run. For interactive exploration,");
-      console.log("     provide these questions to the user and perform additional");
+      console.log(
+        "  💡 Note: This is an automated run. For interactive exploration,",
+      );
+      console.log(
+        "     provide these questions to the user and perform additional",
+      );
       console.log("     searches based on their priorities.");
     }
 
@@ -4510,7 +5420,7 @@ function extractRichMetadata(result, pageTab) {
     authority: 0,
     socialSignals: {},
     technicalMetrics: {},
-    contentQuality: {}
+    contentQuality: {},
   };
 
   if (!pageTab || !result.url) return metadata;
@@ -4520,10 +5430,18 @@ function extractRichMetadata(result, pageTab) {
     var authorityPrompt =
       "以下のウェブページの権威性を評価するためのメタデータを抽出してください。\n\n" +
       "【ページ情報】\n" +
-      "URL: " + result.url + "\n" +
-      "タイトル: " + result.title + "\n" +
-      "ドメイン: " + result.domain + "\n" +
-      "コンテンツ: " + (result.pageContent || "").substring(0, 500) + "\n\n" +
+      "URL: " +
+      result.url +
+      "\n" +
+      "タイトル: " +
+      result.title +
+      "\n" +
+      "ドメイン: " +
+      result.domain +
+      "\n" +
+      "コンテンツ: " +
+      (result.pageContent || "").substring(0, 500) +
+      "\n\n" +
       "【抽出項目】\n" +
       "1. 著者・組織情報（ページ内から）\n" +
       "2. 最終更新日\n" +
@@ -4535,7 +5453,7 @@ function extractRichMetadata(result, pageTab) {
 
     var metaResponse = iniad_ai_mop.chat(
       "Extract metadata from webpage. Output JSON only.",
-      authorityPrompt
+      authorityPrompt,
     );
 
     metaResponse = metaResponse
@@ -4580,7 +5498,7 @@ function buildKnowledgeGraph(analyzedResults) {
 
   var graph = {
     nodes: [],
-    edges: []
+    edges: [],
   };
 
   var entityMap = {};
@@ -4595,7 +5513,10 @@ function buildKnowledgeGraph(analyzedResults) {
     var entityPrompt =
       "以下のテキストから重要なエンティティ（概念・人物・組織・製品・技術）を抽出してください。\n\n" +
       "【テキスト】\n" +
-      facts + "\n" + content.substring(0, 1000) + "\n\n" +
+      facts +
+      "\n" +
+      content.substring(0, 1000) +
+      "\n\n" +
       "【タスク】\n" +
       "1. 固有名詞（人名、組織名、製品名）を抽出\n" +
       "2. 重要な技術的用語・概念を抽出\n" +
@@ -4607,7 +5528,7 @@ function buildKnowledgeGraph(analyzedResults) {
     try {
       var entityResponse = iniad_ai_mop.chat(
         "Extract entities from text. Output JSON array only.",
-        entityPrompt
+        entityPrompt,
       );
 
       entityResponse = entityResponse
@@ -4630,7 +5551,7 @@ function buildKnowledgeGraph(analyzedResults) {
               name: entity.name,
               type: entity.type,
               sources: [],
-              weight: 0
+              weight: 0,
             };
             graph.nodes.push(entityMap[key]);
           }
@@ -4665,13 +5586,19 @@ function buildKnowledgeGraph(analyzedResults) {
           source: nodeA.id,
           target: nodeB.id,
           weight: commonSources.length,
-          sources: commonSources
+          sources: commonSources,
         });
       }
     }
   }
 
-  console.log("    ✓ Built graph with " + graph.nodes.length + " nodes, " + graph.edges.length + " edges");
+  console.log(
+    "    ✓ Built graph with " +
+      graph.nodes.length +
+      " nodes, " +
+      graph.edges.length +
+      " edges",
+  );
 
   return graph;
 }
@@ -4692,7 +5619,8 @@ function generateKnowledgeGraphReport(graph) {
   });
 
   Object.keys(nodesByType).forEach(function (type) {
-    report += "#### " + type.toUpperCase() + " (" + nodesByType[type].length + ")\n\n";
+    report +=
+      "#### " + type.toUpperCase() + " (" + nodesByType[type].length + ")\n\n";
     nodesByType[type].forEach(function (node) {
       report += "- " + node.name + " (出現: " + node.sources.length + "回)\n";
     });
@@ -4708,11 +5636,16 @@ function generateKnowledgeGraphReport(graph) {
 
     for (var i = 0; i < Math.min(10, sortedEdges.length); i++) {
       var edge = sortedEdges[i];
-      var nodeA = graph.nodes.find(function (n) { return n.id === edge.source; });
-      var nodeB = graph.nodes.find(function (n) { return n.id === edge.target; });
+      var nodeA = graph.nodes.find(function (n) {
+        return n.id === edge.source;
+      });
+      var nodeB = graph.nodes.find(function (n) {
+        return n.id === edge.target;
+      });
 
       if (nodeA && nodeB) {
-        report += "- " + nodeA.name + " ↔ " + nodeB.name + " (" + edge.weight + ")\n";
+        report +=
+          "- " + nodeA.name + " ↔ " + nodeB.name + " (" + edge.weight + ")\n";
       }
     }
   }
@@ -4731,7 +5664,7 @@ function performQualityCheck(analyzedResults, report, searchResults) {
 
   var qaResults = {
     overallScore: 0,
-    metrics: {}
+    metrics: {},
   };
 
   // 1. Source Diversity
@@ -4745,30 +5678,33 @@ function performQualityCheck(analyzedResults, report, searchResults) {
   qaResults.metrics.sourceDiversity = {
     score: diversityScore,
     domainCount: Object.keys(domains).length,
-    topDomains: Object.keys(domains).sort(function (a, b) {
-      return domains[b] - domains[a];
-    }).slice(0, 3)
+    topDomains: Object.keys(domains)
+      .sort(function (a, b) {
+        return domains[b] - domains[a];
+      })
+      .slice(0, 3),
   };
 
   // 2. Temporal Relevance
   var recentSources = searchResults.filter(function (r) {
     return r.isRecent;
   });
-  var temporalScore = recentSources.length / searchResults.length * 10;
+  var temporalScore = (recentSources.length / searchResults.length) * 10;
   qaResults.metrics.temporalRelevance = {
     score: temporalScore,
     recentCount: recentSources.length,
-    totalCount: searchResults.length
+    totalCount: searchResults.length,
   };
 
   // 3. Content Depth
-  var avgContentLength = analyzedResults.reduce(function (sum, a) {
-    return sum + (a.result.pageContent || "").length;
-  }, 0) / analyzedResults.length;
+  var avgContentLength =
+    analyzedResults.reduce(function (sum, a) {
+      return sum + (a.result.pageContent || "").length;
+    }, 0) / analyzedResults.length;
   var depthScore = Math.min(10, avgContentLength / 500);
   qaResults.metrics.contentDepth = {
     score: depthScore,
-    avgLength: avgContentLength
+    avgLength: avgContentLength,
   };
 
   // 4. Citation Completeness
@@ -4776,25 +5712,30 @@ function performQualityCheck(analyzedResults, report, searchResults) {
   var completenessScore = Math.min(10, citationCount / 10);
   qaResults.metrics.citationCompleteness = {
     score: completenessScore,
-    citationCount: citationCount
+    citationCount: citationCount,
   };
 
   // 5. Cross-Source Validation
   var crossRef = verifyCrossSource(analyzedResults, 2);
-  var validationScore = crossRef.verified.length / crossRef.total * 10;
+  var validationScore = (crossRef.verified.length / crossRef.total) * 10;
   qaResults.metrics.crossSourceValidation = {
     score: validationScore,
     verified: crossRef.verified.length,
-    total: crossRef.total
+    total: crossRef.total,
   };
 
   // Calculate overall score
   var scores = Object.keys(qaResults.metrics).map(function (key) {
     return qaResults.metrics[key].score;
   });
-  qaResults.overallScore = scores.reduce(function (a, b) { return a + b; }, 0) / scores.length;
+  qaResults.overallScore =
+    scores.reduce(function (a, b) {
+      return a + b;
+    }, 0) / scores.length;
 
-  console.log("  Overall Quality Score: " + qaResults.overallScore.toFixed(1) + "/10");
+  console.log(
+    "  Overall Quality Score: " + qaResults.overallScore.toFixed(1) + "/10",
+  );
   Object.keys(qaResults.metrics).forEach(function (key) {
     var metric = qaResults.metrics[key];
     console.log("    " + key + ": " + metric.score.toFixed(1) + "/10");
@@ -4816,7 +5757,12 @@ function generateQualityReport(qaResults) {
   else if (qaResults.overallScore >= 5) grade = "C (標準)";
   else grade = "D (要改善)";
 
-  report += "> 総合評価: **" + grade + "** (" + qaResults.overallScore.toFixed(1) + "/10)\n\n";
+  report +=
+    "> 総合評価: **" +
+    grade +
+    "** (" +
+    qaResults.overallScore.toFixed(1) +
+    "/10)\n\n";
 
   report += "### 11.1 評価指標\n\n";
   report += "| 評価項目 | スコア | 詳細 |\n";
@@ -4856,19 +5802,29 @@ function generateQualityReport(qaResults) {
   var recommendations = [];
 
   if (qaResults.metrics.sourceDiversity.score < 6) {
-    recommendations.push("- 情報源の多様性を向上させてください。特定のドメインに偏りがあります。");
+    recommendations.push(
+      "- 情報源の多様性を向上させてください。特定のドメインに偏りがあります。",
+    );
   }
   if (qaResults.metrics.temporalRelevance.score < 6) {
-    recommendations.push("- より新しい情報源を追加してください。情報の鮮度が不足しています。");
+    recommendations.push(
+      "- より新しい情報源を追加してください。情報の鮮度が不足しています。",
+    );
   }
   if (qaResults.metrics.contentDepth.score < 6) {
-    recommendations.push("- 各情報源の詳細分析を深めてください。コンテンツの深度が不十分です。");
+    recommendations.push(
+      "- 各情報源の詳細分析を深めてください。コンテンツの深度が不十分です。",
+    );
   }
   if (qaResults.metrics.citationCompleteness.score < 6) {
-    recommendations.push("- 引用情報を充実させてください。出典の明示が不足しています。");
+    recommendations.push(
+      "- 引用情報を充実させてください。出典の明示が不足しています。",
+    );
   }
   if (qaResults.metrics.crossSourceValidation.score < 6) {
-    recommendations.push("- 複数の情報源で事実を確認してください。クロス検証が不十分です。");
+    recommendations.push(
+      "- 複数の情報源で事実を確認してください。クロス検証が不十分です。",
+    );
   }
 
   if (recommendations.length > 0) {
@@ -4891,7 +5847,7 @@ function generateQualityReport(qaResults) {
 // 日付・バージョン情報の正規化と検証
 function normalizeAndVerifyMetadata(analyzedResults) {
   console.log("  Validating date and version metadata...");
-  
+
   var versionMap = {};
   var dateMap = {};
   var extractedVersions = [];
@@ -4899,7 +5855,11 @@ function normalizeAndVerifyMetadata(analyzedResults) {
 
   for (var i = 0; i < analyzedResults.length; i++) {
     var result = analyzedResults[i];
-    var content = (result.pageContent || result.result.pageContent || "").substring(0, 5000);
+    var content = (
+      result.pageContent ||
+      result.result.pageContent ||
+      ""
+    ).substring(0, 5000);
     var sourceIndex = i + 1;
 
     // バージョン抽出パターン（例: v11.0.0, Floorp 11, バージョン 11, version 11.0）
@@ -4907,20 +5867,20 @@ function normalizeAndVerifyMetadata(analyzedResults) {
       /v(\d+(?:\.\d+)*)/gi,
       /version\s*(\d+(?:\.\d+)*)/gi,
       /バージョン\s*(\d+(?:\.\d+)*)/gi,
-      /Ver\.?\s*(\d+(?:\.\d+)*)/gi
+      /Ver\.?\s*(\d+(?:\.\d+)*)/gi,
     ];
 
-    versionPatterns.forEach(function(pattern) {
+    versionPatterns.forEach(function (pattern) {
       var matches = content.match(pattern);
       if (matches) {
-        matches.forEach(function(v) {
+        matches.forEach(function (v) {
           var normalized = v.replace(/[^\d.]/g, "");
           if (normalized && normalized.length > 0) {
             versionMap[normalized] = (versionMap[normalized] || 0) + 1;
             extractedVersions.push({
               version: normalized,
               source: sourceIndex,
-              raw: v
+              raw: v,
             });
           }
         });
@@ -4930,17 +5890,17 @@ function normalizeAndVerifyMetadata(analyzedResults) {
     // 日付抽出パターン
     var datePatterns = [
       /(\d{4})[年\/\-](\d{1,2})[月\/\-]?(\d{1,2})?/g,
-      /(\d{4})年(\d{1,2})月/g
+      /(\d{4})年(\d{1,2})月/g,
     ];
 
-    datePatterns.forEach(function(pattern) {
+    datePatterns.forEach(function (pattern) {
       var matches = content.match(pattern);
       if (matches) {
-        matches.forEach(function(d) {
+        matches.forEach(function (d) {
           dateMap[d] = (dateMap[d] || 0) + 1;
           extractedDates.push({
             date: d,
-            source: sourceIndex
+            source: sourceIndex,
           });
         });
       }
@@ -4955,10 +5915,18 @@ function normalizeAndVerifyMetadata(analyzedResults) {
   var dateConflicts = Object.keys(dateMap).length > 10;
 
   if (versionConflicts) {
-    console.log("    ⚠ Version conflicts detected: " + Object.keys(versionMap).length + " different versions");
+    console.log(
+      "    ⚠ Version conflicts detected: " +
+        Object.keys(versionMap).length +
+        " different versions",
+    );
   }
   if (dateConflicts) {
-    console.log("    ⚠ Date conflicts detected: " + Object.keys(dateMap).length + " different dates");
+    console.log(
+      "    ⚠ Date conflicts detected: " +
+        Object.keys(dateMap).length +
+        " different dates",
+    );
   }
   if (likelyVersion) {
     console.log("    → Most likely version: " + likelyVersion);
@@ -4970,7 +5938,7 @@ function normalizeAndVerifyMetadata(analyzedResults) {
     versionConflicts: versionConflicts,
     dateConflicts: dateConflicts,
     allVersions: extractedVersions,
-    allDates: extractedDates
+    allDates: extractedDates,
   };
 }
 
@@ -4993,19 +5961,23 @@ function getSortedByFrequency(map) {
   for (var key in map) {
     arr.push({ value: key, count: map[key] });
   }
-  arr.sort(function(a, b) { return b.count - a.count; });
-  return arr.map(function(item) { return item.value; });
+  arr.sort(function (a, b) {
+    return b.count - a.count;
+  });
+  return arr.map(function (item) {
+    return item.value;
+  });
 }
 
 // ソース引用のバリデーション
 function validateSourceReferences(report, analyzedResults) {
   console.log("  Validating source citations...");
-  
+
   // レポート内の[n]形式の引用を検出
   var citationPattern = /\[(\d+)\]/g;
   var citations = [];
   var match;
-  
+
   while ((match = citationPattern.exec(report)) !== null) {
     var num = parseInt(match[1]);
     if (citations.indexOf(num) < 0) {
@@ -5016,7 +5988,7 @@ function validateSourceReferences(report, analyzedResults) {
   var invalidCitations = [];
   var validCitations = [];
 
-  citations.forEach(function(num) {
+  citations.forEach(function (num) {
     if (num < 1 || num > analyzedResults.length) {
       invalidCitations.push(num);
     } else {
@@ -5024,12 +5996,25 @@ function validateSourceReferences(report, analyzedResults) {
     }
   });
 
-  var coverage = (validCitations.length / analyzedResults.length * 100).toFixed(1);
+  var coverage = (
+    (validCitations.length / analyzedResults.length) *
+    100
+  ).toFixed(1);
 
   if (invalidCitations.length > 0) {
-    console.log("    ⚠ Invalid citations: [" + invalidCitations.join(", ") + "]");
+    console.log(
+      "    ⚠ Invalid citations: [" + invalidCitations.join(", ") + "]",
+    );
   }
-  console.log("    → Citation coverage: " + coverage + "% (" + validCitations.length + "/" + analyzedResults.length + " sources cited)");
+  console.log(
+    "    → Citation coverage: " +
+      coverage +
+      "% (" +
+      validCitations.length +
+      "/" +
+      analyzedResults.length +
+      " sources cited)",
+  );
 
   return {
     totalCitations: citations.length,
@@ -5037,26 +6022,29 @@ function validateSourceReferences(report, analyzedResults) {
     invalidCount: invalidCitations.length,
     invalidCitations: invalidCitations,
     coverage: parseFloat(coverage),
-    uncitedSources: analyzedResults.length - validCitations.length
+    uncitedSources: analyzedResults.length - validCitations.length,
   };
 }
 
 // レポート内容の品質検証
 function performContentValidation(report, topic, analyzedResults) {
   console.log("  Performing content validation...");
-  
+
   var issues = [];
 
   // 1. トピックの基本定義チェック
   var firstParagraphs = report.split("\n\n").slice(0, 5).join("\n");
-  var topicRegex = new RegExp(topic.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  var topicRegex = new RegExp(
+    topic.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "gi",
+  );
   var topicMentions = (firstParagraphs.match(topicRegex) || []).length;
-  
+
   if (topicMentions < 2) {
     issues.push({
       severity: "high",
       type: "topic_relevance",
-      message: "導入部でトピック「" + topic + "」の言及が不足しています"
+      message: "導入部でトピック「" + topic + "」の言及が不足しています",
     });
   }
 
@@ -5064,25 +6052,26 @@ function performContentValidation(report, topic, analyzedResults) {
   var sectionPattern = /^##\s+(.+)$/gm;
   var sectionMatch;
   var sections = [];
-  
+
   while ((sectionMatch = sectionPattern.exec(report)) !== null) {
     sections.push({
       title: sectionMatch[1],
-      position: sectionMatch.index
+      position: sectionMatch.index,
     });
   }
 
   for (var i = 0; i < sections.length; i++) {
     var start = sections[i].position;
-    var end = (i < sections.length - 1) ? sections[i + 1].position : report.length;
+    var end =
+      i < sections.length - 1 ? sections[i + 1].position : report.length;
     var sectionContent = report.substring(start, end);
     var contentOnly = sectionContent.replace(/^##\s+[^\n]+\n/, "").trim();
-    
+
     if (contentOnly.length < 50) {
       issues.push({
         severity: "medium",
         type: "empty_section",
-        message: "セクション「" + sections[i].title + "」の内容が不十分です"
+        message: "セクション「" + sections[i].title + "」の内容が不十分です",
       });
     }
   }
@@ -5092,16 +6081,16 @@ function performContentValidation(report, topic, analyzedResults) {
     /生成に失敗しました/g,
     /エラーが発生しました/g,
     /取得できませんでした/g,
-    /情報が不足しています/g
+    /情報が不足しています/g,
   ];
 
-  failurePatterns.forEach(function(pattern) {
+  failurePatterns.forEach(function (pattern) {
     var matches = report.match(pattern);
     if (matches && matches.length > 0) {
       issues.push({
         severity: "medium",
         type: "generation_failure",
-        message: "生成失敗のメッセージが" + matches.length + "件検出されました"
+        message: "生成失敗のメッセージが" + matches.length + "件検出されました",
       });
     }
   });
@@ -5109,17 +6098,17 @@ function performContentValidation(report, topic, analyzedResults) {
   // 4. 外国語混入チェック（英語以外）
   // フィンランド語、ドイツ語などの特徴的なパターン
   var foreignPatterns = [
-    /\b[äöüÄÖÜß]{2,}\b/g,  // ドイツ語
-    /\b[åäöÅÄÖ]{2,}\b/g   // フィンランド語/スウェーデン語
+    /\b[äöüÄÖÜß]{2,}\b/g, // ドイツ語
+    /\b[åäöÅÄÖ]{2,}\b/g, // フィンランド語/スウェーデン語
   ];
 
-  foreignPatterns.forEach(function(pattern) {
+  foreignPatterns.forEach(function (pattern) {
     var matches = report.match(pattern);
     if (matches && matches.length > 2) {
       issues.push({
         severity: "low",
         type: "foreign_language",
-        message: "外国語文字が検出されました（翻訳推奨）"
+        message: "外国語文字が検出されました（翻訳推奨）",
       });
     }
   });
@@ -5127,8 +6116,13 @@ function performContentValidation(report, topic, analyzedResults) {
   // 結果の出力
   if (issues.length > 0) {
     console.log("    ⚠ Found " + issues.length + " validation issues:");
-    issues.forEach(function(issue) {
-      var icon = issue.severity === "high" ? "🔴" : (issue.severity === "medium" ? "🟡" : "🔵");
+    issues.forEach(function (issue) {
+      var icon =
+        issue.severity === "high"
+          ? "🔴"
+          : issue.severity === "medium"
+            ? "🟡"
+            : "🔵";
       console.log("      " + icon + " " + issue.message);
     });
   } else {
@@ -5139,7 +6133,11 @@ function performContentValidation(report, topic, analyzedResults) {
 }
 
 // メタデータ検証レポートセクションを生成
-function generateMetadataValidationReport(metadataValidation, citationValidation, contentIssues) {
+function generateMetadataValidationReport(
+  metadataValidation,
+  citationValidation,
+  contentIssues,
+) {
   var report = "";
 
   report += "## 12. データ品質検証\n\n";
@@ -5148,16 +6146,24 @@ function generateMetadataValidationReport(metadataValidation, citationValidation
   report += "### 12.1 メタデータ整合性\n\n";
 
   if (metadataValidation.likelyVersion) {
-    report += "- **推定バージョン**: " + metadataValidation.likelyVersion + "\n";
+    report +=
+      "- **推定バージョン**: " + metadataValidation.likelyVersion + "\n";
   }
   if (metadataValidation.versionConflicts) {
-    report += "- ⚠ **バージョン不整合**: 複数の異なるバージョン番号が検出されました\n";
+    report +=
+      "- ⚠ **バージョン不整合**: 複数の異なるバージョン番号が検出されました\n";
   }
   if (metadataValidation.dateConflicts) {
     report += "- ⚠ **日付不整合**: 多数の異なる日付が検出されました\n";
   }
-  if (metadataValidation.likelyDates && metadataValidation.likelyDates.length > 0) {
-    report += "- **主要な日付**: " + metadataValidation.likelyDates.slice(0, 3).join(", ") + "\n";
+  if (
+    metadataValidation.likelyDates &&
+    metadataValidation.likelyDates.length > 0
+  ) {
+    report +=
+      "- **主要な日付**: " +
+      metadataValidation.likelyDates.slice(0, 3).join(", ") +
+      "\n";
   }
   report += "\n";
 
@@ -5166,19 +6172,29 @@ function generateMetadataValidationReport(metadataValidation, citationValidation
   report += "- **引用カバレッジ**: " + citationValidation.coverage + "%\n";
   report += "- **有効な引用**: " + citationValidation.validCount + "件\n";
   if (citationValidation.invalidCount > 0) {
-    report += "- ⚠ **無効な引用**: " + citationValidation.invalidCount + "件 ([" + 
-              citationValidation.invalidCitations.join(", ") + "])\n";
+    report +=
+      "- ⚠ **無効な引用**: " +
+      citationValidation.invalidCount +
+      "件 ([" +
+      citationValidation.invalidCitations.join(", ") +
+      "])\n";
   }
   if (citationValidation.uncitedSources > 0) {
-    report += "- **未引用ソース**: " + citationValidation.uncitedSources + "件\n";
+    report +=
+      "- **未引用ソース**: " + citationValidation.uncitedSources + "件\n";
   }
   report += "\n";
 
   // コンテンツ品質
   if (contentIssues && contentIssues.length > 0) {
     report += "### 12.3 コンテンツ品質問題\n\n";
-    contentIssues.forEach(function(issue) {
-      var icon = issue.severity === "high" ? "🔴" : (issue.severity === "medium" ? "🟡" : "🔵");
+    contentIssues.forEach(function (issue) {
+      var icon =
+        issue.severity === "high"
+          ? "🔴"
+          : issue.severity === "medium"
+            ? "🟡"
+            : "🔵";
       report += "- " + icon + " " + issue.message + "\n";
     });
     report += "\n";
