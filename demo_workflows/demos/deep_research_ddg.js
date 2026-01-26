@@ -1,17 +1,157 @@
 /**
  * Deep Research - Comprehensive Web Analysis
  *
- * 1. Search on DuckDuckGo (50 results)
- * 2. AI relevance filtering to select most relevant results
- * 3. Visit each relevant URL to extract detailed content
+ * ENHANCED FEATURES:
+ * 1. Query Expansion - Multi-angle search with synonyms and related terms
+ * 2. Source Reliability Scoring - Trustworthiness evaluation
+ * 3. Cross-Reference Verification - Fact validation across sources
+ * 4. Academic Citation Format - Professional referencing
+ * 5. Insight Generation - Pattern recognition and predictions
+ * 6. Interactive Exploration - User-guided investigation
+ * 7. Metadata Extraction - Authority and social signals
+ * 8. Knowledge Graph - Relationship mapping
+ * 9. Quality Assurance - Multi-dimensional quality metrics
+ *
+ * PIPELINE:
+ * 1. DuckDuckGo Search (50 results) with Query Expansion
+ * 2. AI relevance filtering + Source Reliability Scoring
+ * 3. Visit each relevant URL to extract detailed content + Metadata
  * 4. Analyze and synthesize with LLM
- * 5. Generate comprehensive academic-style report with fact-checking
+ * 5. Cross-Reference Verification + Insight Extraction
+ * 6. Generate comprehensive academic-style report with fact-checking
  */
+
+// ============================================================================
+// 動的パス・ディレクトリ検出ユーティリティ
+// ============================================================================
+
+// ホームディレクトリを動的に取得
+function getHomeDir() {
+  try {
+    if (
+      app &&
+      app.sapphillon &&
+      app.sapphillon.core &&
+      app.sapphillon.core.exec
+    ) {
+      var result = app.sapphillon.core.exec.exec("echo $HOME");
+      if (result) {
+        return result.toString().trim();
+      }
+    }
+  } catch (e) {}
+  return "/Users/user"; // フォールバック
+}
+
+// 存在するディレクトリのみをフィルタリング
+function filterExistingDirs(dirs) {
+  var existing = [];
+  for (var i = 0; i < dirs.length; i++) {
+    try {
+      // ls コマンドで存在確認
+      var result = app.sapphillon.core.exec.exec(
+        "test -d " + JSON.stringify(dirs[i]) + " && echo 'exists'",
+      );
+      if (result && result.toString().trim() === "exists") {
+        existing.push(dirs[i]);
+      }
+    } catch (e) {
+      // ディレクトリが存在しない場合はスキップ
+    }
+  }
+  return existing;
+}
+
+// LLM を使用して検索クエリに適した検索ディレクトリを推薦
+function suggestSearchDirectories(query, homeDir) {
+  // デフォルトの検索ディレクトリ（一般的な場所）
+  var defaultDirs = [
+    homeDir + "/Desktop",
+    homeDir + "/Documents",
+    homeDir + "/Downloads",
+  ];
+
+  // 開発関連ディレクトリを探索
+  var devDirs = [];
+  var potentialDevPaths = [
+    homeDir + "/dev",
+    homeDir + "/dev-source",
+    homeDir + "/Developer",
+    homeDir + "/Projects",
+    homeDir + "/repos",
+    homeDir + "/git",
+    homeDir + "/src",
+    homeDir + "/code",
+    homeDir + "/workspace",
+  ];
+
+  // 存在する開発ディレクトリを取得
+  devDirs = filterExistingDirs(potentialDevPaths);
+
+  // LLM を使用してクエリに基づいてディレクトリを推薦
+  try {
+    if (
+      typeof iniad_ai_mop !== "undefined" &&
+      typeof iniad_ai_mop.chat === "function"
+    ) {
+      console.log("  [LLM] Analyzing query to suggest search directories...");
+
+      var systemPrompt =
+        "あなたはファイル検索の専門家です。\n" +
+        "ユーザーの検索クエリから、どのような種類のディレクトリを優先的に検索すべきかを判断してください。\n\n" +
+        "以下の形式で JSON を出力してください（他のテキストは出力しないでください）:\n" +
+        '{"priority": "development|documents|general", "keywords": ["関連キーワード1", "関連キーワード2"]}\n\n' +
+        "- development: ソースコード、プログラミング、ソフトウェア開発関連\n" +
+        "- documents: ドキュメント、レポート、資料関連\n" +
+        "- general: 一般的な検索（すべてのディレクトリを均等に検索）";
+
+      var userPrompt = "検索クエリ: " + query;
+
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+
+      if (aiResponse) {
+        try {
+          // JSON を抽出（余分なテキストがある場合に対応）
+          var jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            var suggestion = JSON.parse(jsonMatch[0]);
+            console.log("  [LLM] Suggested priority: " + suggestion.priority);
+
+            if (suggestion.priority === "development" && devDirs.length > 0) {
+              // 開発ディレクトリを優先
+              return devDirs.concat(defaultDirs);
+            } else if (suggestion.priority === "documents") {
+              // ドキュメントディレクトリを優先
+              return [
+                homeDir + "/Documents",
+                homeDir + "/Desktop",
+                homeDir + "/Downloads",
+              ].concat(devDirs);
+            }
+          }
+        } catch (parseErr) {
+          console.log("  [LLM] Parse error, using default directories");
+        }
+      }
+    }
+  } catch (llmErr) {
+    console.log("  [LLM] Error: " + (llmErr.message || llmErr));
+  }
+
+  // フォールバック: 開発ディレクトリ + デフォルト
+  if (devDirs.length > 0) {
+    return devDirs.concat(defaultDirs);
+  }
+  return defaultDirs;
+}
 
 function workflow() {
   var searchQuery = "Floorp";
   var maxResults = 50;
-  var outputPath = "/Users/user/Desktop/Deep_Research_Report.md";
+
+  // ホームディレクトリを動的に取得
+  var homeDir = getHomeDir();
+  var outputPath = homeDir + "/Desktop/Deep_Research_Report.md";
 
   console.log("╔════════════════════════════════════════════════════════════╗");
   console.log("║           Deep Research - Comprehensive Analysis           ║");
@@ -19,6 +159,7 @@ function workflow() {
   console.log("");
   console.log("Search Query: " + searchQuery);
   console.log("Target Results: " + maxResults);
+  console.log("Home Directory: " + homeDir);
   console.log("");
 
   // --- Phase 1: DuckDuckGo Search ---
@@ -122,74 +263,276 @@ function workflow() {
   // --- Phase 1B: Local Finder Search ---
   console.log("");
   console.log("━━━ Phase 1B: Local File Search ━━━");
-  console.log("  Searching local files in /Users/user for: " + searchQuery);
+  console.log("  [DEBUG] Search Query: '" + searchQuery + "'");
 
   var localResults = [];
-  var localMaxResults = 20;
+  var localMaxResults = 100; // 大幅に増加して多くのファイルを取得
+
+  // 複数のディレクトリを検索（動的に決定）
+  // LLM を使用して検索クエリに適したディレクトリを推薦
+  var searchDirectories = suggestSearchDirectories(searchQuery, homeDir);
+
+  // 存在するディレクトリのみをフィルタリング
+  searchDirectories = filterExistingDirs(searchDirectories);
+
+  console.log("  [DEBUG] Search directories: " + searchDirectories.length);
+  for (var i = 0; i < searchDirectories.length; i++) {
+    console.log("    [" + (i + 1) + "] " + searchDirectories[i]);
+  }
 
   try {
+    // Finder プラグインの存在確認（詳細デバッグ）
+    console.log("");
+    console.log("  [DEBUG] Checking Finder plugin availability...");
+    console.log("    app exists: " + (typeof app !== "undefined"));
+    console.log(
+      "    app.sapphillon exists: " +
+        (app && typeof app.sapphillon !== "undefined"),
+    );
+    console.log(
+      "    app.sapphillon.core exists: " +
+        (app && app.sapphillon && typeof app.sapphillon.core !== "undefined"),
+    );
+    console.log(
+      "    app.sapphillon.core.finder exists: " +
+        (app &&
+          app.sapphillon &&
+          app.sapphillon.core &&
+          typeof app.sapphillon.core.finder !== "undefined"),
+    );
+    if (
+      app &&
+      app.sapphillon &&
+      app.sapphillon.core &&
+      app.sapphillon.core.finder
+    ) {
+      console.log(
+        "    finder.findFiles type: " +
+          typeof app.sapphillon.core.finder.findFiles,
+      );
+    }
+
     if (
       app &&
       app.sapphillon &&
       app.sapphillon.core &&
       app.sapphillon.core.finder &&
-      app.sapphillon.core.finder.findFiles
+      typeof app.sapphillon.core.finder.findFiles === "function"
     ) {
-      var finderStartTime = Date.now();
-      var pathsJson = app.sapphillon.core.finder.findFiles(
-        "/Users/user",
-        searchQuery,
-        localMaxResults,
-      );
-      var finderElapsed = Date.now() - finderStartTime;
+      console.log("  [DEBUG] ✓ Finder plugin is available");
+      console.log("");
 
-      var foundPaths = [];
-      try {
-        foundPaths = JSON.parse(pathsJson || "[]");
-      } catch (e) {
-        foundPaths = [];
+      var allFoundPaths = [];
+
+      // 各ディレクトリを順番に検索
+      // 優先度の高いディレクトリ（最初の2つ）にはより多くの結果を割り当てる
+      for (var dirIdx = 0; dirIdx < searchDirectories.length; dirIdx++) {
+        var searchDir = searchDirectories[dirIdx];
+        // 最初のディレクトリは50件、2番目は30件、残りは均等配分
+        var maxPerDir;
+        if (dirIdx === 0) {
+          maxPerDir = 50; // 最優先ディレクトリ
+        } else if (dirIdx === 1) {
+          maxPerDir = 30; // 2番目の優先ディレクトリ
+        } else {
+          maxPerDir = Math.ceil(
+            (localMaxResults - 80) / (searchDirectories.length - 2),
+          );
+        }
+        console.log(
+          "  ┌─ Directory [" +
+            (dirIdx + 1) +
+            "/" +
+            searchDirectories.length +
+            "]: " +
+            searchDir,
+        );
+        console.log(
+          "  │  Query: '" + searchQuery + "', MaxResults: " + maxPerDir,
+        );
+
+        try {
+          var finderStartTime = Date.now();
+          console.log("  │  [DEBUG] Calling finder.findFiles...");
+
+          var pathsJson = app.sapphillon.core.finder.findFiles(
+            searchDir,
+            searchQuery,
+            maxPerDir,
+          );
+          var finderElapsed = Date.now() - finderStartTime;
+
+          console.log(
+            "  │  [DEBUG] findFiles returned in " + finderElapsed + "ms",
+          );
+          console.log("  │  [DEBUG] Response type: " + typeof pathsJson);
+          console.log(
+            "  │  [DEBUG] Response length: " +
+              (pathsJson ? pathsJson.length : "null/undefined"),
+          );
+
+          // レスポンスの先頭を表示（デバッグ用）
+          if (pathsJson && typeof pathsJson === "string") {
+            var previewLen = Math.min(pathsJson.length, 500);
+            console.log(
+              "  │  [DEBUG] Response preview: " +
+                pathsJson.substring(0, previewLen),
+            );
+            if (pathsJson.length > 500) {
+              console.log(
+                "  │  [DEBUG] ... (truncated, total " +
+                  pathsJson.length +
+                  " chars)",
+              );
+            }
+          }
+
+          // JSON パース
+          var foundPaths = [];
+          if (pathsJson && typeof pathsJson === "string") {
+            try {
+              foundPaths = JSON.parse(pathsJson);
+              console.log("  │  [DEBUG] JSON parse successful");
+              console.log("  │  [DEBUG] Parsed type: " + typeof foundPaths);
+              console.log(
+                "  │  [DEBUG] Is array: " + Array.isArray(foundPaths),
+              );
+
+              if (!Array.isArray(foundPaths)) {
+                console.log(
+                  "  │  ⚠ Finder returned non-array: " + typeof foundPaths,
+                );
+                foundPaths = [];
+              } else {
+                // 見つかったパスを表示
+                console.log("  │  [DEBUG] Found paths:");
+                for (var pi = 0; pi < foundPaths.length; pi++) {
+                  console.log("  │    [" + (pi + 1) + "] " + foundPaths[pi]);
+                }
+              }
+            } catch (parseErr) {
+              console.log("  │  ⚠ JSON parse error: " + parseErr.message);
+              console.log(
+                "  │  Raw response (first 200 chars): " +
+                  String(pathsJson).substring(0, 200),
+              );
+              foundPaths = [];
+            }
+          } else if (pathsJson === null || pathsJson === undefined) {
+            console.log("  │  ⚠ Finder returned null/undefined");
+            foundPaths = [];
+          } else {
+            console.log(
+              "  │  ⚠ Finder returned invalid response type: " +
+                typeof pathsJson,
+            );
+            foundPaths = [];
+          }
+
+          console.log(
+            "  └─ Result: " +
+              foundPaths.length +
+              " files in " +
+              finderElapsed +
+              "ms",
+          );
+          console.log("");
+
+          // 重複を避けて追加
+          foundPaths.forEach(function (path) {
+            if (allFoundPaths.indexOf(path) === -1) {
+              allFoundPaths.push(path);
+            }
+          });
+        } catch (dirErr) {
+          console.log("  └─ ✗ Error: " + (dirErr.message || dirErr));
+          console.log("");
+        }
       }
 
+      var foundPaths = allFoundPaths;
+      console.log("  ════════════════════════════════════════");
       console.log(
-        "  ✓ Found " +
-          foundPaths.length +
-          " local files in " +
-          finderElapsed +
-          "ms",
+        "  ✓ Total: " + foundPaths.length + " unique local files found",
       );
+      console.log("  ════════════════════════════════════════");
 
       // Readable text file extensions
       var readableExtensions = [
         ".txt",
         ".md",
         ".js",
+        ".jsx",
         ".ts",
+        ".tsx",
+        ".mjs",
+        ".mts",
+        ".cjs",
+        ".cts",
         ".json",
+        ".jsonc",
         ".html",
+        ".htm",
         ".css",
+        ".scss",
+        ".sass",
+        ".less",
         ".xml",
+        ".xhtml",
         ".yaml",
         ".yml",
         ".sh",
+        ".bash",
+        ".zsh",
+        ".fish",
         ".py",
         ".rb",
         ".rs",
         ".c",
         ".cpp",
+        ".cc",
+        ".cxx",
         ".h",
+        ".hpp",
+        ".hxx",
         ".java",
         ".go",
         ".swift",
         ".kt",
+        ".kts",
         ".toml",
         ".ini",
         ".cfg",
         ".conf",
+        ".config",
         ".log",
         ".csv",
+        ".tsv",
         ".plist",
         ".entitlements",
         ".strings",
+        ".svg", // アイコン・図
+        ".vue", // Vue.js
+        ".svelte", // Svelte
+        ".astro", // Astro
+        ".graphql", // GraphQL
+        ".gql", // GraphQL
+        ".sql", // SQL
+        ".prisma", // Prisma
+        ".env", // 環境変数
+        ".env.example", // 環境変数テンプレート
+        ".gitignore", // Git設定
+        ".eslintrc", // ESLint設定
+        ".prettierrc", // Prettier設定
+        ".editorconfig", // エディタ設定
+        "Makefile", // Makefile（拡張子なし対応用）
+        "Dockerfile", // Docker
+        "Cargo.toml", // Rust
+        "deno.json", // Deno
+        "package.json", // Node.js
+        "README", // README
+        "LICENSE", // ライセンス
+        "CHANGELOG", // 変更履歴
       ];
 
       for (var f = 0; f < foundPaths.length; f++) {
@@ -243,6 +586,40 @@ function workflow() {
             isReadable = true;
             break;
           }
+          // 拡張子なしファイル名の場合もチェック（README, Makefile など）
+          if (readableExtensions[ext].indexOf(".") === -1) {
+            if (
+              fileName === readableExtensions[ext] ||
+              fileName.startsWith(readableExtensions[ext] + ".")
+            ) {
+              isReadable = true;
+              break;
+            }
+          }
+        }
+
+        // 拡張子なしでも特定のファイル名は読み込み可能
+        var specialFiles = [
+          "README",
+          "LICENSE",
+          "CHANGELOG",
+          "Makefile",
+          "Dockerfile",
+          "Containerfile",
+          ".gitignore",
+          ".eslintrc",
+          ".prettierrc",
+        ];
+        if (!isReadable && extension === "") {
+          for (var sf = 0; sf < specialFiles.length; sf++) {
+            if (
+              fileName === specialFiles[sf] ||
+              fileName.startsWith(specialFiles[sf])
+            ) {
+              isReadable = true;
+              break;
+            }
+          }
         }
 
         // Only add readable text files to search results
@@ -259,63 +636,133 @@ function workflow() {
 
         var fileContent = "";
         var fileDescription = "";
+        var readError = null;
 
         if (isReadable) {
           // Read file content
           try {
             if (
               app.sapphillon.core.filesystem &&
-              app.sapphillon.core.filesystem.read
+              typeof app.sapphillon.core.filesystem.read === "function"
             ) {
-              fileContent = app.sapphillon.core.filesystem.read(filePath) || "";
-              if (fileContent.length > 3000) {
-                fileContent = fileContent.substring(0, 3000);
+              var rawContent = app.sapphillon.core.filesystem.read(filePath);
+              if (rawContent && typeof rawContent === "string") {
+                fileContent = rawContent;
+                // 大きすぎるファイルは切り詰める（10000文字に増加）
+                if (fileContent.length > 10000) {
+                  // 先頭と末尾を保持して中間を省略
+                  var headPart = fileContent.substring(0, 7000);
+                  var tailPart = fileContent.substring(
+                    fileContent.length - 2000,
+                  );
+                  fileContent =
+                    headPart +
+                    "\n\n[... " +
+                    (fileContent.length - 9000) +
+                    " chars truncated ...]\n\n" +
+                    tailPart;
+                }
+              } else if (rawContent === null || rawContent === undefined) {
+                readError = "Read returned null/undefined";
+              } else {
+                readError = "Read returned non-string: " + typeof rawContent;
               }
+            } else {
+              readError = "filesystem.read function not available";
+              console.log(
+                "    ⚠ filesystem.read not available for: " + fileName,
+              );
             }
           } catch (readErr) {
+            readError = String(readErr.message || readErr);
+            console.log("    ⚠ Read error for " + fileName + ": " + readError);
             fileContent = "";
           }
         }
 
-        // Generate file description based on path and extension
-        fileDescription = describeLocalFile(filePath, extension, fileContent);
-
-        // Add to search results as a local source
-        searchResults.push({
-          rank: searchResults.length + 1,
-          title: "[LOCAL] " + fileName,
-          url: "file://" + filePath,
-          snippet: fileDescription,
-          domain: "local:" + extension.replace(".", ""),
-          pageContent: fileContent || fileDescription,
-          pageTitle: fileName,
-          extractedAt: new Date().toISOString(),
-          isLocalFile: true,
-          filePath: filePath,
-          fileExtension: extension,
-        });
-
-        localResults.push({
-          path: filePath,
-          name: fileName,
-          extension: extension,
-          isReadable: isReadable,
-          contentLength: fileContent.length,
-        });
-
-        console.log(
-          "  [LOCAL] " +
-            fileName +
-            (isReadable
-              ? " (" + fileContent.length + " chars)"
-              : " (folder/binary)"),
+        // Generate file description using LLM (dynamic, query-aware)
+        fileDescription = describeLocalFile(
+          filePath,
+          extension,
+          fileContent,
+          searchQuery,
         );
+
+        // ファイルが読み込めた場合のみ結果に追加
+        if (fileContent.length > 0 || !readError) {
+          // Add to search results as a local source
+          searchResults.push({
+            rank: searchResults.length + 1,
+            title: "[LOCAL] " + fileName,
+            url: "file://" + filePath,
+            snippet: fileDescription,
+            domain: "local:" + extension.replace(".", ""),
+            pageContent: fileContent || fileDescription,
+            pageTitle: fileName,
+            extractedAt: new Date().toISOString(),
+            isLocalFile: true,
+            filePath: filePath,
+            fileExtension: extension,
+            fileType: getFileType(extension),
+          });
+
+          localResults.push({
+            path: filePath,
+            name: fileName,
+            extension: extension,
+            isReadable: isReadable,
+            contentLength: fileContent.length,
+            error: readError,
+          });
+
+          console.log(
+            "  [LOCAL] ✓ " + fileName + " (" + fileContent.length + " chars)",
+          );
+        } else {
+          console.log(
+            "  [LOCAL] ✗ " + fileName + " - " + (readError || "empty content"),
+          );
+        }
       }
     } else {
       console.log("  ⚠ Finder plugin not available, skipping local search");
+      console.log("  [DEBUG] Plugin check details:");
+      console.log("    - app: " + (typeof app !== "undefined"));
+      console.log(
+        "    - app.sapphillon: " +
+          (app && typeof app.sapphillon !== "undefined"),
+      );
+      console.log(
+        "    - app.sapphillon.core: " +
+          (app && app.sapphillon && typeof app.sapphillon.core !== "undefined"),
+      );
+      console.log(
+        "    - app.sapphillon.core.finder: " +
+          (app &&
+            app.sapphillon &&
+            app.sapphillon.core &&
+            typeof app.sapphillon.core.finder !== "undefined"),
+      );
+      if (app && app.sapphillon && app.sapphillon.core) {
+        console.log(
+          "    - Available core plugins: " +
+            Object.keys(app.sapphillon.core).join(", "),
+        );
+      }
     }
   } catch (finderErr) {
     console.log("  ✗ Finder Error: " + finderErr);
+    console.log("  [DEBUG] Error details:");
+    console.log(
+      "    - Error type: " +
+        (finderErr ? finderErr.constructor.name : "unknown"),
+    );
+    console.log(
+      "    - Error message: " + (finderErr ? finderErr.message : "none"),
+    );
+    if (finderErr && finderErr.stack) {
+      console.log("    - Stack trace: " + finderErr.stack.substring(0, 500));
+    }
   }
 
   console.log("  ✓ Added " + localResults.length + " local sources");
@@ -422,6 +869,15 @@ function workflow() {
   console.log("  ✓ Successfully extracted: " + successCount + " pages");
   console.log("  ⚠ Limited/Failed: " + failCount + " pages");
 
+  // --- Phase 2.5: Temporal Analysis ---
+  console.log("");
+  console.log("━━━ Phase 2.5: Temporal Analysis ━━━");
+
+  var temporalTrends = analyzeTemporalTrends(searchResults);
+  searchResults = filterByFreshness(searchResults, 365);
+
+  console.log("  ✓ Temporal analysis complete");
+
   // --- Phase 3: LLM Analysis ---
   console.log("");
   console.log("━━━ Phase 3: AI Analysis ━━━");
@@ -466,11 +922,10 @@ function workflow() {
         result.pageTitle +
         "\n\n" +
         "【コンテンツ】\n" +
-        result.pageContent.substring(0, 3000);
+        result.pageContent.substring(0, 6000);
 
       var factList = iniad_ai_mop.chat(
-        "You are a fact extractor. Extract ONLY concrete facts, numbers, names, and specific claims. " +
-          "Do NOT summarize or interpret. Output in Japanese bullet points.",
+        "You are a comprehensive analyzer. Extract detailed information, provide context, and explain relationships. Output in structured Japanese markdown format.",
         factExtractionPrompt,
       );
 
@@ -522,6 +977,88 @@ function workflow() {
 
   // Store raw content globally for fact-checking
   var globalRawContent = allRawContent;
+
+  // --- Phase 3.2: Contradiction Detection ---
+  console.log("");
+  console.log("━━━ Phase 3.2: Contradiction Detection ━━━");
+
+  var contradictions = detectContradictions(analyzedResults);
+
+  if (contradictions.length > 0) {
+    console.log("  ⚠ Detected " + contradictions.length + " contradictions");
+    var highCount = contradictions.filter(function (c) {
+      return c.severity === "high";
+    }).length;
+    var mediumCount = contradictions.filter(function (c) {
+      return c.severity === "medium";
+    }).length;
+    console.log("    - High severity: " + highCount);
+    console.log("    - Medium severity: " + mediumCount);
+  } else {
+    console.log("  ✓ No contradictions detected");
+  }
+
+  // --- Phase 3.3: Technical Facts Cross-Validation (Generic) ---
+  console.log("");
+  console.log("━━━ Phase 3.3: Technical Facts Validation ━━━");
+
+  var technicalFacts = verifyTechnicalFactsGeneric(
+    analyzedResults,
+    searchQuery,
+  );
+  analyzedResults.technicalFactValidation = technicalFacts;
+
+  if (technicalFacts.conflictsDetected) {
+    console.log("  ⚠ Technical facts conflicts detected:");
+    Object.keys(technicalFacts.categories).forEach(function (cat) {
+      if (technicalFacts.categories[cat].conflicts.length > 0) {
+        console.log(
+          "    - " +
+            cat +
+            ": " +
+            technicalFacts.categories[cat].conflicts.join(", "),
+        );
+      }
+    });
+  } else {
+    console.log("  ✓ No technical facts conflicts detected");
+  }
+
+  // --- Phase 3.4: AI Generation Risk Detection (Generic) ---
+  console.log("");
+  console.log("━━━ Phase 3.4: AI Generation Risk Analysis ━━━");
+
+  var highRiskCount = 0;
+  var mediumRiskCount = 0;
+
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var aiDetection = detectAIGenerationGeneric(
+      analyzedResults[i].result.pageContent,
+      analyzedResults[i].factList,
+      {
+        title: analyzedResults[i].result.title,
+        domain: analyzedResults[i].result.domain,
+      },
+    );
+    analyzedResults[i].aiGenerationRisk = aiDetection;
+
+    if (aiDetection.riskLevel === "high") {
+      highRiskCount++;
+      console.log(
+        "    ⚠ High risk: " +
+          analyzedResults[i].result.title.substring(0, 30) +
+          " (score: " +
+          aiDetection.totalScore.toFixed(2) +
+          ")",
+      );
+    } else if (aiDetection.riskLevel === "medium") {
+      mediumRiskCount++;
+    }
+  }
+
+  console.log(
+    "  ✓ High risk: " + highRiskCount + " | Medium risk: " + mediumRiskCount,
+  );
 
   // Build FACT-BASED summaries (not abstractive summaries)
   console.log("");
@@ -598,6 +1135,91 @@ function workflow() {
     searchQuery,
     allSummaries,
     analyzedResults.length,
+  );
+
+  // --- Phase 3.6: Source Reliability Scoring (Enhanced) ---
+  console.log("");
+  console.log("━━━ Phase 3.6: Source Reliability Scoring (Enhanced) ━━━");
+
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var reliability = calculateSourceReliabilityEnhanced(
+      analyzedResults[i].result,
+      analyzedResults,
+    );
+    analyzedResults[i].reliability = reliability;
+
+    var scoreIcon =
+      reliability.score >= 8 ? "🟢" : reliability.score >= 6 ? "🟡" : "🔴";
+    console.log(
+      "    " +
+        scoreIcon +
+        " [" +
+        (i + 1) +
+        "] " +
+        analyzedResults[i].result.title.substring(0, 40) +
+        "... " +
+        reliability.score.toFixed(1) +
+        "/10 (" +
+        reliability.level +
+        ")",
+    );
+  }
+
+  // --- Phase 3.7: Cross-Reference Verification ---
+  console.log("");
+  console.log("━━━ Phase 3.7: Cross-Reference Verification ━━━");
+
+  var crossRefResults = verifyCrossSource(analyzedResults, 2);
+  analyzedResults.forEach(function (a) {
+    a.crossRefScore = 0;
+  });
+
+  // Mark sources with verified facts
+  crossRefResults.verified.forEach(function (vf) {
+    vf.sources.forEach(function (sourceIdx) {
+      if (analyzedResults[sourceIdx]) {
+        analyzedResults[sourceIdx].crossRefScore += vf.sourceCount;
+      }
+    });
+  });
+
+  // --- Phase 3.8: Metadata Extraction ---
+  console.log("");
+  console.log("━━━ Phase 3.8: Rich Metadata Extraction ━━━");
+
+  for (var i = 0; i < Math.min(5, analyzedResults.length); i++) {
+    if (!analyzedResults[i].result.isLocalFile) {
+      console.log("    Extracting metadata for source " + (i + 1) + "...");
+      var metadata = extractRichMetadata(analyzedResults[i].result, null);
+      analyzedResults[i].metadata = metadata;
+      console.log(
+        "      Authority: " +
+          metadata.authority.toFixed(1) +
+          "/10" +
+          (metadata.author ? " | Author: " + metadata.author : ""),
+      );
+    }
+  }
+
+  // --- Phase 3.9: Knowledge Graph Construction ---
+  console.log("");
+  console.log("━━━ Phase 3.9: Knowledge Graph Construction ━━━");
+
+  var knowledgeGraph = buildKnowledgeGraph(analyzedResults);
+
+  // --- Phase 3.10: Insight Generation ---
+  console.log("");
+  console.log("━━━ Phase 3.10: Insight Generation ━━━");
+
+  var insightsText = extractInsights(analyzedResults, searchQuery);
+
+  // --- Phase 3.11: Interactive Exploration Setup ---
+  console.log("");
+  console.log("━━━ Phase 3.11: Interactive Exploration Setup ━━━");
+
+  var interactiveQuestions = performInteractiveExploration(
+    analyzedResults,
+    searchQuery,
   );
 
   // Generate detailed Key Findings with multiple subsections
@@ -711,25 +1333,71 @@ function workflow() {
 
   var findingsTexts = [];
   var mentionedKeywords = []; // Track keywords across sections
+  var generatedSectionsSummary = ""; // 前セクションの要約を追跡
+  var allGeneratedSentences = []; // 全セクションで生成された文を追跡（重複検出用）
+  var usedExamples = []; // 使用済みの具体例・固有名詞を追跡
 
   for (var f = 0; f < findingsList.length; f++) {
     var item = findingsList[f];
     console.log("    → " + item.id + " " + item.title + "...");
 
-    // Use the enhanced generation function with retry and keyword awareness
+    // Use the enhanced generation function with retry, keyword awareness, and previous section context
     var sectionContent = generateDetailedFindingsWithRetry(
       searchQuery,
       allSummaries,
       item.id,
       item.prompt,
       mentionedKeywords,
+      generatedSectionsSummary,
     );
+
+    // 重複文の検出と除去
+    var cleanedContent = removeDuplicateSentences(
+      sectionContent,
+      allGeneratedSentences,
+    );
+    var duplicatesRemoved = sectionContent.length - cleanedContent.length;
+    if (duplicatesRemoved > 50) {
+      console.log(
+        "      → Removed " + duplicatesRemoved + " chars of duplicate content",
+      );
+    }
+    sectionContent = cleanedContent;
 
     findingsTexts.push({
       id: item.id,
       title: item.title,
       content: sectionContent,
     });
+
+    // 生成した文を追跡リストに追加
+    var sentences = extractSentences(sectionContent);
+    sentences.forEach(function (s) {
+      if (s.length > 20 && allGeneratedSentences.indexOf(s) < 0) {
+        allGeneratedSentences.push(s);
+      }
+    });
+    // 文リストが大きくなりすぎないように制限
+    if (allGeneratedSentences.length > 200) {
+      allGeneratedSentences = allGeneratedSentences.slice(-150);
+    }
+
+    // 具体例・固有名詞を抽出して追跡
+    var examples = extractExamplesAndNames(sectionContent);
+    examples.forEach(function (ex) {
+      if (usedExamples.indexOf(ex) < 0) {
+        usedExamples.push(ex);
+      }
+    });
+
+    // セクションの要点を抽出して要約に追加
+    var keyPoints = extractKeyPoints(sectionContent);
+    generatedSectionsSummary += "\n【" + item.title + "】" + keyPoints;
+
+    // 要約が長くなりすぎないように制限
+    if (generatedSectionsSummary.length > 4000) {
+      generatedSectionsSummary = generatedSectionsSummary.slice(-3000);
+    }
 
     // Extract and accumulate keywords from this section
     var newKeywords = extractKeywords(sectionContent);
@@ -739,16 +1407,18 @@ function workflow() {
       }
     });
 
-    // Keep keyword list manageable (max 50)
-    if (mentionedKeywords.length > 50) {
-      mentionedKeywords = mentionedKeywords.slice(-50);
+    // Keep keyword list manageable (max 80)
+    if (mentionedKeywords.length > 80) {
+      mentionedKeywords = mentionedKeywords.slice(-60);
     }
 
     console.log(
       "      ✓ " +
         sectionContent.length +
         " chars | Keywords: " +
-        newKeywords.length,
+        newKeywords.length +
+        " | Tracked sentences: " +
+        allGeneratedSentences.length,
     );
   }
 
@@ -780,6 +1450,92 @@ function workflow() {
   report += "**Deep Research** | Generated: " + today + "\n\n";
   report += "---\n\n";
 
+  // Quality Metrics Summary (NEW)
+  console.log("  Generating quality metrics...");
+  var qualityMetrics = calculateQualityMetricsGeneric(
+    analyzedResults,
+    contradictions,
+    searchQuery,
+  );
+
+  report += "> **Quality Metrics Summary**\n>\n";
+  report += "> **Data Collection:**\n>\n";
+  report +=
+    "> - Total sources: " +
+    qualityMetrics.dataCollection.totalSources +
+    "\n>\n";
+  report +=
+    "> - Web sources: " + qualityMetrics.dataCollection.webSources + "\n>\n";
+  report +=
+    "> - Local sources: " +
+    qualityMetrics.dataCollection.localSources +
+    "\n>\n";
+  report +=
+    "> - Avg. content length: " +
+    qualityMetrics.dataCollection.averageContentLength +
+    " chars\n>\n";
+  report += ">\n";
+  report += "> **Content Quality:**\n>\n";
+  report +=
+    "> - High reliability (≥8/10): " +
+    qualityMetrics.contentQuality.highReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Medium reliability (6-8/10): " +
+    qualityMetrics.contentQuality.mediumReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Low reliability (<6/10): " +
+    qualityMetrics.contentQuality.lowReliabilityCount +
+    "\n>\n";
+  report +=
+    "> - Average reliability: " +
+    qualityMetrics.contentQuality.averageReliability +
+    "/10\n>\n";
+  report += ">\n";
+  report += "> **AI Generation Risk:**\n>\n";
+  report +=
+    "> - High risk: " + qualityMetrics.aiGenerationRisk.highRiskCount + "\n>\n";
+  report +=
+    "> - Medium risk: " +
+    qualityMetrics.aiGenerationRisk.mediumRiskCount +
+    "\n>\n";
+  report +=
+    "> - Low risk: " + qualityMetrics.aiGenerationRisk.lowRiskCount + "\n";
+
+  if (qualityMetrics.technicalConsistency.hasConflicts) {
+    report += ">\n";
+    report += "> ⚠ **Technical Conflicts Detected:**\n>\n";
+    report +=
+      "> Conflicting information found in: " +
+      qualityMetrics.technicalConsistency.conflictCategories.join(", ") +
+      "\n>\n";
+  }
+
+  if (qualityMetrics.contradictions.total > 0) {
+    report += ">\n";
+    report += "> ⚠ **Contradictions:**\n>\n";
+    report += "> - Total: " + qualityMetrics.contradictions.total + "\n>\n";
+    report +=
+      "> - High severity: " +
+      qualityMetrics.contradictions.highSeverity +
+      "\n>\n";
+    report +=
+      "> - Medium severity: " +
+      qualityMetrics.contradictions.mediumSeverity +
+      "\n>\n";
+  }
+
+  report +=
+    "> **Warning:** This report contains " +
+    qualityMetrics.aiGenerationRisk.highRiskCount +
+    " sources with high AI generation risk. " +
+    (qualityMetrics.technicalConsistency.hasConflicts
+      ? "Technical claims may have conflicts. "
+      : "") +
+    "Always verify critical information against official sources.\n>\n";
+  report += "---\n\n";
+
   // Executive Summary Box
   report += "> **Executive Summary**\n>\n";
   report +=
@@ -805,8 +1561,10 @@ function workflow() {
   report += "5. [Web-Local Correlation](#5-web-local-correlation)\n";
   report += "6. [Discussion](#6-discussion)\n";
   report += "7. [Conclusions](#7-conclusions)\n";
-  report += "8. [References](#8-references)\n";
-  report += "9. [Fact-Check Summary](#9-fact-check-summary)\n\n";
+  report += "8. [References](#11-references)\n";
+  report += "9. [Fact-Check Summary](#12-fact-check-summary)\n";
+  report +=
+    "10. [Temporal & Contradiction Analysis](#13-temporal--contradiction-analysis)\n";
   report += "---\n\n";
 
   // Overview
@@ -825,7 +1583,7 @@ function workflow() {
   report += "### 2.2 Analysis Pipeline\n\n";
   report += "```\n";
   report +=
-    "検索 → URL収集 → ページ訪問 → コンテンツ抽出 → AI分析 → 要約生成 → レポート作成\n";
+    "検索 → URL収集 → ページ訪問 → コンテンツ抽出 → 時系列分析 → AI分析 → 矛盾検出 → 要約生成 → レポート作成\n";
   report += "```\n\n";
 
   report += "### 2.3 Statistics\n\n";
@@ -834,7 +1592,8 @@ function workflow() {
   report += "| 検索結果取得数 | " + searchResults.length + " |\n";
   report += "| コンテンツ抽出成功 | " + successCount + " |\n";
   report += "| 抽出制限/失敗 | " + failCount + " |\n";
-  report += "| 分析完了 | " + analyzedResults.length + " |\n\n";
+  report += "| 分析完了 | " + analyzedResults.length + " |\n";
+  report += "| 検出された矛盾 | " + contradictions.length + " |\n\n";
 
   // Key Findings - 15 Detailed Sections
   report += "## 3. Key Findings\n\n";
@@ -888,12 +1647,20 @@ function workflow() {
         report += "#### [" + a.result.rank + "] " + a.result.title + "\n\n";
         if (a.result.isLocalFile) {
           report += "- **パス**: `" + a.result.filePath + "`\n";
-          report += "- **種類**: " + (a.result.fileExtension || "不明") + "\n";
+          report += "- **種類**: " + (a.result.fileExtension || "不明") + "\n\n";
+          // ローカルファイルの場合は、LLM生成の詳細説明（snippet）を使用
+          // snippet には describeLocalFileWithAI の結果が保存されている
+          if (a.result.snippet && a.result.snippet.length > 100) {
+            report += a.result.snippet + "\n\n";
+          } else {
+            // フォールバック: Phase 3 のファクト抽出結果を使用
+            report += "**分析**: " + a.summary + "\n\n";
+          }
         } else {
           report +=
             "- **URL**: [" + a.result.domain + "](" + a.result.url + ")\n";
+          report += "- **分析**: " + a.summary + "\n\n";
         }
-        report += "- **分析**: " + a.summary + "\n\n";
       });
     }
   });
@@ -1025,9 +1792,69 @@ function workflow() {
   report += "## 7. Conclusions\n\n";
   report += conclusionsText + "\n\n";
 
+  // Cross-Reference Verification
+  report += "---\n\n";
+  report += "## 8. Cross-Reference Verification\n\n";
+  report += "> **クロスリファレンス検証**\n>\n";
+  report += "> 複数の情報源で同じ事実が確認されているかを検証しました。\n\n";
+
+  report += "### 8.1 検証済みの事実\n\n";
+  report += "以下の事実は2つ以上の情報源で確認されています：\n\n";
+  report += "| 事実 | 確認数 | 信頼度 | 情報源 |\n";
+  report += "|------|--------|--------|---------|\n";
+
+  crossRefResults.verified.forEach(function (vf) {
+    var confidenceBar = "";
+    for (var c = 0; c < 5; c++) {
+      confidenceBar += c < Math.floor(vf.confidence * 5) ? "●" : "○";
+    }
+    var sourcesStr = vf.sources
+      .map(function (s) {
+        return "[" + (s + 1) + "]";
+      })
+      .join(", ");
+    report +=
+      "| " +
+      vf.fact.substring(0, 30) +
+      " | " +
+      vf.sourceCount +
+      " | " +
+      confidenceBar +
+      " | " +
+      sourcesStr +
+      " |\n";
+  });
+
+  report += "\n";
+  report += "### 8.2 未検証の事実\n\n";
+  report +=
+    "以下の事実は単一の情報源からのみ確認されています（追加検証推奨）：\n\n";
+  var unverifiedToShow = crossRefResults.unverified.slice(0, 10);
+  unverifiedToShow.forEach(function (uf) {
+    var sourcesStr = uf.sources
+      .map(function (s) {
+        return "[" + (s + 1) + "]";
+      })
+      .join(", ");
+    report += "- " + uf.fact + " (情報源: " + sourcesStr + ")\n";
+  });
+  if (crossRefResults.unverified.length > 10) {
+    report += "  ... 他 " + (crossRefResults.unverified.length - 10) + "件\n";
+  }
+  report += "\n";
+
+  // Insights & Patterns
+  report += "---\n\n";
+  report += "## 9. Insights & Patterns\n\n";
+  report += insightsText + "\n\n";
+
+  // Knowledge Graph
+  report += "---\n\n";
+  report += generateKnowledgeGraphReport(knowledgeGraph);
+
   // References
   report += "---\n\n";
-  report += "## 8. References\n\n";
+  report += "## 11. References\n\n";
   searchResults.forEach(function (r, i) {
     report +=
       "[" +
@@ -1044,6 +1871,9 @@ function workflow() {
   // Fact-Check Section (now using raw content for verification)
   console.log("");
   console.log("━━━ Phase 5: Fact-Checking (with Raw Data) ━━━");
+  console.log(
+    "  Note: Temporal analysis and contradiction detection were performed in Phases 2.5 and 3.2",
+  );
   var factCheckSection = generateFactCheckReport(
     findingsTexts,
     allSummaries,
@@ -1052,14 +1882,58 @@ function workflow() {
   report += factCheckSection;
 
   report += "---\n\n";
+  report += "## 13. Temporal & Contradiction Analysis\n\n";
+  report += generateTemporalReport(temporalTrends, searchResults);
+  report += generateContradictionReport(contradictions, analyzedResults);
+  report += "---\n\n";
+
+  report += "---\n\n";
+  report += "## 14. Quality Assurance\n\n";
+
+  // Perform quality check
+  console.log("");
+  console.log("━━━ Phase 6: Quality Assurance ━━━");
+
+  var qaResults = performQualityCheck(analyzedResults, report, searchResults);
+  var qaReport = generateQualityReport(qaResults);
+  report += qaReport;
+
+  // --- Phase 7: Metadata Validation (新規) ---
+  console.log("");
+  console.log("━━━ Phase 7: Metadata Validation ━━━");
+
+  // メタデータ（日付・バージョン）の検証
+  var metadataValidation = normalizeAndVerifyMetadata(analyzedResults);
+
+  // ソース引用の検証
+  var citationValidation = validateSourceReferences(report, analyzedResults);
+
+  // コンテンツ品質の検証
+  var contentIssues = performContentValidation(
+    report,
+    searchQuery,
+    analyzedResults,
+  );
+
+  // 検証結果をレポートに追加
+  report += generateMetadataValidationReport(
+    metadataValidation,
+    citationValidation,
+    contentIssues,
+  );
+
+  report += "---\n\n";
   report += "*This report was automatically generated by Deep Research.*\n";
   report +=
     "*Analysis powered by AI-driven content extraction and synthesis.*\n";
   report +=
     "*Fact-checking enabled: Claims verified against source documents.*\n";
+  report += "*Temporal analysis: Information freshness and trends analyzed.*\n";
+  report += "*Contradiction detection: Cross-source verification performed.*\n";
+  report += "*Metadata validation: Date/version consistency verified.*\n";
   report += "*Generated: " + new Date().toISOString() + "*\n";
 
-  // --- Phase 5: Save Report ---
+  // --- Phase 8: Save Report ---
   console.log("  Report size: " + report.length + " characters");
   console.log("  Saving to: " + outputPath);
 
@@ -1089,9 +1963,19 @@ function workflow() {
 // --- Helper Functions ---
 
 function generateAnalysis(type, topic, summaries, count) {
+  // 強化されたシステムプロンプト（言語制約を含む）
   var systemPrompt =
-    "You are an expert researcher writing in Japanese. Use formal academic tone.";
+    "You are an expert researcher writing in Japanese. Use formal academic tone. " +
+    "【言語制約】すべての出力は日本語で記述してください。" +
+    "ソースに含まれる外国語（英語以外）は日本語に翻訳して引用してください。" +
+    "固有名詞（ソフトウェア名、組織名等）は原語のまま使用可能です。" +
+    "【重要】情報源に明記されている内容のみを記述し、推測や一般的な知識を追加しないでください。";
   var prompt = "";
+
+  // ソース情報の先頭部分を抽出（overview等で使用）
+  var topSources = summaries
+    ? summaries.split("\n").slice(0, 15).join("\n")
+    : "";
 
   switch (type) {
     case "abstract":
@@ -1100,14 +1984,27 @@ function generateAnalysis(type, topic, summaries, count) {
         count +
         "件のWeb情報源の分析に基づき、「" +
         topic +
-        "」に関する包括的なAbstract（200-250語）を書いてください。背景、調査範囲、主要な発見、意義を含めてください。\n\n情報源の要約:\n" +
+        "」に関する包括的なAbstract（200-250語）を書いてください。\n\n" +
+        "【必須事項】\n" +
+        "1. 対象の種類・カテゴリ（ソフトウェア、ブラウザ、サービス等）を最初に明確にする\n" +
+        "2. 背景、調査範囲、主要な発見、意義を含める\n" +
+        "3. 情報源に明記されている内容のみを記述する\n\n" +
+        "情報源の要約:\n" +
         summaries;
       break;
     case "overview":
+      // 改善: ソース情報を含めて誤認を防ぐ
       prompt =
-        "「" +
+        "以下の情報源に基づいて「" +
         topic +
-        "」とは何か、その特徴、歴史、現在の状況について、収集した情報に基づいてOverviewセクション（300-400語）を書いてください。";
+        "」とは何か、その特徴、歴史、現在の状況についてOverviewセクション（300-400語）を書いてください。\n\n" +
+        "【重要な制約】\n" +
+        "1. 情報源に明記されている内容のみを記述する\n" +
+        "2. 対象の種類・カテゴリ（ソフトウェア、ブラウザ、サービス等）を最初の文で明確にする\n" +
+        "3. 推測や一般的な知識を追加しない\n" +
+        "4. 情報源番号を引用（例：[1][3]）する\n\n" +
+        "【主要情報源】\n" +
+        topSources;
       break;
     case "findings":
       prompt =
@@ -1116,38 +2013,49 @@ function generateAnalysis(type, topic, summaries, count) {
       break;
     case "discussion":
       prompt =
-        "「" +
+        "以下の情報源に基づいて「" +
         topic +
-        "」に関する調査結果を総括し、Discussionセクション（250-300語）を書いてください。傾向、強み、課題、将来の展望を含めてください。";
+        "」に関する調査結果を総括し、Discussionセクション（250-300語）を書いてください。\n" +
+        "傾向、強み、課題、将来の展望を含め、情報源番号を引用してください。\n\n" +
+        "【主要情報源】\n" +
+        topSources;
       break;
     case "conclusions":
       prompt =
-        "「" +
+        "以下の情報源に基づいて「" +
         topic +
-        "」に関する本調査の結論（150-200語）を書いてください。主要なポイントと今後の発展可能性を含めてください。";
+        "」に関する本調査の結論（150-200語）を書いてください。\n" +
+        "主要なポイントと今後の発展可能性を含めてください。\n\n" +
+        "【主要情報源】\n" +
+        topSources;
       break;
   }
 
   try {
     return iniad_ai_mop.chat(systemPrompt, prompt);
   } catch (e) {
+    console.log("  ⚠ " + type + " generation failed: " + e.message);
     return "（" + type + "の生成に失敗しました）";
   }
 }
 
-// Generate detailed findings for a specific topic
+// Generate detailed findings for a specific topic (強化版)
 function generateDetailedFindings(topic, summaries, sectionType, customPrompt) {
   var systemPrompt =
-    "You are an expert research analyst writing in Japanese. Use formal academic tone with detailed explanations. " +
-    "Structure your response with clear paragraphs and comprehensive analysis. " +
-    "Always cite source numbers like [1], [3], [5] when referring to specific information. " +
-    "IMPORTANT: This is one section of a multi-section report. Avoid repeating the same examples, facility names, or project names that are commonly mentioned. " +
-    "Focus on NEW insights and unique perspectives specific to this section's theme. " +
-    "If you must reference a commonly mentioned item, do so briefly without re-explaining it.";
+    "You are an expert research analyst writing in Japanese. " +
+    "【最重要ルール - 繰り返し禁止】\n" +
+    "- 同じ情報を2回以上書かないでください\n" +
+    "- 同じ表現、同じ例を繰り返さないでください\n" +
+    "- 新しい情報・観点のみを記述してください\n\n" +
+    "【文体】フォーマルな学術的文体、引用番号[1][3]等を使用";
 
   var fullPrompt =
     customPrompt +
-    "\n\n【重要】他のセクションで既に詳述されている内容（施設名、プロジェクト名、基本的な学部概要など）は簡潔に触れるにとどめ、このセクション固有の新しい観点・分析に重点を置いてください。\n\n情報源一覧:\n" +
+    "\n\n【絶対厳守】\n" +
+    "★ 繰り返し厳禁: 同じ文章・説明・例を2回以上書かないこと\n" +
+    "★ 簡潔: 既知の情報は「前述の通り」で済ませること\n" +
+    "★ 新規性: このセクション固有の内容に集中すること\n\n" +
+    "情報源一覧:\n" +
     summaries;
 
   try {
@@ -1586,22 +2494,168 @@ function performRecursiveSearch(originalQuery, currentFacts, existingResults) {
 // Local File Description Function
 // ============================================================================
 
-// Generate a description of a local file based on its path, extension, and content
-function describeLocalFile(filePath, extension, content) {
+// Get file type category from extension
+function getFileType(extension) {
+  var ext = (extension || "").toLowerCase();
+
+  var codeExtensions = [
+    ".js",
+    ".ts",
+    ".py",
+    ".rb",
+    ".rs",
+    ".go",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".swift",
+    ".kt",
+  ];
+  var configExtensions = [
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".plist",
+    ".xml",
+  ];
+  var docExtensions = [".md", ".txt", ".log", ".csv"];
+  var webExtensions = [".html", ".css", ".htm"];
+  var shellExtensions = [".sh", ".bash", ".zsh"];
+
+  if (codeExtensions.indexOf(ext) >= 0) return "source_code";
+  if (configExtensions.indexOf(ext) >= 0) return "config";
+  if (docExtensions.indexOf(ext) >= 0) return "document";
+  if (webExtensions.indexOf(ext) >= 0) return "web";
+  if (shellExtensions.indexOf(ext) >= 0) return "script";
+
+  return "other";
+}
+
+// ============================================================================
+// LLM-based Local File Description Generation
+// ============================================================================
+
+// LLM を使ってローカルファイルの説明を動的に生成する
+// 検索クエリに基づいて、ファイルがどのように関連しているかを分析
+function describeLocalFileWithAI(filePath, extension, content, searchQuery) {
   var fileName = filePath.split("/").pop() || filePath;
   var pathParts = filePath.split("/");
   var parentFolder =
     pathParts.length > 1 ? pathParts[pathParts.length - 2] : "";
 
-  // Determine file type description
+  // コンテンツのプレビュー（LLM に渡す用、最大2000文字）
+  var contentPreview = "";
+  if (content && content.length > 0) {
+    contentPreview = content.substring(0, 2000);
+    if (content.length > 2000) {
+      contentPreview += "\n... (以下省略、合計 " + content.length + " 文字)";
+    }
+  }
+
+  // LLM 用のシステムプロンプト
+  var systemPrompt =
+    "あなたはローカルファイルを分析する専門家です。\n" +
+    "与えられたファイル情報から、そのファイルがユーザーの検索クエリにどのように関連しているかを分析し、\n" +
+    "自然で読みやすい日本語で説明を生成してください。\n\n" +
+    "以下の形式で出力してください：\n\n" +
+    "1. **発見場所と概要**: このファイルがどこで見つかり、何のファイルなのかを1-2文で説明\n" +
+    "2. **検索クエリとの関連性**: ユーザーの検索クエリ「" +
+    searchQuery +
+    "」との関連性を具体的に説明（なぜこのファイルが検索結果に含まれたか）\n" +
+    "3. **機能的な役割**: このファイルがプロジェクトやシステム全体でどのような役割を果たしているか（推測可）\n" +
+    "4. **重要なポイント**: ファイルの内容から読み取れる重要な情報やインサイト\n\n" +
+    "注意事項：\n" +
+    "- 検索クエリがソフトウェア名の場合は、そのソフトウェアとの関連を説明\n" +
+    "- 検索クエリが一般的なトピック（例: 機械学習、料理、旅行など）の場合は、ファイルがそのトピックにどう関連するかを説明\n" +
+    "- 技術的な詳細は適度に含めるが、読みやすさを重視\n" +
+    "- 推測は「可能性があります」「と思われます」などの表現を使う\n" +
+    "- 出力は Markdown 形式で";
+
+  // LLM 用のユーザープロンプト
+  var userPrompt =
+    "以下のローカルファイルを分析してください。\n\n" +
+    "**検索クエリ**: " +
+    searchQuery +
+    "\n\n" +
+    "**ファイル情報**:\n" +
+    "- ファイル名: " +
+    fileName +
+    "\n" +
+    "- 拡張子: " +
+    (extension || "(なし)") +
+    "\n" +
+    "- フルパス: " +
+    filePath +
+    "\n" +
+    "- 親フォルダ: " +
+    parentFolder +
+    "\n" +
+    "- ファイルサイズ: " +
+    (content ? content.length : 0) +
+    " 文字\n\n" +
+    "**ファイル内容（プレビュー）**:\n```\n" +
+    (contentPreview || "(内容なし)") +
+    "\n```\n\n" +
+    "上記の情報から、このファイルの説明を生成してください。";
+
+  try {
+    // LLM 呼び出し
+    if (
+      typeof iniad_ai_mop !== "undefined" &&
+      typeof iniad_ai_mop.chat === "function"
+    ) {
+      console.log("    [LLM] Analyzing: " + fileName);
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+
+      if (aiResponse && aiResponse.length > 0) {
+        // LLM レスポンスにファイル情報を追加
+        var fullDescription = "---\n\n";
+        fullDescription += "### " + fileName + "\n\n";
+        fullDescription += "📍 **パス**: `" + filePath + "`\n\n";
+        fullDescription += aiResponse;
+        fullDescription += "\n\n---";
+        return fullDescription;
+      }
+    }
+  } catch (llmErr) {
+    console.log(
+      "    [LLM] Error analyzing " +
+        fileName +
+        ": " +
+        (llmErr.message || llmErr),
+    );
+  }
+
+  // LLM が使えない場合やエラー時はフォールバック
+  return describeLocalFileFallback(filePath, extension, content, searchQuery);
+}
+
+// フォールバック用の静的説明生成（LLM が使えない場合）
+function describeLocalFileFallback(filePath, extension, content, searchQuery) {
+  var fileName = filePath.split("/").pop() || filePath;
+  var pathParts = filePath.split("/");
+  var parentFolder =
+    pathParts.length > 1 ? pathParts[pathParts.length - 2] : "";
+
+  // ファイル種別の説明
   var fileTypeDescriptions = {
     ".js": "JavaScript ソースコード",
+    ".jsx": "React JSX コンポーネント",
     ".ts": "TypeScript ソースコード",
-    ".json": "JSON データファイル",
+    ".tsx": "React TSX コンポーネント",
+    ".mts": "TypeScript ESモジュール",
+    ".mjs": "JavaScript ESモジュール",
+    ".json": "JSON 設定/データファイル",
     ".md": "Markdown ドキュメント",
     ".txt": "テキストファイル",
     ".html": "HTML ウェブページ",
     ".css": "CSS スタイルシート",
+    ".scss": "SCSS スタイルシート",
     ".py": "Python スクリプト",
     ".rs": "Rust ソースコード",
     ".swift": "Swift ソースコード",
@@ -1625,49 +2679,69 @@ function describeLocalFile(filePath, extension, content) {
     ".cfg": "設定ファイル",
     ".conf": "設定ファイル",
     ".strings": "ローカライズ文字列ファイル",
+    ".svg": "SVG ベクター画像",
+    ".vue": "Vue.js コンポーネント",
+    ".svelte": "Svelte コンポーネント",
   };
 
   var typeDesc = fileTypeDescriptions[extension] || "ファイル";
 
-  // Build description
-  var description = "ローカル" + typeDesc + ": " + fileName;
+  // 自然言語での説明を構築
+  var description = "---\n\n";
+  description += "### " + fileName + "\n\n";
+  description += "📍 **パス**: `" + filePath + "`\n\n";
 
-  // Add path context
-  if (parentFolder) {
-    description += " (場所: " + parentFolder + "/)";
-  }
+  // 1. 発見場所と概要
+  description += "**発見場所と概要**: ";
+  description +=
+    "`" + parentFolder + "/` フォルダ内で発見された " + typeDesc + " です。";
 
-  // Add content summary if available
-  if (content && content.length > 0) {
-    var contentPreview = content.substring(0, 200).replace(/\s+/g, " ").trim();
-    if (content.length > 200) {
-      contentPreview += "...";
+  // 検索クエリとの関連性（ファイル名やパスに含まれているか）
+  if (searchQuery) {
+    var queryLower = searchQuery.toLowerCase();
+    var pathLower = filePath.toLowerCase();
+    var contentLower = content ? content.toLowerCase() : "";
+
+    if (
+      pathLower.indexOf(queryLower) > -1 ||
+      contentLower.indexOf(queryLower) > -1
+    ) {
+      description += "\n\n**検索クエリとの関連性**: ";
+      description +=
+        "このファイルは検索クエリ「" + searchQuery + "」に関連しています。";
+
+      if (pathLower.indexOf(queryLower) > -1) {
+        description += " ファイルパスに検索キーワードが含まれています。";
+      }
+      if (contentLower.indexOf(queryLower) > -1) {
+        description += " ファイル内容に検索キーワードが含まれています。";
+      }
     }
-    description += " | 内容プレビュー: " + contentPreview;
   }
 
-  // Detect project type from path
-  if (filePath.indexOf("/node_modules/") > -1) {
-    description += " [Node.js 依存関係]";
-  } else if (filePath.indexOf("/.git/") > -1) {
-    description += " [Git リポジトリ]";
-  } else if (filePath.indexOf("/src/") > -1) {
-    description += " [ソースコード]";
-  } else if (
-    filePath.indexOf("/docs/") > -1 ||
-    filePath.indexOf("/doc/") > -1
-  ) {
-    description += " [ドキュメント]";
-  } else if (
-    filePath.indexOf("/test/") > -1 ||
-    filePath.indexOf("/tests/") > -1
-  ) {
-    description += " [テストコード]";
-  } else if (filePath.indexOf("/config/") > -1) {
-    description += " [設定]";
+  // 内容プレビュー
+  if (content && content.length > 0) {
+    description +=
+      "\n\n**内容プレビュー** (" + content.length + " 文字):\n```\n";
+    var contentPreview = content.substring(0, 400).trim();
+    if (content.length > 400) {
+      contentPreview += "\n... (省略)";
+    }
+    description += contentPreview + "\n```";
   }
 
+  description += "\n\n---";
   return description;
+}
+
+// メインのファイル説明生成関数（LLM を優先的に使用）
+function describeLocalFile(filePath, extension, content, searchQuery) {
+  // searchQuery がある場合は LLM ベースの分析を使用
+  if (searchQuery) {
+    return describeLocalFileWithAI(filePath, extension, content, searchQuery);
+  }
+  // searchQuery がない場合はフォールバック
+  return describeLocalFileFallback(filePath, extension, content, "");
 }
 
 // ============================================================================
@@ -1677,6 +2751,26 @@ function describeLocalFile(filePath, extension, content) {
 // Filter search results for relevance to the query using AI
 function filterRelevantResults(results, query) {
   if (results.length === 0) return results;
+
+  // Separate local files from web results - local files always pass through
+  var localFiles = results.filter(function (r) {
+    return r.isLocalFile === true;
+  });
+  var webResults = results.filter(function (r) {
+    return r.isLocalFile !== true;
+  });
+
+  console.log("  [DEBUG] Total results: " + results.length);
+  console.log("  [DEBUG] Local files (auto-included): " + localFiles.length);
+  console.log("  [DEBUG] Web results to filter: " + webResults.length);
+
+  // If only local files, return them directly
+  if (webResults.length === 0) {
+    return localFiles;
+  }
+
+  // Replace results with only web results for AI filtering
+  results = webResults;
 
   var systemPrompt =
     "あなたは検索結果の関連性を評価する専門家です。\n\n" +
@@ -1806,9 +2900,22 @@ function filterRelevantResults(results, query) {
     );
   }
 
-  return scoredResults.map(function (sr) {
+  // Extract web results and add local files back
+  var filteredWebResults = scoredResults.map(function (sr) {
     return sr.result;
   });
+
+  // Add local files at the end (they always pass through)
+  if (localFiles.length > 0) {
+    console.log(
+      "  [DEBUG] Adding " + localFiles.length + " local files to results",
+    );
+    localFiles.forEach(function (lf) {
+      console.log("    [LOCAL] " + lf.title);
+    });
+  }
+
+  return filteredWebResults.concat(localFiles);
 }
 
 // ============================================================================
@@ -1895,6 +3002,290 @@ function retryWithBackoff(fn, maxRetries, initialDelay) {
   throw lastError || new Error("All retry attempts failed");
 }
 
+// ============================================================================
+// 重複検出・除去関数群
+// ============================================================================
+
+// 文を抽出する
+function extractSentences(content) {
+  if (!content) return [];
+
+  // 日本語の句点「。」と英語のピリオド「.」で分割
+  var sentences = content.split(/(?<=[。.!?])\s*/);
+
+  return sentences
+    .map(function (s) {
+      return s.trim();
+    })
+    .filter(function (s) {
+      return s.length > 10;
+    });
+}
+
+// 重複文を除去する
+function removeDuplicateSentences(content, existingSentences) {
+  if (!content || !existingSentences || existingSentences.length === 0) {
+    return content;
+  }
+
+  var sentences = extractSentences(content);
+  var cleanedSentences = [];
+  var removedCount = 0;
+
+  sentences.forEach(function (sentence) {
+    var isDuplicate = false;
+    var normalizedSentence = normalizeSentence(sentence);
+
+    // 既存の文との類似度をチェック
+    for (var i = 0; i < existingSentences.length; i++) {
+      var existingNormalized = normalizeSentence(existingSentences[i]);
+
+      // 完全一致または高い類似度
+      if (normalizedSentence === existingNormalized) {
+        isDuplicate = true;
+        break;
+      }
+
+      // 部分一致（80%以上の重複）
+      if (calculateSimilarity(normalizedSentence, existingNormalized) > 0.8) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (isDuplicate) {
+      removedCount++;
+    } else {
+      cleanedSentences.push(sentence);
+    }
+  });
+
+  return cleanedSentences.join("");
+}
+
+// 文を正規化する（比較用）
+function normalizeSentence(sentence) {
+  if (!sentence) return "";
+
+  return sentence
+    .replace(/\s+/g, "") // 空白を除去
+    .replace(/[「」『』【】（）()]/g, "") // 括弧を除去
+    .replace(/[、,。.]/g, "") // 句読点を除去
+    .replace(/\[\d+\]/g, "") // 引用番号を除去
+    .toLowerCase();
+}
+
+// 2つの文字列の類似度を計算（0-1）
+function calculateSimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  if (str1 === str2) return 1;
+
+  var longer = str1.length > str2.length ? str1 : str2;
+  var shorter = str1.length > str2.length ? str2 : str1;
+
+  if (longer.length === 0) return 1;
+
+  // 短い方が長い方に含まれているかチェック
+  if (longer.indexOf(shorter) >= 0) {
+    return shorter.length / longer.length;
+  }
+
+  // 共通の部分文字列の割合を計算（簡易版）
+  var matches = 0;
+  var chunkSize = 10; // 10文字単位でチェック
+
+  for (var i = 0; i <= shorter.length - chunkSize; i += chunkSize) {
+    var chunk = shorter.substring(i, i + chunkSize);
+    if (longer.indexOf(chunk) >= 0) {
+      matches += chunkSize;
+    }
+  }
+
+  return matches / shorter.length;
+}
+
+// コンテンツから要点を抽出する
+function extractKeyPoints(content) {
+  if (!content) return "";
+
+  var points = [];
+
+  // 最初の2文を要点として抽出
+  var sentences = extractSentences(content);
+  if (sentences.length > 0) {
+    points.push(sentences[0].substring(0, 100));
+  }
+
+  // 「特に」「重要なのは」「注目すべき」などを含む文を抽出
+  var importantPatterns = [
+    /特に[^。]+。/g,
+    /重要な[^。]+。/g,
+    /注目すべき[^。]+。/g,
+    /主な[^。]+。/g,
+    /具体的には[^。]+。/g,
+  ];
+
+  importantPatterns.forEach(function (pattern) {
+    var matches = content.match(pattern);
+    if (matches) {
+      matches.slice(0, 1).forEach(function (m) {
+        if (m.length < 150 && points.indexOf(m) < 0) {
+          points.push(m.substring(0, 80));
+        }
+      });
+    }
+  });
+
+  return points.slice(0, 3).join(" / ");
+}
+
+// 具体例や固有名詞を抽出する
+function extractExamplesAndNames(content) {
+  if (!content) return [];
+
+  var examples = [];
+
+  // 「」内の固有名詞
+  var quoted = content.match(/「([^」]{2,30})」/g) || [];
+  quoted.forEach(function (q) {
+    var name = q.replace(/[「」]/g, "");
+    if (examples.indexOf(name) < 0) {
+      examples.push(name);
+    }
+  });
+
+  // 英語の固有名詞（大文字始まり）
+  var englishNames = content.match(/\b[A-Z][a-zA-Z]{2,20}\b/g) || [];
+  englishNames.forEach(function (name) {
+    // 一般的な単語を除外
+    var commonWords = [
+      "The",
+      "This",
+      "That",
+      "These",
+      "Those",
+      "When",
+      "Where",
+      "What",
+      "Which",
+      "How",
+      "Why",
+      "And",
+      "But",
+      "For",
+      "Not",
+      "All",
+      "Can",
+      "Had",
+      "Has",
+      "Have",
+      "Its",
+      "May",
+      "New",
+      "Now",
+      "Old",
+      "See",
+      "Two",
+      "Way",
+      "Who",
+      "Any",
+      "Each",
+      "From",
+      "Get",
+      "Got",
+      "Her",
+      "Him",
+      "His",
+      "Into",
+      "Just",
+      "Like",
+      "Made",
+      "Make",
+      "More",
+      "Most",
+      "Must",
+      "Over",
+      "Such",
+      "Take",
+      "Than",
+      "Them",
+      "Then",
+      "Very",
+      "Well",
+      "With",
+      "Also",
+      "Back",
+      "Been",
+      "Come",
+      "Could",
+      "Did",
+      "Down",
+      "Even",
+      "First",
+      "Good",
+      "Great",
+      "Here",
+      "High",
+      "However",
+      "Important",
+      "Know",
+      "Last",
+      "Little",
+      "Long",
+      "Look",
+      "Many",
+      "Much",
+      "Need",
+      "Never",
+      "Next",
+      "Only",
+      "Other",
+      "Our",
+      "Own",
+      "Part",
+      "People",
+      "Place",
+      "Point",
+      "Right",
+      "Same",
+      "Should",
+      "Small",
+      "Some",
+      "State",
+      "Still",
+      "System",
+      "Think",
+      "Through",
+      "Under",
+      "Used",
+      "Using",
+      "Want",
+      "While",
+      "Will",
+      "Within",
+      "Without",
+      "Work",
+      "World",
+      "Would",
+      "Year",
+      "Years",
+    ];
+    if (commonWords.indexOf(name) < 0 && examples.indexOf(name) < 0) {
+      examples.push(name);
+    }
+  });
+
+  // 数値を含む表現（バージョン番号等）
+  var versions = content.match(/v?\d+\.\d+(?:\.\d+)?/g) || [];
+  versions.forEach(function (v) {
+    if (examples.indexOf(v) < 0) {
+      examples.push(v);
+    }
+  });
+
+  return examples.slice(0, 30);
+}
+
 // Extract key concepts/keywords from generated content
 function extractKeywords(content) {
   if (!content) return [];
@@ -1931,13 +3322,14 @@ function extractKeywords(content) {
   return unique;
 }
 
-// Enhanced generateDetailedFindings with retry, truncation repair, and keyword awareness
+// Enhanced generateDetailedFindings with retry, truncation repair, keyword awareness, and previous section context
 function generateDetailedFindingsWithRetry(
   topic,
   summaries,
   sectionType,
   customPrompt,
   mentionedKeywords,
+  previousSectionsSummary, // 新規: 前セクションの要約
 ) {
   var MAX_RETRIES = 3;
   var content = "";
@@ -1951,20 +3343,38 @@ function generateDetailedFindingsWithRetry(
       mentionedKeywords.slice(0, 15).join("、");
   }
 
+  // Build previous sections context (新規: 前セクション要約コンテキスト)
+  var previousContext = "";
+  if (previousSectionsSummary && previousSectionsSummary.length > 0) {
+    previousContext =
+      "\n\n【既に記述済みの内容（繰り返し禁止）】:\n" +
+      previousSectionsSummary.slice(0, 2000);
+  }
+
+  // 強化されたシステムプロンプト（重複防止を最優先）
   var systemPrompt =
-    "You are an expert research analyst writing in Japanese. Use formal academic tone with detailed explanations. " +
-    "Structure your response with clear paragraphs and comprehensive analysis. " +
-    "Always cite source numbers like [1], [3], [5] when referring to specific information. " +
-    "IMPORTANT: This is one section of a multi-section report. Avoid repeating the same examples, facility names, or project names that are commonly mentioned. " +
-    "Focus on NEW insights and unique perspectives specific to this section's theme. " +
-    "If you must reference a commonly mentioned item, do so briefly without re-explaining it. " +
-    "CRITICAL: Complete your response with a proper conclusion. Do not end mid-sentence.";
+    "You are an expert research analyst writing in Japanese. " +
+    "【最重要ルール - 繰り返し禁止】\n" +
+    "- 同じ情報、同じ表現、同じ例を絶対に繰り返さないでください\n" +
+    "- 「〜は〜である」のような定義文を何度も書かないでください\n" +
+    "- 既に他のセクションで述べた内容は「前述の通り」と一言で済ませてください\n" +
+    "- このセクション固有の新しい情報のみを記述してください\n\n" +
+    "【言語制約】すべての出力は日本語で記述してください。" +
+    "【引用】情報源番号 [1], [3] 等を必ず使用してください。" +
+    "【文体】フォーマルな学術的文体を使用してください。";
 
   var basePrompt =
     customPrompt +
-    "\n\n【重要】他のセクションで既に詳述されている内容（施設名、プロジェクト名、基本的な学部概要など）は簡潔に触れるにとどめ、このセクション固有の新しい観点・分析に重点を置いてください。" +
+    "\n\n【絶対に守るべき制約】\n" +
+    "★ 繰り返し厳禁: 同じ文章、同じ説明、同じ例を絶対に2回以上書かないこと\n" +
+    "★ 新規情報のみ: このセクションでしか書けない独自の内容に集中すること\n" +
+    "★ 簡潔な言及: 既出の情報は「前述の〜」「既に述べた〜」で1文のみ\n" +
+    "★ 冗長禁止: 同じ意味を異なる言葉で言い換えて繰り返さないこと\n\n" +
+    "【既に詳述済み - これらの内容は繰り返さないこと】" +
+    previousContext +
+    "\n\n【既出のキーワード - 再定義不要】" +
     keywordContext +
-    "\n\n情報源一覧:\n" +
+    "\n\n【このセクションで使用する情報源】\n" +
     summaries;
 
   while (attempt < MAX_RETRIES) {
@@ -2251,6 +3661,9 @@ function generateFactCheckReport(
   rawContentArray,
 ) {
   console.log("  → Fact-checking generated content against RAW DATA...");
+  console.log(
+    "  → Temporal analysis and contradiction detection completed in Phase 10",
+  );
 
   var allContent = findingsTexts
     .map(function (f) {
@@ -2288,8 +3701,10 @@ function generateFactCheckReport(
   );
 
   // Generate report section
-  var report = "## 9. Fact-Check Summary\n\n";
+  var report = "## 12. Fact-Check Summary\n\n";
   report += "> **検証結果概要**\n>\n";
+  report += "> 本レポートの内容を情報源と照合し、事実確認を実施しました。\n";
+  report += "> また、セクション10で時系列分析と矛盾検出も実施しています。\n\n";
   report += "> 本レポートの内容を情報源と照合し、事実確認を実施しました。\n\n";
 
   report += "### 9.1 パターンベース検証\n\n";
@@ -2378,7 +3793,7 @@ function generateFactCheckReport(
 
   // Add unverified claims warning
   if (basicResults.lowConfidence > 0) {
-    report += "### 8.3 要確認事項\n\n";
+    report += "### 9.3 要確認事項\n\n";
     report += "> [!WARNING]\n";
     report +=
       "> 以下の主張は情報源で直接確認できませんでした。公式情報との照合を推奨します。\n\n";
@@ -2390,6 +3805,2397 @@ function generateFactCheckReport(
       .slice(0, 10);
     unverifiedList.forEach(function (item) {
       report += "- `" + item.claim + "`\n";
+    });
+    report += "\n";
+  }
+
+  report += "---\n\n";
+
+  return report;
+}
+
+// ============================================================================
+// Temporal Analysis Functions
+// ============================================================================
+
+// Extract date from URL or content
+function extractDateFromContent(content, url) {
+  // Try to extract from URL first (most reliable)
+  var urlPatterns = [
+    /\/(\d{4})\/(\d{2})\/(\d{2})\//, // /2024/01/15/
+    /\/(\d{4})-(\d{2})-(\d{2})\//, // /2024-01-15/
+    /\/(\d{4})(\d{2})(\d{2})\//, // /20240115/
+    /(\d{4})\/(\d{2})\/(\d{2})/, // 2024/01/15
+    /(\d{4})-(\d{2})-(\d{2})/, // 2024-01-15
+  ];
+
+  for (var i = 0; i < urlPatterns.length; i++) {
+    var match = url.match(urlPatterns[i]);
+    if (match) {
+      return new Date(
+        parseInt(match[1]),
+        parseInt(match[2]) - 1,
+        parseInt(match[3]),
+      );
+    }
+  }
+
+  // Try to extract from content
+  if (!content) return null;
+
+  var datePatterns = [
+    /(\d{4})年(\d{1,2})月(\d{1,2})日/, // 2024年1月15日
+    /(\d{4})\/(\d{1,2})\/(\d{1,2})/, // 2024/1/15
+    /(\d{4})-(\d{1,2})-(\d{1,2})/, // 2024-1-15
+    /(\d{1,2})月(\d{1,2})日.*?(\d{4})年/, // 1月15日 2024年
+    /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, // 2024 年 1 月 15 日
+  ];
+
+  for (var i = 0; i < datePatterns.length; i++) {
+    var matches = content.match(new RegExp(datePatterns[i].source, "g"));
+    if (matches && matches.length > 0) {
+      var match = matches[0].match(datePatterns[i]);
+      if (match) {
+        var year, month, day;
+        if (match.length >= 4) {
+          year = parseInt(match[1]);
+          month = parseInt(match[2]);
+          day = parseInt(match[3]);
+        } else {
+          // Handle patterns where year might be last
+          year = parseInt(match[3]);
+          month = parseInt(match[1]);
+          day = parseInt(match[2]);
+        }
+        if (
+          year > 1900 &&
+          year < 2100 &&
+          month >= 1 &&
+          month <= 12 &&
+          day >= 1 &&
+          day <= 31
+        ) {
+          return new Date(year, month - 1, day);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// Calculate freshness score based on content indicators
+function calculateFreshnessScore(content, url) {
+  var score = 0;
+  var lowerContent = (content || "").toLowerCase();
+  var lowerUrl = (url || "").toLowerCase();
+
+  // Recent indicators in content
+  var recentKeywords = [
+    "最新",
+    "2024",
+    "2025",
+    "recent",
+    "latest",
+    "new",
+    "updated",
+    "アップデート",
+    "更新",
+    "新機能",
+    "new feature",
+    "recently",
+  ];
+
+  for (var i = 0; i < recentKeywords.length; i++) {
+    if (lowerContent.indexOf(recentKeywords[i]) >= 0) {
+      score += 0.2;
+    }
+  }
+
+  // URL indicators
+  if (lowerUrl.match(/\/202[4-5]\//)) score += 0.5;
+  if (lowerUrl.match(/\/archive\//)) score -= 0.3;
+  if (lowerUrl.match(/\/old\//)) score -= 0.3;
+
+  return Math.min(Math.max(score, 0), 1);
+}
+
+// Filter results by freshness
+function filterByFreshness(results, daysThreshold) {
+  if (!daysThreshold) daysThreshold = 365;
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysThreshold);
+
+  var filtered = [];
+  var oldCount = 0;
+  var recentCount = 0;
+
+  for (var i = 0; i < results.length; i++) {
+    var result = results[i];
+    var date = extractDateFromContent(result.pageContent, result.url);
+    var freshnessScore = calculateFreshnessScore(
+      result.pageContent,
+      result.url,
+    );
+
+    result.extractedDate = date ? date.toISOString().split("T")[0] : null;
+    result.freshnessScore = freshnessScore;
+    result.isRecent = date ? date >= cutoff : freshnessScore > 0.5;
+
+    if (result.isRecent) {
+      recentCount++;
+    } else {
+      oldCount++;
+    }
+
+    filtered.push(result);
+  }
+
+  console.log(
+    "  時系列分析: 最新 " + recentCount + "件 | 過去 " + oldCount + "件",
+  );
+
+  return filtered;
+}
+
+// Analyze temporal trends in the results
+function analyzeTemporalTrends(results) {
+  var trends = {
+    byYear: {},
+    byMonth: {},
+    recentTrend: "stable",
+    oldestDate: null,
+    newestDate: null,
+  };
+
+  var dates = [];
+  for (var i = 0; i < results.length; i++) {
+    var date = extractDateFromContent(results[i].pageContent, results[i].url);
+    if (date) {
+      dates.push(date);
+      var year = date.getFullYear();
+      var month = date.getMonth();
+
+      if (!trends.byYear[year]) trends.byYear[year] = 0;
+      trends.byYear[year]++;
+
+      var monthKey = year + "-" + (month + 1);
+      if (!trends.byMonth[monthKey]) trends.byMonth[monthKey] = 0;
+      trends.byMonth[monthKey]++;
+    }
+  }
+
+  if (dates.length > 0) {
+    dates.sort(function (a, b) {
+      return a - b;
+    });
+    trends.oldestDate = dates[0].toISOString().split("T")[0];
+    trends.newestDate = dates[dates.length - 1].toISOString().split("T")[0];
+
+    // Determine trend
+    if (dates.length >= 3) {
+      var recent = dates.slice(-3);
+      var older = dates.slice(-6, -3);
+      var recentAvg =
+        recent.reduce(function (sum, d) {
+          return sum + d.getTime();
+        }, 0) / recent.length;
+      var olderAvg =
+        older.reduce(function (sum, d) {
+          return sum + d.getTime();
+        }, 0) / older.length;
+
+      if (recentAvg > olderAvg + 30 * 24 * 60 * 60 * 1000) {
+        trends.recentTrend = "increasing";
+      } else if (recentAvg < olderAvg - 30 * 24 * 60 * 60 * 1000) {
+        trends.recentTrend = "decreasing";
+      }
+    }
+  }
+
+  return trends;
+}
+
+// ============================================================================
+// Contradiction Detection Functions
+// ============================================================================
+
+// Extract structured facts from fact list
+function extractStructuredFacts(factList) {
+  var facts = [];
+  if (!factList) return facts;
+
+  var lines = factList.split("\n");
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line.length > 5) {
+      // Extract numerical values
+      var numberMatch = line.match(
+        /(\d+(?:\.\d+)?)(?:\s*(?:%|倍|倍|時間|時間|円|ドル|\$|GB|MB|TB|mm|g|kg))/,
+      );
+      var value = numberMatch ? numberMatch[1] : null;
+
+      // Extract dates
+      var dateMatch = line.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+      var date = dateMatch ? dateMatch[0] : null;
+
+      // Extract key phrases
+      var keyPhrase = line
+        .replace(/^- /, "")
+        .replace(/：.*$/, "")
+        .replace(/:.*$/, "")
+        .trim();
+
+      facts.push({
+        original: line,
+        keyPhrase: keyPhrase,
+        value: value,
+        date: date,
+        normalized: normalizeFactForComparison(line),
+      });
+    }
+  }
+
+  return facts;
+}
+
+// Normalize fact for comparison
+function normalizeFactForComparison(fact) {
+  var normalized = fact
+    // Remove bullet points
+    .replace(/^[-*•]\s*/, "")
+    // Normalize dates
+    .replace(/\d{4}年\d{1,2}月\d{1,2}日/g, "DATE")
+    .replace(/\d{4}\/\d{1,2}\/\d{1,2}/g, "DATE")
+    .replace(/\d{4}-\d{1,2}-\d{1,2}/g, "DATE")
+    // Normalize percentages
+    .replace(/\d+%/g, "PERCENTAGE")
+    .replace(/\d+(?:\.\d+)?\s*%/g, "PERCENTAGE")
+    // Normalize multipliers
+    .replace(/\d+(?:\.\d+)?\s*倍/g, "MULTIPLIER")
+    .replace(/\d+(?:\.\d+)?\s*x/g, "MULTIPLIER")
+    // Normalize prices
+    .replace(/(?:\$|¥|円)\s*\d+(?:,\d{3})*/g, "PRICE")
+    // Normalize measurements
+    .replace(
+      /\d+(?:\.\d+)?\s*(?:GB|MB|TB|mm|g|kg|時間|hours?|hrs?)/g,
+      "MEASUREMENT",
+    )
+    // Remove extra whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized.toLowerCase();
+}
+
+// Detect contradictions between sources
+function detectContradictions(analyzedResults) {
+  var contradictions = [];
+  var factMap = {};
+
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var facts = extractStructuredFacts(result.factList);
+
+    for (var j = 0; j < facts.length; j++) {
+      var fact = facts[j];
+      var key = fact.normalized;
+
+      if (factMap[key]) {
+        var existing = factMap[key];
+
+        // Check for value contradictions
+        if (fact.value && existing.value && fact.value !== existing.value) {
+          contradictions.push({
+            type: "value_contradiction",
+            fact: fact.keyPhrase,
+            sourceA: existing.sourceIndex,
+            sourceB: i,
+            valueA: existing.value,
+            valueB: fact.value,
+            severity: calculateContradictionSeverity(
+              existing.value,
+              fact.value,
+            ),
+          });
+        }
+
+        // Check for date contradictions
+        if (fact.date && existing.date && fact.date !== existing.date) {
+          contradictions.push({
+            type: "date_contradiction",
+            fact: fact.keyPhrase,
+            sourceA: existing.sourceIndex,
+            sourceB: i,
+            dateA: existing.date,
+            dateB: fact.date,
+            severity: "medium",
+          });
+        }
+      } else {
+        factMap[key] = {
+          sourceIndex: i,
+          value: fact.value,
+          date: fact.date,
+          original: fact.original,
+        };
+      }
+    }
+  }
+
+  return contradictions;
+}
+
+// Calculate severity of contradiction
+function calculateContradictionSeverity(valueA, valueB) {
+  var numA = parseFloat(valueA);
+  var numB = parseFloat(valueB);
+
+  if (isNaN(numA) || isNaN(numB)) return "low";
+
+  var diff = Math.abs(numA - numB);
+  var avg = (numA + numB) / 2;
+  var ratio = diff / avg;
+
+  if (ratio > 0.5) return "high";
+  if (ratio > 0.2) return "medium";
+  return "low";
+}
+
+// ============================================================================
+// NEW: Generic Technical Facts Validation Functions
+// ============================================================================
+
+// Verify technical facts across sources (generic, topic-independent)
+function verifyTechnicalFactsGeneric(analyzedResults, searchQuery) {
+  var technicalCategories = {
+    baseTechnology: {
+      patterns: [
+        "base",
+        "based on",
+        "engine",
+        "framework",
+        "powered by",
+        "ベース",
+        "基盤",
+        "エンジン",
+      ],
+      detectedValues: {},
+      conflicts: [],
+    },
+    programmingLanguages: {
+      patterns: [
+        "written in",
+        "language",
+        "coded in",
+        "implemented",
+        "言語",
+        "プログラミング",
+      ],
+      detectedValues: {},
+      conflicts: [],
+    },
+    versionInfo: {
+      patterns: ["version", "ver\\.", "v\\d+", "release", "バージョン"],
+      detectedValues: {},
+      conflicts: [],
+    },
+  };
+
+  // Extract technical facts from each source
+  analyzedResults.forEach(function (a, idx) {
+    var content = a.factList + " " + a.summary;
+    var sourceTitle = a.result.title;
+
+    // Extract base technology
+    technicalCategories.baseTechnology.patterns.forEach(function (pattern) {
+      var regex = new RegExp(
+        pattern + "[:\\s]+([A-Z][A-Za-z0-9\\s\\-]+)",
+        "gi",
+      );
+      var matches = content.match(regex);
+      if (matches) {
+        matches.forEach(function (m) {
+          var tech = m
+            .split(/[:\s]+/)
+            .pop()
+            .trim();
+          if (tech && tech.length > 2) {
+            var techKey = tech.toLowerCase();
+            if (!technicalCategories.baseTechnology.detectedValues[techKey]) {
+              technicalCategories.baseTechnology.detectedValues[techKey] = [];
+            }
+            technicalCategories.baseTechnology.detectedValues[techKey].push(
+              idx,
+            );
+          }
+        });
+      }
+    });
+
+    // Extract programming languages
+    var langRegex =
+      /(written in|language|coded in|implemented|言語).*?[:\s]+([A-Za-z+#]+)/gi;
+    var langMatches = content.match(langRegex);
+    if (langMatches) {
+      langMatches.forEach(function (m) {
+        var lang = m
+          .split(/[:\s]+/)
+          .pop()
+          .trim();
+        if (lang && lang.length > 1) {
+          var langKey = lang.toLowerCase();
+          if (
+            !technicalCategories.programmingLanguages.detectedValues[langKey]
+          ) {
+            technicalCategories.programmingLanguages.detectedValues[langKey] =
+              [];
+          }
+          technicalCategories.programmingLanguages.detectedValues[langKey].push(
+            idx,
+          );
+        }
+      });
+    }
+
+    // Extract version information
+    var versionRegex =
+      /version[:\s]*([0-9.]+)|v([0-9.]+)|バージョン[:\s]*([0-9.]+)/gi;
+    var versionMatches = content.match(versionRegex);
+    if (versionMatches) {
+      versionMatches.forEach(function (m) {
+        var ver = m
+          .replace(/version[:\s]*/gi, "")
+          .replace(/^v/i, "")
+          .replace(/バージョン[:\s]*/gi, "");
+        if (ver && ver.length > 1) {
+          if (!technicalCategories.versionInfo.detectedValues[ver]) {
+            technicalCategories.versionInfo.detectedValues[ver] = [];
+          }
+          technicalCategories.versionInfo.detectedValues[ver].push(idx);
+        }
+      });
+    }
+  });
+
+  // Detect conflicts (multiple different values exist)
+  Object.keys(technicalCategories).forEach(function (category) {
+    var values = Object.keys(technicalCategories[category].detectedValues);
+    if (values.length > 1) {
+      technicalCategories[category].conflicts = values;
+    }
+  });
+
+  var hasConflicts = Object.keys(technicalCategories).some(function (cat) {
+    return technicalCategories[cat].conflicts.length > 0;
+  });
+
+  return {
+    categories: technicalCategories,
+    conflictsDetected: hasConflicts,
+    summary: hasConflicts
+      ? "Conflicts detected in: " +
+        Object.keys(technicalCategories)
+          .filter(function (cat) {
+            return technicalCategories[cat].conflicts.length > 0;
+          })
+          .join(", ")
+      : "No conflicts detected",
+  };
+}
+
+// ============================================================================
+// NEW: Generic AI Generation Risk Detection Functions
+// ============================================================================
+
+// Detect AI-generated content (generic, topic-independent)
+function detectAIGenerationGeneric(content, factList, sourceMetadata) {
+  var indicators = {
+    totalScore: 0,
+    categories: {
+      specificity: { score: 0, issues: [] },
+      vagueness: { score: 0, issues: [] },
+      repetition: { score: 0, issues: [] },
+      coherence: { score: 0, issues: [] },
+    },
+  };
+
+  // 1. Specificity check
+  var foundSpecificities = 0;
+  var specificityChecks = [
+    { pattern: /\d{4}/, name: "日付/年号" },
+    { pattern: /\d+\s*(%|percent|件|個|人|kb|mb|gb)/i, name: "数値データ" },
+    { pattern: /version[:\s]*[0-9.]+/i, name: "バージョン番号" },
+    { pattern: /[A-Z][a-z]+\s+[A-Z][a-z]+/, name: "固有名詞" },
+    { pattern: /https?:\/\/[^\s]+/, name: "URL" },
+  ];
+
+  specificityChecks.forEach(function (check) {
+    if (check.pattern.test(content)) {
+      foundSpecificities++;
+    }
+  });
+
+  if (foundSpecificities < 3) {
+    indicators.categories.specificity.score = 0.4;
+    indicators.categories.specificity.issues.push(
+      "具体的な詳細が不足 (" +
+        foundSpecificities +
+        "/" +
+        specificityChecks.length +
+        ")",
+    );
+  }
+
+  // 2. Vagueness check
+  var vaguePatterns = [
+    /〜とされている/g,
+    /〜という/g,
+    /〜かもしれない/g,
+    /〜ようだ/g,
+    /〜らしい/g,
+    /考えられる/g,
+    /推測される/g,
+    /と思われる/g,
+  ];
+
+  var vagueCount = 0;
+  vaguePatterns.forEach(function (pattern) {
+    var matches = factList.match(pattern);
+    if (matches) vagueCount += matches.length;
+  });
+
+  var statementCount = factList.split("\n").length || 1;
+  var vagueRatio = vagueCount / statementCount;
+
+  if (vagueRatio > 0.3) {
+    indicators.categories.vagueness.score = 0.3;
+    indicators.categories.vagueness.issues.push(
+      "曖昧表現の割合が高い (" +
+        (vagueRatio * 100).toFixed(1) +
+        "%, " +
+        vagueCount +
+        "/" +
+        statementCount +
+        ")",
+    );
+  }
+
+  // 3. Repetition check
+  var sentences = content.split(/[。！？.!?]/).filter(function (s) {
+    return s.trim().length > 10;
+  });
+
+  if (sentences.length > 5) {
+    var repeatedPhrases = {};
+    for (var i = 0; i < sentences.length; i++) {
+      var words = sentences[i].trim().split(/\s+/).slice(0, 4);
+      if (words.length >= 3) {
+        var phrase = words.join(" ");
+        if (repeatedPhrases[phrase]) {
+          repeatedPhrases[phrase]++;
+        } else {
+          repeatedPhrases[phrase] = 1;
+        }
+      }
+    }
+
+    var maxRepetition = Math.max.apply(null, Object.values(repeatedPhrases));
+    if (maxRepetition > 2) {
+      indicators.categories.repetition.score = 0.2;
+      indicators.categories.repetition.issues.push("フレーズの反復が見られる");
+    }
+  }
+
+  // 4. Coherence check
+  var bulletCount = (factList.match(/[-・]/g) || []).length;
+  var hasContradictions = factList.match(/しかし|だが|逆に|一方で/g);
+
+  if (bulletCount > 0) {
+    var bulletContradictionRatio =
+      (hasContradictions ? hasContradictions.length : 0) / bulletCount;
+    if (bulletContradictionRatio > 0.2) {
+      indicators.categories.coherence.score = 0.2;
+      indicators.categories.coherence.issues.push("文量に対して矛盾表現が多い");
+    }
+  }
+
+  // Calculate total score
+  Object.keys(indicators.categories).forEach(function (cat) {
+    indicators.totalScore += indicators.categories[cat].score;
+  });
+
+  return {
+    riskLevel:
+      indicators.totalScore > 0.5
+        ? "high"
+        : indicators.totalScore > 0.3
+          ? "medium"
+          : "low",
+    totalScore: indicators.totalScore,
+    categories: indicators.categories,
+    summary: Object.keys(indicators.categories)
+      .filter(function (cat) {
+        return indicators.categories[cat].score > 0;
+      })
+      .map(function (cat) {
+        return cat + ": " + indicators.categories[cat].issues.join(", ");
+      })
+      .join("; "),
+  };
+}
+
+// ============================================================================
+// NEW: Enhanced Source Reliability Scoring (Generic)
+// ============================================================================
+
+// Enhanced calculateSourceReliability function (generic, topic-independent)
+function calculateSourceReliabilityEnhanced(result, allResults) {
+  var score = 5.0; // Base score
+  var factors = [];
+  var penalties = [];
+
+  // 1. Domain trust scores (generic)
+  var domainTrustScores = {
+    "github.com": 2.5,
+    "gitlab.com": 2.0,
+    "bitbucket.org": 2.0,
+    "wikipedia.org": 2.0,
+    "stackoverflow.com": 2.0,
+    "stackexchange.com": 2.0,
+    "developer.mozilla.org": 2.5,
+    "docs.microsoft.com": 2.0,
+    "docs.google.com": 1.5,
+    "medium.com": 1.0,
+    "dev.to": 1.0,
+    "qiita.com": 1.5,
+    "zenn.dev": 1.5,
+    "juejin.cn": 1.0,
+  };
+
+  var domain = (result.domain || "").toLowerCase();
+  var url = (result.url || "").toLowerCase();
+
+  Object.keys(domainTrustScores).forEach(function (d) {
+    if (domain.includes(d)) {
+      score += domainTrustScores[d];
+      factors.push("信頼できるドメイン");
+    }
+  });
+
+  // 2. URL structure evaluation
+  if (url.match(/\/docs\//i) || url.match(/\/documentation\//i)) {
+    score += 1.0;
+    factors.push("公式ドキュメント");
+  }
+
+  if (url.match(/\/api\//i) || url.match(/\/reference\//i)) {
+    score += 0.8;
+    factors.push("APIリファレンス");
+  }
+
+  if (url.match(/\/blog\//i) || url.match(/\/post\//i)) {
+    score -= 0.3;
+    penalties.push("ブログ記事");
+  }
+
+  // 3. Content quality (generic)
+  if (result.pageContent) {
+    var contentLength = result.pageContent.length;
+
+    if (contentLength > 2000) {
+      score += 0.5;
+      factors.push("詳細な内容");
+    } else if (contentLength < 200) {
+      score -= 0.5;
+      penalties.push("内容が不十分");
+    }
+
+    // Check for structured content (headings, lists)
+    var hasStructure = result.pageContent.match(/#+\s|<h[1-6]>|<ul>|<ol>/gi);
+    if (hasStructure && hasStructure.length > 3) {
+      score += 0.3;
+      factors.push("構造化された内容");
+    }
+
+    // Check for code blocks or examples
+    if (result.pageContent.match(/```|<code>|<pre>/gi)) {
+      score += 0.4;
+      factors.push("コード例を含む");
+    }
+  }
+
+  // 4. Cross-reference score (if available)
+  if (result.crossRefScore > 0) {
+    score += Math.min(1.0, result.crossRefScore * 0.2);
+    factors.push("他のソースで確認済");
+  }
+
+  // 5. Timestamp freshness (if available)
+  if (result.extractedAt) {
+    var daysOld =
+      (new Date() - new Date(result.extractedAt)) / (1000 * 60 * 60 * 24);
+    if (daysOld < 7) {
+      score += 0.3;
+      factors.push("最近抽出");
+    } else if (daysOld > 365) {
+      score -= 0.5;
+      penalties.push("古い情報");
+    }
+  }
+
+  // Normalize score (0-10 range)
+  var normalizedScore = Math.min(10, Math.max(0, score));
+
+  return {
+    score: parseFloat(normalizedScore.toFixed(2)),
+    level:
+      normalizedScore >= 8 ? "high" : normalizedScore >= 6 ? "medium" : "low",
+    factors: factors,
+    penalties: penalties,
+    rawScore: score,
+  };
+}
+
+// ============================================================================
+// NEW: Generic Quality Metrics Calculation
+// ============================================================================
+
+// Calculate comprehensive quality metrics (generic, topic-independent)
+function calculateQualityMetricsGeneric(
+  analyzedResults,
+  contradictions,
+  searchQuery,
+) {
+  var aiHighRisk = analyzedResults.filter(function (a) {
+    return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "high";
+  }).length;
+  var aiMediumRisk = analyzedResults.filter(function (a) {
+    return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "medium";
+  }).length;
+  var aiLowRisk = analyzedResults.filter(function (a) {
+    return a.aiGenerationRisk && a.aiGenerationRisk.riskLevel === "low";
+  }).length;
+
+  return {
+    dataCollection: {
+      totalSources: analyzedResults.length,
+      webSources: analyzedResults.filter(function (a) {
+        return !a.result.isLocalFile;
+      }).length,
+      localSources: analyzedResults.filter(function (a) {
+        return a.result.isLocalFile;
+      }).length,
+      averageContentLength: (
+        analyzedResults.reduce(function (sum, a) {
+          return sum + (a.result.pageContent ? a.result.pageContent.length : 0);
+        }, 0) / analyzedResults.length
+      ).toFixed(0),
+    },
+    contentQuality: {
+      highReliabilityCount: analyzedResults.filter(function (a) {
+        return a.reliability && a.reliability.score >= 8;
+      }).length,
+      mediumReliabilityCount: analyzedResults.filter(function (a) {
+        return (
+          a.reliability && a.reliability.score >= 6 && a.reliability.score < 8
+        );
+      }).length,
+      lowReliabilityCount: analyzedResults.filter(function (a) {
+        return a.reliability && a.reliability.score < 6;
+      }).length,
+      averageReliability: (
+        analyzedResults.reduce(function (sum, a) {
+          return sum + (a.reliability ? a.reliability.score : 5);
+        }, 0) / analyzedResults.length
+      ).toFixed(1),
+    },
+    aiGenerationRisk: {
+      highRiskCount: aiHighRisk,
+      mediumRiskCount: aiMediumRisk,
+      lowRiskCount: aiLowRisk,
+    },
+    technicalConsistency: {
+      hasConflicts:
+        analyzedResults.technicalFactValidation &&
+        Object.keys(analyzedResults.technicalFactValidation.categories).some(
+          function (cat) {
+            return (
+              analyzedResults.technicalFactValidation.categories[cat].conflicts
+                .length > 0
+            );
+          },
+        ),
+      conflictCategories: analyzedResults.technicalFactValidation
+        ? Object.keys(
+            analyzedResults.technicalFactValidation.categories,
+          ).filter(function (cat) {
+            return (
+              analyzedResults.technicalFactValidation.categories[cat].conflicts
+                .length > 0
+            );
+          })
+        : [],
+    },
+    contradictions: {
+      total: contradictions.length,
+      highSeverity: contradictions.filter(function (c) {
+        return c.severity === "high";
+      }).length,
+      mediumSeverity: contradictions.filter(function (c) {
+        return c.severity === "medium";
+      }).length,
+    },
+  };
+}
+
+// Generate contradiction report section
+function generateContradictionReport(contradictions, analyzedResults) {
+  var report = "";
+
+  if (contradictions.length === 0) {
+    report += "### 10.3 矛盾検出結果\n\n";
+    report +=
+      "> ✅ **矛盾なし**: 情報源間に重大な矛盾は検出されませんでした。\n\n";
+    return report;
+  }
+
+  report += "### 10.3 矛盾検出結果\n\n";
+  report +=
+    "> ⚠️ **" +
+    contradictions.length +
+    "件の矛盾を検出**: 情報源間で矛盾する記述が見つかりました。\n\n";
+
+  // Group by severity
+  var highSeverity = contradictions.filter(function (c) {
+    return c.severity === "high";
+  });
+  var mediumSeverity = contradictions.filter(function (c) {
+    return c.severity === "medium";
+  });
+  var lowSeverity = contradictions.filter(function (c) {
+    return c.severity === "low";
+  });
+
+  if (highSeverity.length > 0) {
+    report += "#### 🔴 高度な矛盾 (" + highSeverity.length + "件)\n\n";
+    report += "情報源間で大きな食い違いがあります。確認が必要です。\n\n";
+
+    for (var i = 0; i < highSeverity.length; i++) {
+      var c = highSeverity[i];
+      var sourceA = analyzedResults[c.sourceA];
+      var sourceB = analyzedResults[c.sourceB];
+      report += "- **" + c.fact + "**\n";
+      report +=
+        "  - 情報源[" +
+        (c.sourceA + 1) +
+        "]: " +
+        c.valueA +
+        " (" +
+        sourceA.result.title +
+        ")\n";
+      report +=
+        "  - 情報源[" +
+        (c.sourceB + 1) +
+        "]: " +
+        c.valueB +
+        " (" +
+        sourceB.result.title +
+        ")\n\n";
+    }
+  }
+
+  if (mediumSeverity.length > 0) {
+    report += "#### 🟡 中程度の矛盾 (" + mediumSeverity.length + "件)\n\n";
+
+    for (var i = 0; i < mediumSeverity.length; i++) {
+      var c = mediumSeverity[i];
+      var sourceA = analyzedResults[c.sourceA];
+      var sourceB = analyzedResults[c.sourceB];
+      report += "- **" + c.fact + "**\n";
+      report +=
+        "  - 情報源[" + (c.sourceA + 1) + "]: " + (c.valueA || c.dateA) + "\n";
+      report +=
+        "  - 情報源[" +
+        (c.sourceB + 1) +
+        "]: " +
+        (c.valueB || c.dateB) +
+        "\n\n";
+    }
+  }
+
+  if (lowSeverity.length > 0) {
+    report += "#### 🟢 軽微な矛盾 (" + lowSeverity.length + "件)\n\n";
+    report += "軽微な違いですが、注意が必要です。\n\n";
+
+    for (var i = 0; i < Math.min(5, lowSeverity.length); i++) {
+      var c = lowSeverity[i];
+      report += "- " + c.fact + ": " + c.valueA + " vs " + c.valueB + "\n";
+    }
+    if (lowSeverity.length > 5) {
+      report += "  ... 他 " + (lowSeverity.length - 5) + "件\n";
+    }
+    report += "\n";
+  }
+
+  return report;
+}
+
+// Generate temporal analysis report section
+function generateTemporalReport(trends, results) {
+  var report = "### 10.1 時系列分析\n\n";
+
+  if (trends.oldestDate && trends.newestDate) {
+    report +=
+      "**期間**: " + trends.oldestDate + " 〜 " + trends.newestDate + "\n\n";
+    report += "**傾向**: ";
+
+    switch (trends.recentTrend) {
+      case "increasing":
+        report += "📈 増加傾向（最近の情報が多い）\n\n";
+        break;
+      case "decreasing":
+        report += "📉 減少傾向（最近の情報が少ない）\n\n";
+        break;
+      default:
+        report += "➡️ 安定（情報が均等に分布）\n\n";
+    }
+  } else {
+    report += "**期間**: 不明（日付情報を抽出できませんでした）\n\n";
+  }
+
+  // Year distribution
+  if (Object.keys(trends.byYear).length > 0) {
+    report += "**年別分布**:\n\n";
+    var years = Object.keys(trends.byYear).sort();
+    for (var i = 0; i < years.length; i++) {
+      var year = years[i];
+      report += "- " + year + "年: " + trends.byYear[year] + "件\n";
+    }
+    report += "\n";
+  }
+
+  // Recent sources
+  var recentSources = results.filter(function (r) {
+    return r.isRecent;
+  });
+  if (recentSources.length > 0) {
+    report += "**最新の情報源** (" + recentSources.length + "件):\n\n";
+    for (var i = 0; i < Math.min(5, recentSources.length); i++) {
+      var r = recentSources[i];
+      report +=
+        "- [" +
+        (i + 1) +
+        "] " +
+        r.title +
+        " (鮮度スコア: " +
+        r.freshnessScore.toFixed(2) +
+        ")\n";
+    }
+    if (recentSources.length > 5) {
+      report += "  ... 他 " + (recentSources.length - 5) + "件\n";
+    }
+    report += "\n";
+  }
+
+  return report;
+}
+
+// ============================================================================
+// NEW: Query Expansion Functions
+// ============================================================================
+
+// Generate expanded search queries from original query
+function expandSearchQuery(originalQuery) {
+  console.log("  Expanding query for multi-angle search...");
+
+  var expansions = [];
+
+  // Use LLM to generate query expansions
+  var expansionPrompt =
+    "以下の検索クエリについて、包括的な調査を行うための検索クエリの拡張を提案してください。\n\n" +
+    "【タスク】\n" +
+    "以下のカテゴリごとに1〜2つの検索クエリを生成してください：\n" +
+    "1. 基本情報 - 定義、概要、歴史\n" +
+    "2. 技術的詳細 - 仕様、アーキテクチャ、実装\n" +
+    "3. 比較・評価 - 他との比較、レビュー、評価\n" +
+    "4. 最新動向 - ニュース、アップデート、今後の展望\n" +
+    "5. 課題・問題 - 既知の問題、課題、改善点\n\n" +
+    "【重要】\n" +
+    "- クエリは簡潔に（3〜8語程度）\n" +
+    "- 専門用語や技術的な用語を含める\n" +
+    "- 日本語と英語の両方を含める\n" +
+    "- 元のクエリを含めること\n\n" +
+    "【出力形式】JSON配列のみ:\n" +
+    '[{"category":"basic","query":"検索クエリ1"},{"category":"technical","query":"検索クエリ2"},...]';
+
+  try {
+    var expansionResponse = iniad_ai_mop.chat(
+      "Generate search query expansions. Output JSON array only.",
+      expansionPrompt,
+    );
+
+    expansionResponse = expansionResponse
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = expansionResponse.indexOf("[");
+    var jsonEnd = expansionResponse.lastIndexOf("]") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      expansions = JSON.parse(expansionResponse.slice(jsonStart, jsonEnd));
+    }
+
+    console.log("    Generated " + expansions.length + " expanded queries");
+  } catch (e) {
+    console.log("    ⚠ Query expansion failed: " + e.message);
+    // Fallback to manual expansions
+    expansions = [
+      { category: "basic", query: originalQuery },
+      { category: "basic", query: originalQuery + " 概要" },
+      { category: "basic", query: originalQuery + " history" },
+      { category: "technical", query: originalQuery + " 仕様" },
+      { category: "technical", query: originalQuery + " 設計" },
+      { category: "comparison", query: originalQuery + " 比較" },
+      { category: "comparison", query: originalQuery + " review" },
+      { category: "trend", query: originalQuery + " 最新" },
+      { category: "trend", query: originalQuery + " news" },
+      { category: "problem", query: originalQuery + " 課題" },
+      { category: "problem", query: originalQuery + " issues" },
+    ];
+  }
+
+  // Ensure original query is first
+  var finalQueries = [{ category: "original", query: originalQuery }];
+  for (var i = 0; i < expansions.length; i++) {
+    if (expansions[i].query !== originalQuery) {
+      finalQueries.push(expansions[i]);
+    }
+  }
+
+  return finalQueries;
+}
+
+// ============================================================================
+// NEW: Source Reliability Scoring Functions
+// ============================================================================
+
+// Calculate reliability score for a source
+function calculateSourceReliability(result) {
+  var score = 5.0; // Base score
+  var reasons = [];
+  var domain = (result.domain || "").toLowerCase();
+  var url = (result.url || "").toLowerCase();
+  var title = (result.title || "").toLowerCase();
+
+  // High trust domains
+  var highTrustDomains = [
+    "github.com",
+    "gitlab.com",
+    "bitbucket.org", // Official code
+    "docs.microsoft.com",
+    "developer.mozilla.org", // Official docs
+    "w3.org",
+    "ietf.org",
+    "ecma-international.org", // Standards
+    "stackexchange.com",
+    "stackoverflow.com", // Expert Q&A
+    "medium.com",
+    "dev.to", // Tech blogs
+    "juejin.cn",
+    "qiita.com",
+    "zenn.dev", // Developer communities
+  ];
+
+  // Academic sources
+  var academicDomains = [
+    "scholar.google.com",
+    "arxiv.org",
+    "researchgate.net",
+    "acm.org",
+    "ieee.org",
+    "springer.com",
+    "sciencedirect.com",
+  ];
+
+  // Official documentation patterns
+  var officialPatterns = [
+    "/docs/",
+    "/documentation/",
+    "/api/",
+    "/reference/",
+    "developer.",
+    "developers.",
+    "docs.",
+  ];
+
+  // Low trust indicators
+  var lowTrustPatterns = [
+    "spam",
+    "clickbait",
+    "fake",
+    "hoax",
+    "scam",
+    "ads",
+    "affiliate",
+    "sponsored",
+  ];
+
+  // Check high trust domains
+  for (var i = 0; i < highTrustDomains.length; i++) {
+    if (domain.indexOf(highTrustDomains[i]) >= 0) {
+      score += 2.0;
+      reasons.push("信頼できる技術プラットフォーム");
+      break;
+    }
+  }
+
+  // Check academic sources
+  for (var j = 0; j < academicDomains.length; j++) {
+    if (domain.indexOf(academicDomains[j]) >= 0) {
+      score += 3.0;
+      reasons.push("学術的情報源");
+      break;
+    }
+  }
+
+  // Check for official documentation
+  for (var k = 0; k < officialPatterns.length; k++) {
+    if (url.indexOf(officialPatterns[k]) >= 0) {
+      score += 1.5;
+      reasons.push("公式ドキュメント");
+      break;
+    }
+  }
+
+  // Low trust indicators
+  for (var l = 0; l < lowTrustPatterns.length; l++) {
+    if (title.indexOf(lowTrustPatterns[l]) >= 0) {
+      score -= 1.5;
+      reasons.push("低信頼度の可能性");
+      break;
+    }
+  }
+
+  // HTTPS bonus
+  if (url.indexOf("https://") === 0) {
+    score += 0.5;
+  }
+
+  // Age bonus (based on content)
+  if (result.pageContent) {
+    var recentYears = ["2024", "2025"];
+    for (var m = 0; m < recentYears.length; m++) {
+      if (result.pageContent.indexOf(recentYears[m]) >= 0) {
+        score += 0.3;
+        break;
+      }
+    }
+  }
+
+  // Depth bonus (longer content suggests comprehensive coverage)
+  if (result.pageContent && result.pageContent.length > 2000) {
+    score += 0.5;
+  }
+
+  // Clamp score
+  score = Math.max(1.0, Math.min(10.0, score));
+
+  return {
+    score: score,
+    level: score >= 8 ? "high" : score >= 6 ? "medium" : "low",
+    reasons: reasons,
+  };
+}
+
+// ============================================================================
+// NEW: Cross-Reference Verification Functions
+// ============================================================================
+
+// Verify facts across multiple sources
+function verifyCrossSource(analyzedResults, threshold) {
+  if (!threshold) threshold = 2; // Minimum sources to confirm
+
+  console.log("  Performing cross-reference verification...");
+
+  var factMap = {};
+  var verifiedFacts = [];
+  var unverifiedFacts = [];
+
+  // Collect all facts from all sources
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var facts = extractStructuredFacts(result.factList);
+
+    for (var j = 0; j < facts.length; j++) {
+      var fact = facts[j];
+      var key = fact.normalized;
+
+      if (!factMap[key]) {
+        factMap[key] = {
+          original: fact.original,
+          keyPhrase: fact.keyPhrase,
+          sources: [],
+          value: fact.value,
+          date: fact.date,
+          count: 0,
+        };
+      }
+
+      factMap[key].sources.push(i);
+      factMap[key].count++;
+    }
+  }
+
+  // Classify facts
+  Object.keys(factMap).forEach(function (key) {
+    var fact = factMap[key];
+    if (fact.count >= threshold) {
+      verifiedFacts.push({
+        fact: fact.keyPhrase,
+        original: fact.original,
+        sourceCount: fact.count,
+        sources: fact.sources,
+        confidence: Math.min(1.0, (fact.count / analyzedResults.length) * 2),
+      });
+    } else {
+      unverifiedFacts.push({
+        fact: fact.keyPhrase,
+        sourceCount: fact.count,
+        sources: fact.sources,
+      });
+    }
+  });
+
+  console.log(
+    "    Verified: " +
+      verifiedFacts.length +
+      " | Unverified: " +
+      unverifiedFacts.length,
+  );
+
+  return {
+    verified: verifiedFacts,
+    unverified: unverifiedFacts,
+    total: Object.keys(factMap).length,
+  };
+}
+
+// ============================================================================
+// NEW: Academic Citation Format Functions
+// ============================================================================
+
+// Generate academic-style citations
+function generateAcademicCitations(searchResults, analyzedResults) {
+  var citations = [];
+
+  for (var i = 0; i < searchResults.length; i++) {
+    var result = searchResults[i];
+    var analyzed = analyzedResults[i];
+    var citationNumber = i + 1;
+
+    var citation = "";
+
+    if (result.isLocalFile) {
+      // Local file citation
+      citation =
+        "[" +
+        citationNumber +
+        "] " +
+        (result.fileName || result.title) +
+        ". " +
+        "Local file: " +
+        result.filePath +
+        ". ";
+    } else {
+      // Web source citation
+      var authors = extractAuthors(result.pageContent, result);
+      var date = extractPublicationDate(result);
+      var title = result.pageTitle || result.title;
+      var domain = result.domain;
+
+      if (authors.length > 0) {
+        citation += "[" + citationNumber + "] " + authors + ". ";
+      } else {
+        citation += "[" + citationNumber + "] ";
+      }
+
+      citation += '"' + title + '". ';
+
+      if (date) {
+        citation += date + ". ";
+      }
+
+      citation += domain + ". " + result.url;
+
+      // Access date
+      var today = new Date().toISOString().split("T")[0];
+      citation += ". Accessed: " + today + ".";
+    }
+
+    citations.push(citation);
+  }
+
+  return citations;
+}
+
+// Extract authors from content
+function extractAuthors(content, result) {
+  // Simple heuristic - look for author patterns
+  var patterns = [
+    /by\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /author:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /筆者:\s*(.+?)(?:\n|$)/,
+  ];
+
+  for (var i = 0; i < patterns.length; i++) {
+    var match = content.match(patterns[i]);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return "";
+}
+
+// Extract publication date
+function extractPublicationDate(result) {
+  if (result.extractedDate) {
+    return result.extractedDate;
+  }
+
+  // Try to extract from content
+  var content = result.pageContent || "";
+  var date = extractDateFromContent(content, result.url);
+
+  if (date) {
+    return date.toISOString().split("T")[0];
+  }
+
+  return "";
+}
+
+// ============================================================================
+// NEW: Insight Generation Functions
+// ============================================================================
+
+// Generate insights from analyzed results (with fallback mechanism)
+function extractInsights(analyzedResults, searchQuery) {
+  console.log("  Extracting insights and patterns...");
+
+  var insightPrompt =
+    "あなたは調査分析の専門家です。収集した情報を深く分析し、表面的な要約ではない「洞察」を抽出してください。\n\n" +
+    "【分析対象】\n" +
+    "トピック: " +
+    searchQuery +
+    "\n" +
+    "情報源数: " +
+    analyzedResults.length +
+    "\n\n" +
+    "【抽出すべき洞察のカテゴリ】\n" +
+    "1. パターン認識\n" +
+    "   - 複数の情報源で見られる共通の傾向\n" +
+    "   - 暗黙の前提や仮定\n" +
+    "   - 反復される構造や関係性\n\n" +
+    "2. 予測・トレンド分析\n" +
+    "   - 現在のデータに基づく将来の展望\n" +
+    "   - 技術的進化の方向性\n" +
+    "   - 市場の変化予測\n\n" +
+    "3. 未解決の問題\n" +
+    "   - 複数の情報源で言及されている課題\n" +
+    "   - 懸念点やリスク\n" +
+    "   - 解決策が提示されていない問題\n\n" +
+    "4. 革新的なアプローチ\n" +
+    "   - 従来の方法と異なるアプローチ\n" +
+    "   - 新しいパラダイムや考え方\n" +
+    "   - ユニークな解決策\n\n" +
+    "5. 関連性の発見\n" +
+    "   - 一見無関係に見える要素の関連性\n" +
+    "   - 隠れたつながり\n" +
+    "   - 類似した概念の統合\n\n" +
+    "【重要】\n" +
+    "- 単なる事実の羅列ではなく、分析・統合・解釈を含めること\n" +
+    "- 情報源番号を引用すること\n" +
+    "- 具体的な例を挙げつつ、普遍的な洞察を提示すること\n" +
+    "- 1000-1500語で詳細に記述すること\n\n" +
+    "【出力形式】\n" +
+    "マークダウン形式で、カテゴリごとに見出しをつけて整理すること。";
+
+  var allFacts = analyzedResults
+    .map(function (a, i) {
+      return "[" + (i + 1) + "] " + a.result.title + ":\n" + a.factList;
+    })
+    .join("\n\n---\n\n");
+
+  // リトライ機構を追加
+  var MAX_RETRIES = 3;
+  for (var attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      var insights = retryWithBackoff(
+        function () {
+          return iniad_ai_mop.chat(
+            "You are an expert researcher generating deep insights. Write in Japanese with formal academic tone. " +
+              "【言語制約】すべての出力は日本語で記述してください。",
+            insightPrompt + "\n\n【情報源】\n" + allFacts.substring(0, 8000),
+          );
+        },
+        2,
+        1000,
+      );
+
+      if (insights && insights.length > 100) {
+        console.log("    ✓ Generated insights");
+        return insights;
+      }
+    } catch (e) {
+      console.log(
+        "    ⚠ Insight generation attempt " + attempt + " failed: " + e.message,
+      );
+      if (attempt < MAX_RETRIES) {
+        sleep(2000 * attempt);
+      }
+    }
+  }
+
+  // フォールバック: 既存データから簡易インサイトを生成
+  console.log("    → Generating fallback insights from collected data...");
+  return generateFallbackInsights(analyzedResults, searchQuery);
+}
+
+// フォールバックインサイト生成（LLMなしで既存データから構築）
+function generateFallbackInsights(analyzedResults, searchQuery) {
+  var fallbackContent = "## 洞察分析（自動生成）\n\n";
+  fallbackContent +=
+    "*注: 詳細なAI分析が利用できなかったため、収集データに基づく自動要約を表示しています。*\n\n";
+
+  // カテゴリ別の集計
+  var categoryMap = {};
+  var categoryNames = {
+    official: "公式情報",
+    news: "ニュース・メディア",
+    review: "レビュー・評価",
+    technical: "技術情報",
+    academic: "学術・研究",
+    community: "コミュニティ",
+    other: "その他",
+  };
+
+  analyzedResults.forEach(function (a) {
+    var cat = a.category || "other";
+    if (!categoryMap[cat]) {
+      categoryMap[cat] = [];
+    }
+    categoryMap[cat].push({
+      title: a.result.title,
+      url: a.result.url,
+    });
+  });
+
+  // カテゴリ別のサマリー
+  fallbackContent += "### 情報源の分布\n\n";
+  for (var cat in categoryMap) {
+    var catName = categoryNames[cat] || cat;
+    fallbackContent +=
+      "- **" + catName + "**: " + categoryMap[cat].length + "件の情報源\n";
+  }
+  fallbackContent += "\n";
+
+  // 主要な情報源のリスト
+  fallbackContent += "### 主要な情報源\n\n";
+  var topSources = analyzedResults.slice(0, 10);
+  topSources.forEach(function (a, i) {
+    fallbackContent += i + 1 + ". **" + a.result.title + "**\n";
+    if (a.factList) {
+      var firstFact = a.factList.split("\n").filter(function (f) {
+        return f.trim().length > 0;
+      })[0];
+      if (firstFact) {
+        fallbackContent += "   - " + firstFact.substring(0, 150) + "...\n";
+      }
+    }
+  });
+  fallbackContent += "\n";
+
+  // 検索クエリに関するパターン
+  fallbackContent += "### パターン認識\n\n";
+  fallbackContent +=
+    "「" +
+    searchQuery +
+    "」に関して、" +
+    analyzedResults.length +
+    "件の情報源を収集しました。";
+  if (categoryMap.official && categoryMap.official.length > 0) {
+    fallbackContent +=
+      "公式情報源が" +
+      categoryMap.official.length +
+      "件含まれており、信頼性の高いデータが得られています。";
+  }
+  fallbackContent += "\n\n";
+
+  fallbackContent += "### 今後の調査推奨事項\n\n";
+  fallbackContent +=
+    "- 詳細なAI分析を実行するため、ネットワーク接続を確認してください\n";
+  fallbackContent +=
+    "- 追加の検索クエリを使用して情報を拡充することを推奨します\n";
+
+  return fallbackContent;
+}
+
+// ============================================================================
+// NEW: Interactive Exploration Functions
+// ============================================================================
+
+// Interactive exploration phase
+function performInteractiveExploration(analyzedResults, searchQuery) {
+  console.log("");
+  console.log("━━━ Phase X: Interactive Exploration ━━━");
+
+  // Generate clarification questions
+  var clarificationPrompt =
+    "あなたは調査のファシリテーターです。「" +
+    searchQuery +
+    "」について調査を深めるための質問を生成してください。\n\n" +
+    "【現在の状況】\n" +
+    "情報源数: " +
+    analyzedResults.length +
+    "\n" +
+    "収集済みの事実: 既に基本的な情報は収集済み\n\n" +
+    "【タスク】\n" +
+    "以下の観点から、調査を深めるための質問を3つ生成してください：\n" +
+    "1. 不明点の特定 - 詳細が不足している点\n" +
+    "2. 興味深い視点 - さらに掘り下げる価値のある点\n" +
+    "3. 代替アプローチ - 別の角度からのアプローチ\n\n" +
+    "【出力形式】JSON配列のみ:\n" +
+    '[{"question":"質問文","category":"不明点|興味深い視点|代替アプローチ","priority":"high|medium"}]';
+
+  try {
+    var response = iniad_ai_mop.chat(
+      "Generate clarification questions. Output JSON array only.",
+      clarificationPrompt,
+    );
+
+    response = response
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = response.indexOf("[");
+    var jsonEnd = response.lastIndexOf("]") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      var questions = JSON.parse(response.slice(jsonStart, jsonEnd));
+
+      console.log("  Clarification Questions:");
+      for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        var priorityIcon = q.priority === "high" ? "🔴" : "🟡";
+        console.log("    " + priorityIcon + " Q" + (i + 1) + ": " + q.question);
+        console.log("       (" + q.category + ")");
+      }
+
+      // Note: In a real implementation, this would pause for user input
+      console.log("");
+      console.log(
+        "  💡 Note: This is an automated run. For interactive exploration,",
+      );
+      console.log(
+        "     provide these questions to the user and perform additional",
+      );
+      console.log("     searches based on their priorities.");
+    }
+
+    return questions || [];
+  } catch (e) {
+    console.log("  ⚠ Interactive exploration setup failed: " + e.message);
+    return [];
+  }
+}
+
+// ============================================================================
+// NEW: Metadata Extraction Functions
+// ============================================================================
+
+// Extract rich metadata from sources
+function extractRichMetadata(result, pageTab) {
+  var metadata = {
+    authority: 0,
+    socialSignals: {},
+    technicalMetrics: {},
+    contentQuality: {},
+  };
+
+  if (!pageTab || !result.url) return metadata;
+
+  try {
+    // Extract authority indicators
+    var authorityPrompt =
+      "以下のウェブページの権威性を評価するためのメタデータを抽出してください。\n\n" +
+      "【ページ情報】\n" +
+      "URL: " +
+      result.url +
+      "\n" +
+      "タイトル: " +
+      result.title +
+      "\n" +
+      "ドメイン: " +
+      result.domain +
+      "\n" +
+      "コンテンツ: " +
+      (result.pageContent || "").substring(0, 500) +
+      "\n\n" +
+      "【抽出項目】\n" +
+      "1. 著者・組織情報（ページ内から）\n" +
+      "2. 最終更新日\n" +
+      "3. 関連リンクの数（外部リンク）\n" +
+      "4. キーワード密度（重要キーワード）\n" +
+      "5. 構造化データの有無\n\n" +
+      "【出力形式】JSONのみ:\n" +
+      '{"author":"","lastUpdated":"","externalLinks":0,"keywords":[],"hasStructuredData":false}';
+
+    var metaResponse = iniad_ai_mop.chat(
+      "Extract metadata from webpage. Output JSON only.",
+      authorityPrompt,
+    );
+
+    metaResponse = metaResponse
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    var jsonStart = metaResponse.indexOf("{");
+    var jsonEnd = metaResponse.lastIndexOf("}") + 1;
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      var parsed = JSON.parse(metaResponse.slice(jsonStart, jsonEnd));
+
+      // Authority score calculation
+      var score = 0;
+      if (parsed.author) score += 2;
+      if (parsed.lastUpdated) score += 1.5;
+      if (parsed.externalLinks > 10) score += 1;
+      if (parsed.hasStructuredData) score += 1.5;
+      if (parsed.keywords && parsed.keywords.length > 3) score += 1;
+
+      metadata.authority = Math.min(10, score);
+      metadata.author = parsed.author;
+      metadata.lastUpdated = parsed.lastUpdated;
+      metadata.externalLinks = parsed.externalLinks;
+      metadata.keywords = parsed.keywords;
+      metadata.hasStructuredData = parsed.hasStructuredData;
+    }
+  } catch (e) {
+    console.log("    ⚠ Metadata extraction failed: " + e.message);
+  }
+
+  return metadata;
+}
+
+// ============================================================================
+// NEW: Knowledge Graph Functions
+// ============================================================================
+
+// Build knowledge graph from analyzed results
+function buildKnowledgeGraph(analyzedResults) {
+  console.log("  Building knowledge graph...");
+
+  var graph = {
+    nodes: [],
+    edges: [],
+  };
+
+  var entityMap = {};
+
+  // Extract entities from each source
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var content = result.result.pageContent || "";
+    var facts = result.factList || "";
+
+    // Extract entities (people, organizations, products, concepts)
+    var entityPrompt =
+      "以下のテキストから重要なエンティティ（概念・人物・組織・製品・技術）を抽出してください。\n\n" +
+      "【テキスト】\n" +
+      facts +
+      "\n" +
+      content.substring(0, 1000) +
+      "\n\n" +
+      "【タスク】\n" +
+      "1. 固有名詞（人名、組織名、製品名）を抽出\n" +
+      "2. 重要な技術的用語・概念を抽出\n" +
+      "3. 各エンティティのタイプを分類\n" +
+      "4. 関連する情報源番号を記録\n\n" +
+      "【出力形式】JSON配列のみ:\n" +
+      '[{"name":"エンティティ名","type":"person|org|product|concept|technology","sources":[1,3]},...]';
+
+    try {
+      var entityResponse = iniad_ai_mop.chat(
+        "Extract entities from text. Output JSON array only.",
+        entityPrompt,
+      );
+
+      entityResponse = entityResponse
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
+      var jsonStart = entityResponse.indexOf("[");
+      var jsonEnd = entityResponse.lastIndexOf("]") + 1;
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        var entities = JSON.parse(entityResponse.slice(jsonStart, jsonEnd));
+
+        for (var j = 0; j < entities.length; j++) {
+          var entity = entities[j];
+          var key = entity.name.toLowerCase();
+
+          if (!entityMap[key]) {
+            entityMap[key] = {
+              id: "node_" + graph.nodes.length,
+              name: entity.name,
+              type: entity.type,
+              sources: [],
+              weight: 0,
+            };
+            graph.nodes.push(entityMap[key]);
+          }
+
+          // Add this source to the entity
+          var sourceId = i + 1;
+          if (entityMap[key].sources.indexOf(sourceId) < 0) {
+            entityMap[key].sources.push(sourceId);
+            entityMap[key].weight++;
+          }
+        }
+      }
+    } catch (e) {
+      console.log("    ⚠ Entity extraction failed for source " + (i + 1));
+    }
+  }
+
+  // Build edges based on co-occurrence
+  var nodeList = graph.nodes;
+  for (var k = 0; k < nodeList.length; k++) {
+    for (var l = k + 1; l < nodeList.length; l++) {
+      var nodeA = nodeList[k];
+      var nodeB = nodeList[l];
+
+      // Check if they appear together in sources
+      var commonSources = nodeA.sources.filter(function (s) {
+        return nodeB.sources.indexOf(s) >= 0;
+      });
+
+      if (commonSources.length > 0) {
+        graph.edges.push({
+          source: nodeA.id,
+          target: nodeB.id,
+          weight: commonSources.length,
+          sources: commonSources,
+        });
+      }
+    }
+  }
+
+  console.log(
+    "    ✓ Built graph with " +
+      graph.nodes.length +
+      " nodes, " +
+      graph.edges.length +
+      " edges",
+  );
+
+  return graph;
+}
+
+// Generate knowledge graph visualization (text-based)
+function generateKnowledgeGraphReport(graph) {
+  var report = "";
+
+  report += "### Knowledge Graph\n\n";
+  report += "**エンティティ数**: " + graph.nodes.length + "\n";
+  report += "**関連数**: " + graph.edges.length + "\n\n";
+
+  // Group nodes by type
+  var nodesByType = {};
+  graph.nodes.forEach(function (node) {
+    if (!nodesByType[node.type]) nodesByType[node.type] = [];
+    nodesByType[node.type].push(node);
+  });
+
+  Object.keys(nodesByType).forEach(function (type) {
+    report +=
+      "#### " + type.toUpperCase() + " (" + nodesByType[type].length + ")\n\n";
+    nodesByType[type].forEach(function (node) {
+      report += "- " + node.name + " (出現: " + node.sources.length + "回)\n";
+    });
+    report += "\n";
+  });
+
+  // Top relationships
+  if (graph.edges.length > 0) {
+    report += "#### 主要な関連\n\n";
+    var sortedEdges = graph.edges.slice().sort(function (a, b) {
+      return b.weight - a.weight;
+    });
+
+    for (var i = 0; i < Math.min(10, sortedEdges.length); i++) {
+      var edge = sortedEdges[i];
+      var nodeA = graph.nodes.find(function (n) {
+        return n.id === edge.source;
+      });
+      var nodeB = graph.nodes.find(function (n) {
+        return n.id === edge.target;
+      });
+
+      if (nodeA && nodeB) {
+        report +=
+          "- " + nodeA.name + " ↔ " + nodeB.name + " (" + edge.weight + ")\n";
+      }
+    }
+  }
+
+  return report;
+}
+
+// ============================================================================
+// NEW: Quality Assurance Functions
+// ============================================================================
+
+// Perform comprehensive quality check
+function performQualityCheck(analyzedResults, report, searchResults) {
+  console.log("");
+  console.log("━━━ Phase X: Quality Assurance ━━━");
+
+  var qaResults = {
+    overallScore: 0,
+    metrics: {},
+  };
+
+  // 1. Source Diversity
+  var domains = {};
+  searchResults.forEach(function (r) {
+    if (r.domain && !r.isLocalFile) {
+      domains[r.domain] = (domains[r.domain] || 0) + 1;
+    }
+  });
+  var diversityScore = Math.min(10, Object.keys(domains).length);
+  qaResults.metrics.sourceDiversity = {
+    score: diversityScore,
+    domainCount: Object.keys(domains).length,
+    topDomains: Object.keys(domains)
+      .sort(function (a, b) {
+        return domains[b] - domains[a];
+      })
+      .slice(0, 3),
+  };
+
+  // 2. Temporal Relevance
+  var recentSources = searchResults.filter(function (r) {
+    return r.isRecent;
+  });
+  var temporalScore = (recentSources.length / searchResults.length) * 10;
+  qaResults.metrics.temporalRelevance = {
+    score: temporalScore,
+    recentCount: recentSources.length,
+    totalCount: searchResults.length,
+  };
+
+  // 3. Content Depth
+  var avgContentLength =
+    analyzedResults.reduce(function (sum, a) {
+      return sum + (a.result.pageContent || "").length;
+    }, 0) / analyzedResults.length;
+  var depthScore = Math.min(10, avgContentLength / 500);
+  qaResults.metrics.contentDepth = {
+    score: depthScore,
+    avgLength: avgContentLength,
+  };
+
+  // 4. Citation Completeness
+  var citationCount = (report.match(/\[\d+\]/g) || []).length;
+  var completenessScore = Math.min(10, citationCount / 10);
+  qaResults.metrics.citationCompleteness = {
+    score: completenessScore,
+    citationCount: citationCount,
+  };
+
+  // 5. Cross-Source Validation
+  var crossRef = verifyCrossSource(analyzedResults, 2);
+  var validationScore = (crossRef.verified.length / crossRef.total) * 10;
+  qaResults.metrics.crossSourceValidation = {
+    score: validationScore,
+    verified: crossRef.verified.length,
+    total: crossRef.total,
+  };
+
+  // Calculate overall score
+  var scores = Object.keys(qaResults.metrics).map(function (key) {
+    return qaResults.metrics[key].score;
+  });
+  qaResults.overallScore =
+    scores.reduce(function (a, b) {
+      return a + b;
+    }, 0) / scores.length;
+
+  console.log(
+    "  Overall Quality Score: " + qaResults.overallScore.toFixed(1) + "/10",
+  );
+  Object.keys(qaResults.metrics).forEach(function (key) {
+    var metric = qaResults.metrics[key];
+    console.log("    " + key + ": " + metric.score.toFixed(1) + "/10");
+  });
+
+  return qaResults;
+}
+
+// Generate quality assurance report section
+function generateQualityReport(qaResults) {
+  var report = "";
+
+  report += "## 11. Quality Assurance\n\n";
+  report += "> **品質評価結果**\n>\n";
+
+  var grade = "";
+  if (qaResults.overallScore >= 9) grade = "A (優秀)";
+  else if (qaResults.overallScore >= 7) grade = "B (良好)";
+  else if (qaResults.overallScore >= 5) grade = "C (標準)";
+  else grade = "D (要改善)";
+
+  report +=
+    "> 総合評価: **" +
+    grade +
+    "** (" +
+    qaResults.overallScore.toFixed(1) +
+    "/10)\n\n";
+
+  report += "### 11.1 評価指標\n\n";
+  report += "| 評価項目 | スコア | 詳細 |\n";
+  report += "|---------|--------|------|\n";
+
+  Object.keys(qaResults.metrics).forEach(function (key) {
+    var metric = qaResults.metrics[key];
+    var score = metric.score.toFixed(1);
+    var details = "";
+
+    switch (key) {
+      case "sourceDiversity":
+        details = metric.domainCount + "つのドメイン";
+        break;
+      case "temporalRelevance":
+        details = metric.recentCount + "/" + metric.totalCount + "件が最新";
+        break;
+      case "contentDepth":
+        details = "平均 " + Math.round(metric.avgLength) + " 文字";
+        break;
+      case "citationCompleteness":
+        details = metric.citationCount + "件の引用";
+        break;
+      case "crossSourceValidation":
+        details = metric.verified + "/" + metric.total + "件が複数情報源で確認";
+        break;
+    }
+
+    report += "| " + key + " | " + score + "/10 | " + details + " |\n";
+  });
+
+  report += "\n";
+
+  // Recommendations
+  report += "### 11.2 改善推奨事項\n\n";
+
+  var recommendations = [];
+
+  if (qaResults.metrics.sourceDiversity.score < 6) {
+    recommendations.push(
+      "- 情報源の多様性を向上させてください。特定のドメインに偏りがあります。",
+    );
+  }
+  if (qaResults.metrics.temporalRelevance.score < 6) {
+    recommendations.push(
+      "- より新しい情報源を追加してください。情報の鮮度が不足しています。",
+    );
+  }
+  if (qaResults.metrics.contentDepth.score < 6) {
+    recommendations.push(
+      "- 各情報源の詳細分析を深めてください。コンテンツの深度が不十分です。",
+    );
+  }
+  if (qaResults.metrics.citationCompleteness.score < 6) {
+    recommendations.push(
+      "- 引用情報を充実させてください。出典の明示が不足しています。",
+    );
+  }
+  if (qaResults.metrics.crossSourceValidation.score < 6) {
+    recommendations.push(
+      "- 複数の情報源で事実を確認してください。クロス検証が不十分です。",
+    );
+  }
+
+  if (recommendations.length > 0) {
+    recommendations.forEach(function (rec) {
+      report += rec + "\n";
+    });
+  } else {
+    report += "✅ すべての評価項目で良好な結果が得られました。\n\n";
+  }
+
+  report += "---\n\n";
+
+  return report;
+}
+
+// ============================================================================
+// NEW: Metadata Validation Functions
+// ============================================================================
+
+// 日付・バージョン情報の正規化と検証
+function normalizeAndVerifyMetadata(analyzedResults) {
+  console.log("  Validating date and version metadata...");
+
+  var versionMap = {};
+  var dateMap = {};
+  var extractedVersions = [];
+  var extractedDates = [];
+
+  for (var i = 0; i < analyzedResults.length; i++) {
+    var result = analyzedResults[i];
+    var content = (
+      result.pageContent ||
+      result.result.pageContent ||
+      ""
+    ).substring(0, 5000);
+    var sourceIndex = i + 1;
+
+    // バージョン抽出パターン（例: v11.0.0, Floorp 11, バージョン 11, version 11.0）
+    var versionPatterns = [
+      /v(\d+(?:\.\d+)*)/gi,
+      /version\s*(\d+(?:\.\d+)*)/gi,
+      /バージョン\s*(\d+(?:\.\d+)*)/gi,
+      /Ver\.?\s*(\d+(?:\.\d+)*)/gi,
+    ];
+
+    versionPatterns.forEach(function (pattern) {
+      var matches = content.match(pattern);
+      if (matches) {
+        matches.forEach(function (v) {
+          var normalized = v.replace(/[^\d.]/g, "");
+          if (normalized && normalized.length > 0) {
+            versionMap[normalized] = (versionMap[normalized] || 0) + 1;
+            extractedVersions.push({
+              version: normalized,
+              source: sourceIndex,
+              raw: v,
+            });
+          }
+        });
+      }
+    });
+
+    // 日付抽出パターン
+    var datePatterns = [
+      /(\d{4})[年\/\-](\d{1,2})[月\/\-]?(\d{1,2})?/g,
+      /(\d{4})年(\d{1,2})月/g,
+    ];
+
+    datePatterns.forEach(function (pattern) {
+      var matches = content.match(pattern);
+      if (matches) {
+        matches.forEach(function (d) {
+          dateMap[d] = (dateMap[d] || 0) + 1;
+          extractedDates.push({
+            date: d,
+            source: sourceIndex,
+          });
+        });
+      }
+    });
+  }
+
+  // 最頻出のバージョン・日付を特定
+  var likelyVersion = getMostFrequent(versionMap);
+  var sortedDates = getSortedByFrequency(dateMap);
+
+  var versionConflicts = Object.keys(versionMap).length > 3;
+  var dateConflicts = Object.keys(dateMap).length > 10;
+
+  if (versionConflicts) {
+    console.log(
+      "    ⚠ Version conflicts detected: " +
+        Object.keys(versionMap).length +
+        " different versions",
+    );
+  }
+  if (dateConflicts) {
+    console.log(
+      "    ⚠ Date conflicts detected: " +
+        Object.keys(dateMap).length +
+        " different dates",
+    );
+  }
+  if (likelyVersion) {
+    console.log("    → Most likely version: " + likelyVersion);
+  }
+
+  return {
+    likelyVersion: likelyVersion,
+    likelyDates: sortedDates.slice(0, 5),
+    versionConflicts: versionConflicts,
+    dateConflicts: dateConflicts,
+    allVersions: extractedVersions,
+    allDates: extractedDates,
+  };
+}
+
+// 最頻出の値を取得
+function getMostFrequent(map) {
+  var max = 0;
+  var result = null;
+  for (var key in map) {
+    if (map[key] > max) {
+      max = map[key];
+      result = key;
+    }
+  }
+  return result;
+}
+
+// 頻度順にソート
+function getSortedByFrequency(map) {
+  var arr = [];
+  for (var key in map) {
+    arr.push({ value: key, count: map[key] });
+  }
+  arr.sort(function (a, b) {
+    return b.count - a.count;
+  });
+  return arr.map(function (item) {
+    return item.value;
+  });
+}
+
+// ソース引用のバリデーション
+function validateSourceReferences(report, analyzedResults) {
+  console.log("  Validating source citations...");
+
+  // レポート内の[n]形式の引用を検出
+  var citationPattern = /\[(\d+)\]/g;
+  var citations = [];
+  var match;
+
+  while ((match = citationPattern.exec(report)) !== null) {
+    var num = parseInt(match[1]);
+    if (citations.indexOf(num) < 0) {
+      citations.push(num);
+    }
+  }
+
+  var invalidCitations = [];
+  var validCitations = [];
+
+  citations.forEach(function (num) {
+    if (num < 1 || num > analyzedResults.length) {
+      invalidCitations.push(num);
+    } else {
+      validCitations.push(num);
+    }
+  });
+
+  var coverage = (
+    (validCitations.length / analyzedResults.length) *
+    100
+  ).toFixed(1);
+
+  if (invalidCitations.length > 0) {
+    console.log(
+      "    ⚠ Invalid citations: [" + invalidCitations.join(", ") + "]",
+    );
+  }
+  console.log(
+    "    → Citation coverage: " +
+      coverage +
+      "% (" +
+      validCitations.length +
+      "/" +
+      analyzedResults.length +
+      " sources cited)",
+  );
+
+  return {
+    totalCitations: citations.length,
+    validCount: validCitations.length,
+    invalidCount: invalidCitations.length,
+    invalidCitations: invalidCitations,
+    coverage: parseFloat(coverage),
+    uncitedSources: analyzedResults.length - validCitations.length,
+  };
+}
+
+// レポート内容の品質検証
+function performContentValidation(report, topic, analyzedResults) {
+  console.log("  Performing content validation...");
+
+  var issues = [];
+
+  // 1. トピックの基本定義チェック
+  var firstParagraphs = report.split("\n\n").slice(0, 5).join("\n");
+  var topicRegex = new RegExp(
+    topic.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "gi",
+  );
+  var topicMentions = (firstParagraphs.match(topicRegex) || []).length;
+
+  if (topicMentions < 2) {
+    issues.push({
+      severity: "high",
+      type: "topic_relevance",
+      message: "導入部でトピック「" + topic + "」の言及が不足しています",
+    });
+  }
+
+  // 2. 空セクションチェック
+  var sectionPattern = /^##\s+(.+)$/gm;
+  var sectionMatch;
+  var sections = [];
+
+  while ((sectionMatch = sectionPattern.exec(report)) !== null) {
+    sections.push({
+      title: sectionMatch[1],
+      position: sectionMatch.index,
+    });
+  }
+
+  for (var i = 0; i < sections.length; i++) {
+    var start = sections[i].position;
+    var end =
+      i < sections.length - 1 ? sections[i + 1].position : report.length;
+    var sectionContent = report.substring(start, end);
+    var contentOnly = sectionContent.replace(/^##\s+[^\n]+\n/, "").trim();
+
+    if (contentOnly.length < 50) {
+      issues.push({
+        severity: "medium",
+        type: "empty_section",
+        message: "セクション「" + sections[i].title + "」の内容が不十分です",
+      });
+    }
+  }
+
+  // 3. 「失敗しました」パターンの検出
+  var failurePatterns = [
+    /生成に失敗しました/g,
+    /エラーが発生しました/g,
+    /取得できませんでした/g,
+    /情報が不足しています/g,
+  ];
+
+  failurePatterns.forEach(function (pattern) {
+    var matches = report.match(pattern);
+    if (matches && matches.length > 0) {
+      issues.push({
+        severity: "medium",
+        type: "generation_failure",
+        message: "生成失敗のメッセージが" + matches.length + "件検出されました",
+      });
+    }
+  });
+
+  // 4. 外国語混入チェック（英語以外）
+  // フィンランド語、ドイツ語などの特徴的なパターン
+  var foreignPatterns = [
+    /\b[äöüÄÖÜß]{2,}\b/g, // ドイツ語
+    /\b[åäöÅÄÖ]{2,}\b/g, // フィンランド語/スウェーデン語
+  ];
+
+  foreignPatterns.forEach(function (pattern) {
+    var matches = report.match(pattern);
+    if (matches && matches.length > 2) {
+      issues.push({
+        severity: "low",
+        type: "foreign_language",
+        message: "外国語文字が検出されました（翻訳推奨）",
+      });
+    }
+  });
+
+  // 結果の出力
+  if (issues.length > 0) {
+    console.log("    ⚠ Found " + issues.length + " validation issues:");
+    issues.forEach(function (issue) {
+      var icon =
+        issue.severity === "high"
+          ? "🔴"
+          : issue.severity === "medium"
+            ? "🟡"
+            : "🔵";
+      console.log("      " + icon + " " + issue.message);
+    });
+  } else {
+    console.log("    ✓ No validation issues found");
+  }
+
+  return issues;
+}
+
+// メタデータ検証レポートセクションを生成
+function generateMetadataValidationReport(
+  metadataValidation,
+  citationValidation,
+  contentIssues,
+) {
+  var report = "";
+
+  report += "## 12. データ品質検証\n\n";
+
+  // バージョン・日付の整合性
+  report += "### 12.1 メタデータ整合性\n\n";
+
+  if (metadataValidation.likelyVersion) {
+    report +=
+      "- **推定バージョン**: " + metadataValidation.likelyVersion + "\n";
+  }
+  if (metadataValidation.versionConflicts) {
+    report +=
+      "- ⚠ **バージョン不整合**: 複数の異なるバージョン番号が検出されました\n";
+  }
+  if (metadataValidation.dateConflicts) {
+    report += "- ⚠ **日付不整合**: 多数の異なる日付が検出されました\n";
+  }
+  if (
+    metadataValidation.likelyDates &&
+    metadataValidation.likelyDates.length > 0
+  ) {
+    report +=
+      "- **主要な日付**: " +
+      metadataValidation.likelyDates.slice(0, 3).join(", ") +
+      "\n";
+  }
+  report += "\n";
+
+  // 引用整合性
+  report += "### 12.2 引用整合性\n\n";
+  report += "- **引用カバレッジ**: " + citationValidation.coverage + "%\n";
+  report += "- **有効な引用**: " + citationValidation.validCount + "件\n";
+  if (citationValidation.invalidCount > 0) {
+    report +=
+      "- ⚠ **無効な引用**: " +
+      citationValidation.invalidCount +
+      "件 ([" +
+      citationValidation.invalidCitations.join(", ") +
+      "])\n";
+  }
+  if (citationValidation.uncitedSources > 0) {
+    report +=
+      "- **未引用ソース**: " + citationValidation.uncitedSources + "件\n";
+  }
+  report += "\n";
+
+  // コンテンツ品質
+  if (contentIssues && contentIssues.length > 0) {
+    report += "### 12.3 コンテンツ品質問題\n\n";
+    contentIssues.forEach(function (issue) {
+      var icon =
+        issue.severity === "high"
+          ? "🔴"
+          : issue.severity === "medium"
+            ? "🟡"
+            : "🔵";
+      report += "- " + icon + " " + issue.message + "\n";
     });
     report += "\n";
   }
