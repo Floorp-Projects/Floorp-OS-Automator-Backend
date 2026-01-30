@@ -89,6 +89,17 @@ pub fn thunderbird_get_emails_function() -> PluginFunction {
     }
 }
 
+pub fn thunderbird_activate_floorp_function() -> PluginFunction {
+    PluginFunction {
+        function_id: "app.sapphillon.thunderbird.activateFloorp".to_string(),
+        function_name: "Activate Floorp".to_string(),
+        description: "Brings Floorp to the foreground.".to_string(),
+        permissions: thunderbird_read_permissions(),
+        function_define: None,
+        version: "".to_string(),
+    }
+}
+
 pub fn thunderbird_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.thunderbird".to_string(),
@@ -100,6 +111,7 @@ pub fn thunderbird_plugin_package() -> PluginPackage {
             thunderbird_get_calendar_function(),
             thunderbird_get_profile_function(),
             thunderbird_get_emails_function(),
+            thunderbird_activate_floorp_function(),
         ],
         package_version: env!("CARGO_PKG_VERSION").to_string(),
         deprecated: None,
@@ -155,6 +167,16 @@ pub fn core_thunderbird_get_emails() -> CorePluginFunction {
     )
 }
 
+pub fn core_thunderbird_activate_floorp() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.thunderbird.activateFloorp".to_string(),
+        "Activate Floorp".to_string(),
+        "Brings Floorp to the foreground.".to_string(),
+        op2_thunderbird_activate_floorp(),
+        None,
+    )
+}
+
 pub fn core_thunderbird_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.thunderbird".to_string(),
@@ -164,6 +186,7 @@ pub fn core_thunderbird_plugin_package() -> CorePluginPackage {
             core_thunderbird_get_calendar_events(),
             core_thunderbird_get_profile(),
             core_thunderbird_get_emails(),
+            core_thunderbird_activate_floorp(),
         ],
     )
 }
@@ -190,6 +213,126 @@ fn permission_check(_state: &mut OpState) -> Result<(), JsErrorBox> {
 // ============================================================================
 // Operations Implementation
 // ============================================================================
+
+/// Activates Thunderbird and brings it to the foreground
+fn activate_thunderbird_app() {
+    let script = r#"
+        tell application "Thunderbird"
+            activate
+            set frontmost to true
+        end tell
+        delay 0.8
+    "#;
+
+    let result = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("AppleScript activate_thunderbird failed: {}", String::from_utf8_lossy(&output.stderr));
+            } else {
+                // Note: Logging via eprintln may not be visible; JavaScript side should handle user feedback
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to run AppleScript activate_thunderbird: {}", e);
+        }
+    }
+}
+
+/// Switches Thunderbird to mail view (Ctrl+1)
+/// key code 18 = digit 1
+fn show_mail_view() {
+    let script = r#"
+        tell application "System Events"
+            tell process "Thunderbird"
+                key code 18 using control down
+            end tell
+        end tell
+        delay 0.5
+    "#;
+
+    let result = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("AppleScript show_mail failed: {}", String::from_utf8_lossy(&output.stderr));
+            } else {
+                eprintln!("AppleScript show_mail executed successfully");
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to run AppleScript show_mail: {}", e);
+        }
+    }
+}
+
+/// Switches Thunderbird to calendar view (Ctrl+3)
+/// key code 20 = digit 3
+fn show_calendar_view() {
+    let script = r#"
+        tell application "System Events"
+            tell process "Thunderbird"
+                key code 20 using control down
+            end tell
+        end tell
+        delay 0.5
+    "#;
+
+    let result = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("AppleScript show_calendar failed: {}", String::from_utf8_lossy(&output.stderr));
+            } else {
+                eprintln!("AppleScript show_calendar executed successfully");
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to run AppleScript show_calendar: {}", e);
+        }
+    }
+}
+
+/// Activates Floorp and brings it to the foreground
+fn activate_floorp_app() {
+    let script = r#"
+        delay 0.3
+        tell application "Floorp"
+            activate
+            set frontmost to true
+        end tell
+    "#;
+
+    let result = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output();
+
+    match result {
+        Ok(output) => {
+            if !output.status.success() {
+                eprintln!("AppleScript activate_floorp failed: {}", String::from_utf8_lossy(&output.stderr));
+            } else {
+                eprintln!("AppleScript activate_floorp executed successfully");
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to run AppleScript activate_floorp: {}", e);
+        }
+    }
+}
 
 fn find_thunderbird_profile() -> anyhow::Result<String> {
     let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
@@ -464,13 +607,15 @@ fn op2_thunderbird_get_identity(
     state: &mut OpState,
 ) -> std::result::Result<String, JsErrorBox> {
     permission_check(state)?;
-    
+    activate_thunderbird_app();
+
     let profile = find_thunderbird_profile()
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
-    
+
     let identity = get_identity_from_prefs(&profile)
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
-    
+
+
     serde_json::to_string(&identity)
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))
 }
@@ -482,13 +627,16 @@ fn op2_thunderbird_get_calendar_events(
     #[bigint] days: i64,
 ) -> std::result::Result<String, JsErrorBox> {
     permission_check(state)?;
-    
+    activate_thunderbird_app();
+    show_calendar_view();
+
     let profile = find_thunderbird_profile()
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
     
     let events = get_calendar_events_from_db(&profile, if days > 0 { days } else { 14 })
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
-    
+
+
     serde_json::to_string(&events)
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))
 }
@@ -512,7 +660,9 @@ fn op2_thunderbird_get_emails(
     #[bigint] limit: i64,
 ) -> std::result::Result<String, JsErrorBox> {
     permission_check(state)?;
-    
+    activate_thunderbird_app();
+    show_mail_view();
+
     let profile = find_thunderbird_profile()
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))?;
     
@@ -524,6 +674,16 @@ fn op2_thunderbird_get_emails(
     
     serde_json::to_string(&emails)
         .map_err(|e| JsErrorBox::new("Error", e.to_string()))
+}
+
+#[op2]
+#[string]
+fn op2_thunderbird_activate_floorp(
+    state: &mut OpState,
+) -> Result<String, JsErrorBox> {
+    permission_check(state)?;
+    activate_floorp_app();
+    Ok(r#"{"success": true}"#.to_string())
 }
 
 // ============================================================================

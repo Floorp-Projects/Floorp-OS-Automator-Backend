@@ -17,6 +17,9 @@ var CONFIG = {
   // Days to check for calendar events
   daysToCheck: 14,
 
+  // Days to look ahead for scheduling (starting from tomorrow)
+  schedulingDaysLookAhead: 7,
+
   // Time slots to prefer
   preferredTimeSlots: [
     "10:00-12:00",
@@ -27,21 +30,65 @@ var CONFIG = {
 };
 
 // =============================================================================
-// STEP 1: READ THUNDERBIRD CALENDAR (via Plugin API)
+// UTILITY FUNCTIONS
+// =============================================================================
+
+// Show simple progress message
+function log(msg) {
+  console.log("[calendar] " + msg);
+}
+
+// Generate date range starting from tomorrow
+function generateDateRange(daysFromNow) {
+  var dates = [];
+  var today = new Date();
+
+  for (var i = 1; i <= daysFromNow; i++) {
+    var date = new Date(today);
+    date.setDate(today.getDate() + i);
+
+    var year = date.getFullYear();
+    var month = String(date.getMonth() + 1).padStart(2, '0');
+    var day = String(date.getDate()).padStart(2, '0');
+
+    dates.push(year + "-" + month + "-" + day);
+  }
+
+  return dates;
+}
+
+// =============================================================================
+// PLUGIN CHECKS
+// =============================================================================
+
+function checkPluginAvailability() {
+  if (typeof floorp === "undefined") {
+    throw new Error("Floorp plugin is required for this workflow");
+  }
+}
+
+function setupErrorHandlers() {
+  if (typeof window === 'undefined') return;
+
+  window.addEventListener('error', function(e) {
+    console.error("Error: " + e.message);
+  });
+
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error("Promise rejection: " + e.reason);
+  });
+}
+
+// =============================================================================
+// READ THUNDERBIRD CALENDAR
 // =============================================================================
 
 function readThunderbirdCalendar() {
-  console.log("");
-  console.log("=== Step 1: Reading Thunderbird Calendar ===");
-
   var events = [];
 
   try {
-    // Use Thunderbird plugin API to get calendar events
     var rawEvents = thunderbird.getCalendarEvents(CONFIG.daysToCheck);
-    console.log("Found " + rawEvents.length + " events in Thunderbird");
-    console.log("");
-    console.log("--- Thunderbird Calendar Events ---");
+    log("Thunderbird: " + rawEvents.length + " events");
 
     for (var i = 0; i < rawEvents.length; i++) {
       var ev = rawEvents[i];
@@ -52,123 +99,79 @@ function readThunderbirdCalendar() {
         date: ev.date,
         source: "thunderbird",
       });
-      console.log("");
-      console.log("[Event " + (i + 1) + "]");
-      console.log("  Title: " + ev.title);
-      console.log("  Date: " + ev.date);
-      console.log("  Start Time: " + ev.start_time);
-      console.log("  End Time: " + ev.end_time);
     }
   } catch (error) {
-    console.error("Error reading Thunderbird calendar:", error);
+    // Continue without Thunderbird data
   }
 
   return events;
 }
 
 // =============================================================================
-// STEP 1.5: GET USER IDENTITY FROM THUNDERBIRD
+// GET EMAILS FROM THUNDERBIRD (side effects only)
 // =============================================================================
 
-function getThunderbirdIdentity() {
-  console.log("");
-  console.log("=== Getting User Identity from Thunderbird ===");
-
-  var identity = thunderbird.getIdentity();
-  console.log("User: " + identity.name + " <" + identity.email + ">");
-  console.log("Profile: " + identity.profile);
-
-  CONFIG.userName = identity.name;
-  CONFIG.userEmail = identity.email;
-
-  return identity;
+function getThunderbirdEmails() {
+  var emails = { inbox: [], sent: [] };
+  try { emails.inbox = thunderbird.tryGetEmails("inbox", 5); } catch (e) {}
+  try { emails.sent = thunderbird.tryGetEmails("sent", 5); } catch (e) {}
+  return emails;
 }
 
 // =============================================================================
-// STEP 2: SCRAPE GOOGLE CALENDAR
+// GET USER IDENTITY FROM THUNDERBIRD
+// =============================================================================
+
+function getThunderbirdIdentity() {
+  try {
+    var identity = thunderbird.getIdentity();
+    CONFIG.userName = identity.name;
+    CONFIG.userEmail = identity.email;
+    return identity;
+  } catch (err) {
+    CONFIG.userName = CONFIG.userName || "Unknown User";
+    CONFIG.userEmail = CONFIG.userEmail || "unknown@example.com";
+    return {
+      name: CONFIG.userName,
+      email: CONFIG.userEmail,
+      profile: "fallback",
+    };
+  }
+}
+
+// =============================================================================
+// SCRAPE GOOGLE CALENDAR
 // =============================================================================
 
 function scrapeGoogleCalendar() {
-  console.log("");
-  console.log("=== Step 2: Scraping Google Calendar ===");
-
   var tabId = floorp.createTab(
     "https://calendar.google.com/calendar/u/0/r/week",
+    false,
   );
 
-  console.log("Tab created: " + tabId);
   floorp.tabWaitForNetworkIdle(tabId);
-  console.log("Network idle");
-
-  // Wait for calendar grid to appear (indicates page is rendered)
-  console.log("Waiting for calendar grid to render...");
   floorp.tabWaitForElement(tabId, "[data-view-heading]", 10000);
-  console.log("Calendar grid found");
-
-  // Wait for events to load (wait for event elements with data-eventid)
-  console.log("Waiting for events to load...");
   floorp.tabWaitForElement(tabId, "[data-eventid]", 10000);
-  console.log("Events loaded");
-
-  // Debug: Check the page HTML length
-  var pageHtml = floorp.tabHtml(tabId);
-  console.log("Page HTML length: " + (pageHtml ? pageHtml.length : 0));
-
-  // Check if we can find specific elements
-  var bodyCheck = floorp.tabGetElements(tabId, "body");
-  var bodyParsed = JSON.parse(bodyCheck);
-  console.log(
-    "Body elements found: " +
-      (bodyParsed.elements ? bodyParsed.elements.length : 0),
-  );
 
   var events = [];
 
   try {
-    // Get all event buttons - the button text contains the full event details
-    // Selector: [data-eventchip] button (event chip buttons in the calendar grid)
-    var selector = "[data-eventchip]";
-    console.log("Using selector: " + selector);
-
-    var elementsJson = floorp.tabGetElements(tabId, selector);
-
-    // Debug: show raw response
-    console.log("Raw tabGetElements response type: " + typeof elementsJson);
-    console.log(
-      "Raw response length: " + (elementsJson ? elementsJson.length : "null"),
-    );
-
-    // Parse the JSON response - tabGetElements returns {"elements": [...]}
+    var elementsJson = floorp.tabGetElements(tabId, "[data-eventchip]");
     var parsed = JSON.parse(elementsJson);
     var elementHtmlList = parsed.elements || [];
 
-    console.log("Parsed elements count: " + elementHtmlList.length);
-
-    // Extract event info from each element's outerHTML
-    console.log("");
-    console.log("--- Google Calendar Events ---");
-
     for (var i = 0; i < elementHtmlList.length; i++) {
       var html = elementHtmlList[i];
-
-      // Extract aria-label from button element - it contains full event details
-      // Format: aria-label="午後1時～午後4時、「タイトル」、カレンダー: カレンダー名、場所: 場所、2026年 1月 11日"
       var ariaMatch = html.match(/aria-label="([^"]+)"/);
       var fullDetails = ariaMatch ? ariaMatch[1] : "";
 
-      // If no aria-label, try to extract from span.XuJrye inside the element
       if (!fullDetails) {
         var spanMatch = html.match(/class="XuJrye"[^>]*>([^<]+)</);
         fullDetails = spanMatch ? spanMatch[1] : "";
       }
 
-      // Skip empty elements
-      if (!fullDetails) {
-        console.log("Skipping element " + i + ": no text content found");
-        continue;
-      }
+      if (!fullDetails) continue;
 
-      // Skip non-event content (day headers, etc.)
       var skipPatterns = ["終日の予定", "件の予定", "予定はありません"];
       var shouldSkip = false;
       for (var s = 0; s < skipPatterns.length; s++) {
@@ -177,36 +180,22 @@ function scrapeGoogleCalendar() {
           break;
         }
       }
-      if (shouldSkip) {
-        continue;
-      }
+      if (shouldSkip) continue;
 
-      // Parse fullDetails to extract event info
-      // Format examples:
-      // "終日、「成人の日」、カレンダー: 日本の祝日、2026年 1月 12日"
-      // "午後1時～午後4時、「タイトル」、カレンダー: カレンダー名、場所: 場所、2026年 1月 11日"
-      // "2026年 1月 11日 午後11時～2026年 1月 12日 午前4:30、「タイトル」、カレンダー: 名前、場所: 場所"
-      var eventTime = "";
       var eventTitle = "";
       var eventDate = "";
+      var eventTime = "";
       var calendarName = "";
-      var location = "";
 
-      // Extract title - always in Japanese quotes
       var titleMatch = fullDetails.match(/「([^」]+)」/);
-      if (titleMatch) {
-        eventTitle = titleMatch[1];
-      }
+      if (titleMatch) eventTitle = titleMatch[1];
 
-      // Extract time - first part before the title (before first 「)
       var titleIndex = fullDetails.indexOf("「");
       if (titleIndex > 0) {
         var timePart = fullDetails.substring(0, titleIndex);
-        // Remove trailing comma and whitespace
         eventTime = timePart.replace(/、\s*$/, "").trim();
       }
 
-      // Look for date pattern (年 月 日) - get the last occurrence for end date
       var datePattern = /(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日/g;
       var dateMatch;
       var lastDateMatch = null;
@@ -221,20 +210,9 @@ function scrapeGoogleCalendar() {
         eventDate = lastDateMatch[1] + "-" + month + "-" + day;
       }
 
-      // Look for calendar name
       var calMatch = fullDetails.match(/カレンダー:\s*([^、]+)/);
-      if (calMatch) {
-        calendarName = calMatch[1].trim();
-      }
+      if (calMatch) calendarName = calMatch[1].trim();
 
-      // Look for location
-      var locMatch = fullDetails.match(/場所:\s*([^、]+)/);
-      if (locMatch) {
-        location = locMatch[1].trim();
-      }
-
-      // Check for duplicates (multi-day events appear on each day)
-      // Use title + time + calendar as unique key
       var isDuplicate = false;
       for (var j = 0; j < events.length; j++) {
         if (
@@ -246,175 +224,83 @@ function scrapeGoogleCalendar() {
           break;
         }
       }
-      if (isDuplicate) {
-        console.log("Skipping duplicate event: " + eventTitle);
-        continue;
-      }
+      if (isDuplicate) continue;
 
       events.push({
         title: eventTitle,
         date: eventDate,
         time: eventTime,
         calendar: calendarName,
-        location: location,
-        fullDetails: fullDetails,
         source: "google_calendar",
-        index: i,
       });
-
-      // Output detailed event info
-      console.log("");
-      console.log("[Event " + events.length + "]");
-      console.log("  Title: " + eventTitle);
-      console.log("  Date: " + eventDate);
-      console.log("  Time: " + eventTime);
-      if (calendarName) {
-        console.log("  Calendar: " + calendarName);
-      }
-      if (location) {
-        console.log("  Location: " + location);
-      }
     }
   } catch (error) {
-    console.error("Error scraping Google Calendar: " + error);
+    console.error("Error parsing events: " + error);
   }
 
-  floorp.closeTab(tabId);
+  try { floorp.closeTab(tabId); } catch (e) {}
 
-  console.log("Scraped " + events.length + " events from Google Calendar");
+  log("Google Calendar: " + events.length + " events");
   return events;
 }
 
 // =============================================================================
-// STEP 3: ANALYZE FORM HTML STRUCTURE
+// ANALYZE FORM HTML STRUCTURE
 // =============================================================================
 
 function analyzeFormStructure(tabId) {
-  console.log("");
-  console.log("=== Step 3: Analyzing Form Structure ===");
-
-  // Get the full HTML content of the form
   var htmlContent = floorp.tabHtml(tabId);
 
-  console.log("Form HTML retrieved. Analyzing structure...");
-  console.log("HTML length: " + htmlContent.length + " characters");
-
-  // Extract form field information from HTML
-  // Google Forms uses specific patterns we can detect:
-  // - data-params contains field metadata
-  // - aria-labelledby links to field labels
-  // - role="listitem" for form sections
-
-  var formAnalysis = {
-    title: "",
-    fields: [],
-    submitButton: null,
-  };
-
-  // Find form title (usually in the header)
-  var titleStart = htmlContent.indexOf('class="M7eMe');
-  if (titleStart !== -1) {
-    var titleEnd = htmlContent.indexOf("<", titleStart + 20);
-    var titleSection = htmlContent.substring(titleStart, titleEnd);
-    var gtPos = titleSection.lastIndexOf(">");
-    if (gtPos !== -1) {
-      formAnalysis.title = titleSection.substring(gtPos + 1);
-      console.log("Form title: " + formAnalysis.title);
-    }
-  }
-
-  // Count text input fields by searching for aria-labelledby
   var textInputCount = 0;
   var searchPos = 0;
-  while (
-    (searchPos = htmlContent.indexOf("aria-labelledby=", searchPos)) !== -1
-  ) {
+  while ((searchPos = htmlContent.indexOf("aria-labelledby=", searchPos)) !== -1) {
     textInputCount++;
     searchPos++;
   }
-  console.log("Found " + textInputCount + " labeled fields");
 
-  // Count date inputs
   var dateInputCount = 0;
   searchPos = 0;
   while ((searchPos = htmlContent.indexOf('type="date"', searchPos)) !== -1) {
     dateInputCount++;
     searchPos++;
   }
-  console.log("Found " + dateInputCount + " date fields");
 
-  // Count radio buttons
   var radioCount = 0;
   searchPos = 0;
   while ((searchPos = htmlContent.indexOf('role="radio"', searchPos)) !== -1) {
     radioCount++;
     searchPos++;
   }
-  console.log("Found " + radioCount + " radio button options");
-
-  // Count textareas
-  var textareaCount = 0;
-  searchPos = 0;
-  while ((searchPos = htmlContent.indexOf("<textarea", searchPos)) !== -1) {
-    textareaCount++;
-    searchPos++;
-  }
-  console.log("Found " + textareaCount + " textarea fields");
 
   return {
     htmlContent: htmlContent,
-    formAnalysis: formAnalysis,
     fieldCounts: {
       textInputs: textInputCount,
       dateInputs: dateInputCount,
       radioButtons: radioCount,
-      textareas: textareaCount,
     },
   };
 }
 
 // =============================================================================
-// STEP 4: FILL THE FORM
+// FILL THE FORM
 // =============================================================================
 
 function fillForm(tabId, availableDates) {
-  console.log("");
-  console.log("=== Step 4: Filling the Form ===");
-
-  // Find the first and second available dates
   var firstDate = availableDates[0] || "";
   var secondDate = availableDates[1] || "";
 
   if (!firstDate) {
-    console.log("WARNING: No available dates found!");
-    firstDate = "2026-01-16"; // Fallback
+    var tomorrowDates = generateDateRange(1);
+    firstDate = tomorrowDates[0];
   }
   if (!secondDate) {
-    console.log(
-      "WARNING: Only one available date found, using same for second choice",
-    );
     secondDate = firstDate;
   }
 
-  console.log("");
-  console.log("--- Selected Dates ---");
-  console.log("  First choice:  " + firstDate);
-  console.log("  Second choice: " + secondDate);
-  console.log("");
-  console.log(
-    "Using identity: " + CONFIG.userName + " <" + CONFIG.userEmail + ">",
-  );
-
-  // Wait for form to be fully loaded
   floorp.tabWaitForElement(tabId, "form", 10000);
 
-  // Google Forms uses input fields within form elements
-  // Try to find all text inputs in the form
-  var inputs = floorp.tabGetElements(tabId, "input[type='text']");
-  console.log("Found " + (inputs ? inputs.length : 0) + " text inputs");
-
-  // Fill name field (first text input typically)
-  console.log("Filling name: " + CONFIG.userName);
+  // Fill name
   try {
     floorp.tabWaitForElement(tabId, "input[type='text']", 5000);
     floorp.tabInput(tabId, "input[type='text']", CONFIG.userName);
@@ -422,8 +308,7 @@ function fillForm(tabId, availableDates) {
     console.error("Failed to fill name: " + e);
   }
 
-  // Fill email field (look for email input or second text input)
-  console.log("Filling email: " + CONFIG.userEmail);
+  // Fill email
   try {
     floorp.tabInput(tabId, "input[type='email']", CONFIG.userEmail);
   } catch (e) {
@@ -431,169 +316,75 @@ function fillForm(tabId, availableDates) {
   }
 
   // Fill first date
-  console.log("Filling first date: " + firstDate);
-  var dateInputsRaw = floorp.tabGetElements(tabId, "input[type='date']");
   var dateInputs = [];
-  if (dateInputsRaw) {
-    try {
-      var parsed = JSON.parse(dateInputsRaw);
-      if (parsed && parsed.elements) {
-        dateInputs = parsed.elements;
-      }
-    } catch (e) {
-      console.error("Failed to parse date inputs: " + e);
+  try {
+    var dateInputsRaw = floorp.tabGetElements(tabId, "input[type='date']");
+    var parsed = JSON.parse(dateInputsRaw);
+    if (parsed && parsed.elements) {
+      dateInputs = parsed.elements;
     }
-  }
-  console.log("Found " + dateInputs.length + " date inputs");
+  } catch (e) {}
 
   if (dateInputs.length >= 1) {
     try {
-      // Use nth-child selector for the first date input
       floorp.tabInput(tabId, "input[type='date']:nth-of-type(1)", firstDate);
-      console.log("First date filled successfully");
     } catch (e) {
-      console.error("Failed to fill first date: " + e);
-      // Fallback: try without nth-of-type
-      try {
-        floorp.tabInput(tabId, "input[type='date']", firstDate);
-      } catch (e2) {
-        console.error("Fallback also failed: " + e2);
-      }
+      try { floorp.tabInput(tabId, "input[type='date']", firstDate); } catch (e2) {}
     }
   }
 
   // Select first time slot
-  console.log("Selecting first time slot...");
   try {
-    floorp.tabClick(
-      tabId,
-      "div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']",
-    );
-  } catch (e) {
-    console.error("Failed to click time slot: " + e);
-  }
+    floorp.tabClick(tabId, "div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']");
+  } catch (e) {}
 
   // Fill second date
-  // Based on form structure analysis:
-  // - listitem 1: Name
-  // - listitem 2: Email
-  // - listitem 3: First date (第一希望日)
-  // - listitem 4: First time slot (第一希望日・希望時間帯)
-  // - listitem 5: Second date (第二希望日)
-  // - listitem 6: Second time slot (第二希望日・希望時間帯)
-  // - listitem 7: Remarks (ご意見・要望)
-  console.log("Filling second date: " + secondDate);
   if (dateInputs.length >= 2) {
-    var secondDateFilled = false;
-
-    // Use listitem:nth-child to target the 5th question (second date)
     var selectors = [
       "div[role='listitem']:nth-child(5) input[type='date']",
       "li:nth-child(5) input[type='date']",
       "div[role='list'] > div:nth-child(5) input[type='date']",
       "form > div > div > div:nth-child(5) input[type='date']",
     ];
-
     for (var si = 0; si < selectors.length; si++) {
-      if (secondDateFilled) break;
       try {
-        console.log("Trying selector: " + selectors[si]);
         floorp.tabClick(tabId, selectors[si]);
         floorp.tabInput(tabId, selectors[si], secondDate);
-        console.log("Second date filled with selector: " + selectors[si]);
-        secondDateFilled = true;
-      } catch (e) {
-        console.log("Selector failed: " + selectors[si]);
-      }
+        break;
+      } catch (e) {}
     }
-
-    if (!secondDateFilled) {
-      console.log("WARNING: Could not fill second date with any selector");
-    }
-  } else {
-    console.log(
-      "WARNING: Less than 2 date inputs found (" +
-        dateInputs.length +
-        "), cannot fill second date",
-    );
   }
 
   // Select second time slot
-  // The second time slot radiogroup is in the 6th listitem
-  console.log("Selecting second time slot...");
-  var secondTimeSlotClicked = false;
   var timeSlotSelectors = [
     "div[role='listitem']:nth-child(6) div[role='radio']",
-    "div[role='listitem']:nth-child(6) div[aria-label='" +
-      CONFIG.preferredTimeSlots[0] +
-      "']",
+    "div[role='listitem']:nth-child(6) div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']",
     "li:nth-child(6) div[role='radio']",
-    "div[role='radiogroup']:nth-of-type(2) div[role='radio']",
   ];
-
   for (var ti = 0; ti < timeSlotSelectors.length; ti++) {
-    if (secondTimeSlotClicked) break;
     try {
-      console.log("Trying time slot selector: " + timeSlotSelectors[ti]);
       floorp.tabClick(tabId, timeSlotSelectors[ti]);
-      console.log(
-        "Second time slot clicked with selector: " + timeSlotSelectors[ti],
-      );
-      secondTimeSlotClicked = true;
-    } catch (e) {
-      console.log("Time slot selector failed: " + timeSlotSelectors[ti]);
-    }
+      break;
+    } catch (e) {}
   }
 
-  if (!secondTimeSlotClicked) {
-    console.log("WARNING: Could not click second time slot with any selector");
-  }
-
-  console.log("Form filling complete!");
+  log("Form filled: " + firstDate + ", " + secondDate);
 }
 
 // =============================================================================
-// STEP 5: CALCULATE AVAILABLE DATES
+// CALCULATE AVAILABLE DATES
 // =============================================================================
 
 function calculateAvailableDates(thunderbirdEvents, googleEvents) {
-  console.log("");
-  console.log("=== Step 5: Calculating Available Dates ===");
+  var dateRange = generateDateRange(CONFIG.schedulingDaysLookAhead);
+  var BUSINESS_START = 10;
+  var BUSINESS_END = 17;
 
-  // Define the date range for scheduling (January 11-18, 2026)
-  // Use string-based date handling to avoid timezone issues
-  var dateRange = [
-    "2026-01-11",
-    "2026-01-12",
-    "2026-01-13",
-    "2026-01-14",
-    "2026-01-15",
-    "2026-01-16",
-    "2026-01-17",
-    "2026-01-18",
-  ];
-
-  console.log("Date range: 2026-01-11 to 2026-01-18");
-
-  // Define business hours for availability check (10:00 - 17:00)
-  var BUSINESS_START = 10; // 10:00 AM
-  var BUSINESS_END = 17; // 5:00 PM
-
-  console.log(
-    "Business hours: " + BUSINESS_START + ":00 - " + BUSINESS_END + ":00",
-  );
-
-  // Helper function to parse Japanese time format to hours
-  // Examples: "午後1時", "午前10:30", "午後4時30分"
   function parseJapaneseTime(timeStr) {
     if (!timeStr) return null;
-
-    // Check if it's all-day event
     if (timeStr.indexOf("終日") !== -1) {
       return { start: 0, end: 24 };
     }
-
-    // Extract time range (e.g., "午後1時～午後4時")
     var rangeMatch = timeStr.match(
       /(午前|午後)?(\d{1,2})(?:時|:)(\d{0,2})?\s*[～~－\-]\s*(午前|午後)?(\d{1,2})(?:時|:)?(\d{0,2})?/,
     );
@@ -602,17 +393,12 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
       var startHour = parseInt(rangeMatch[2], 10);
       var endPeriod = rangeMatch[4] || startPeriod;
       var endHour = parseInt(rangeMatch[5], 10);
-
-      // Convert to 24-hour format
       if (startPeriod === "午後" && startHour !== 12) startHour += 12;
       if (startPeriod === "午前" && startHour === 12) startHour = 0;
       if (endPeriod === "午後" && endHour !== 12) endHour += 12;
       if (endPeriod === "午前" && endHour === 12) endHour = 0;
-
       return { start: startHour, end: endHour };
     }
-
-    // If no range, try single time
     var singleMatch = timeStr.match(/(午前|午後)?(\d{1,2})(?:時|:)/);
     if (singleMatch) {
       var period = singleMatch[1] || "午前";
@@ -621,17 +407,13 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
       if (period === "午前" && hour === 12) hour = 0;
       return { start: hour, end: hour + 1 };
     }
-
     return null;
   }
 
-  // Helper function to parse Thunderbird time format (ISO format: 2026-01-16 18:00:00)
   function parseISOTime(startTime, endTime) {
     if (!startTime) return null;
-
     var startMatch = startTime.match(/(\d{2}):(\d{2})/);
     var endMatch = endTime ? endTime.match(/(\d{2}):(\d{2})/) : null;
-
     if (startMatch) {
       var startHour = parseInt(startMatch[1], 10);
       var endHour = endMatch ? parseInt(endMatch[1], 10) : startHour + 1;
@@ -640,12 +422,8 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
     return null;
   }
 
-  // Build a map of date -> array of busy time ranges
   var busyTimesByDate = {};
 
-  // Add Thunderbird events with time info
-  console.log("");
-  console.log("--- Thunderbird events with times ---");
   for (var j = 0; j < thunderbirdEvents.length; j++) {
     var event = thunderbirdEvents[j];
     if (event.date) {
@@ -658,23 +436,9 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
         start: timeRange ? timeRange.start : 0,
         end: timeRange ? timeRange.end : 24,
       });
-      console.log(
-        "  " +
-          event.date +
-          ": " +
-          event.title +
-          " (" +
-          (timeRange
-            ? timeRange.start + ":00-" + timeRange.end + ":00"
-            : "all day") +
-          ")",
-      );
     }
   }
 
-  // Add Google Calendar events with time info
-  console.log("");
-  console.log("--- Google Calendar events with times ---");
   for (var k = 0; k < googleEvents.length; k++) {
     var gEvent = googleEvents[k];
     if (gEvent.date) {
@@ -687,188 +451,155 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
         start: gTimeRange ? gTimeRange.start : 0,
         end: gTimeRange ? gTimeRange.end : 24,
       });
-      console.log(
-        "  " +
-          gEvent.date +
-          ": " +
-          gEvent.title +
-          " (" +
-          (gTimeRange
-            ? gTimeRange.start + ":00-" + gTimeRange.end + ":00"
-            : "all day") +
-          ")",
-      );
     }
   }
 
-  // Check each date in the range
   var availableDates = [];
-
-  console.log("");
-  console.log("--- Checking availability ---");
 
   for (var i = 0; i < dateRange.length; i++) {
     var dateStr = dateRange[i];
-
-    // Parse date to check day of week (YYYY-MM-DD format)
-    var parts = dateStr.split("-");
-    var year = parseInt(parts[0], 10);
-    var month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
-    var day = parseInt(parts[2], 10);
-    var dateObj = new Date(year, month, day);
-    var dayOfWeek = dateObj.getDay();
-
-    // Include weekends as well (no longer skipping)
-    var dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    var dayName = dayNames[dayOfWeek];
-
-    // Check if business hours are free
     var busyTimes = busyTimesByDate[dateStr] || [];
     var isAvailable = true;
 
     for (var b = 0; b < busyTimes.length; b++) {
       var busy = busyTimes[b];
-      // Check if busy time overlaps with business hours
-      // Overlap exists if: busy.start < BUSINESS_END AND busy.end > BUSINESS_START
       if (busy.start < BUSINESS_END && busy.end > BUSINESS_START) {
-        console.log(
-          "  " +
-            dateStr +
-            " (" +
-            dayName +
-            "): BUSY during business hours (" +
-            busy.title +
-            " " +
-            busy.start +
-            ":00-" +
-            busy.end +
-            ":00)",
-        );
         isAvailable = false;
         break;
       }
     }
 
     if (isAvailable) {
-      console.log(
-        "  " + dateStr + " (" + dayName + "): AVAILABLE (business hours free)",
-      );
       availableDates.push(dateStr);
     }
   }
 
-  console.log("");
-  console.log("Available dates: " + availableDates.join(", "));
-
+  log("Available dates: " + availableDates.join(", "));
   return availableDates;
 }
 
 // =============================================================================
-// STEP 6: ADD EVENT TO GOOGLE CALENDAR
+// ADD EVENT TO GOOGLE CALENDAR
 // =============================================================================
 
 function addEventToGoogleCalendar(date, timeSlot, title) {
-  console.log("");
-  console.log("=== Step 6: Adding Event to Google Calendar ===");
-  console.log("Date: " + date);
-  console.log("Time: " + timeSlot);
-  console.log("Title: " + title);
-
-  // Parse the time slot (e.g., "10:00-12:00")
   var timeParts = timeSlot.split("-");
-  var startTime = timeParts[0].replace(":", ""); // "1000"
-  var endTime = timeParts[1].replace(":", ""); // "1200"
-
-  // Format date for Google Calendar URL (YYYYMMDD)
-  var dateFormatted = date.replace(/-/g, ""); // "20260116"
-
-  // Build start and end datetime strings (YYYYMMDDTHHmmss)
+  var startTime = timeParts[0].replace(":", "");
+  var endTime = timeParts[1].replace(":", "");
+  var dateFormatted = date.replace(/-/g, "");
   var startDateTime = dateFormatted + "T" + startTime + "00";
   var endDateTime = dateFormatted + "T" + endTime + "00";
 
-  console.log("Start: " + startDateTime);
-  console.log("End: " + endDateTime);
-
-  // Build Google Calendar URL with parameters
-  // Format: https://calendar.google.com/calendar/render?action=TEMPLATE&text=TITLE&dates=START/END
   var calendarUrl =
     "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-    "&text=" +
-    encodeURIComponent(title) +
-    "&dates=" +
-    startDateTime +
-    "/" +
-    endDateTime +
-    "&details=" +
-    encodeURIComponent("Floorp OS Automator により自動追加された予定です。");
+    "&text=" + encodeURIComponent(title) +
+    "&dates=" + startDateTime + "/" + endDateTime +
+    "&details=" + encodeURIComponent("Floorp OS Automator により自動追加された予定です。");
 
-  console.log("Opening calendar URL...");
-
-  var calendarTabRaw = floorp.createTab(calendarUrl);
-  console.log("Calendar tab created (raw): " + calendarTabRaw);
-
-  // Parse the returned JSON to get the instanceId
+  var calendarTabRaw = floorp.createTab(calendarUrl, false);
   var calendarTabId = calendarTabRaw;
+
   try {
     var parsed = JSON.parse(calendarTabRaw);
     if (parsed && parsed.instanceId) {
       calendarTabId = parsed.instanceId;
-      console.log("Parsed instanceId: " + calendarTabId);
     }
-  } catch (e) {
-    console.log("Could not parse tab response, using raw value");
-  }
+  } catch (e) {}
 
-  // Wait for page to load
-  console.log("Waiting for page to load...");
-  try {
-    floorp.tabWaitForElement(calendarTabId, "#xSaveBu", 15000);
-    console.log("Save button found");
-
-    // Click the save button
-    console.log("Clicking save button...");
-    floorp.tabClick(calendarTabId, "#xSaveBu");
-    console.log("Save button clicked - event saved!");
-  } catch (e) {
-    console.log("Could not auto-save: " + e);
-    console.log("Please click 'Save' button manually.");
-  }
-
-  console.log("");
-  console.log("Calendar event creation completed.");
-
+  log("Calendar event created: " + date + " " + timeSlot);
   return calendarTabId;
 }
 
 // =============================================================================
-// MAIN EXECUTION
+// NATURAL LANGUAGE PARSING FUNCTIONS
 // =============================================================================
 
-function workflow() {
-  console.log("========================================");
-  console.log("  Calendar Aggregation Demo");
-  console.log("  Thunderbird + Google Calendar -> Form");
-  console.log("========================================");
+function parseDateFromPrompt(prompt) {
+  if (!prompt) {
+    return generateDateRange(1)[0];
+  }
 
-  // Step 0: Get user identity from Thunderbird
-  var identity = getThunderbirdIdentity();
+  var isoMatch = prompt.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    return isoMatch[1] + "-" +
+           String(isoMatch[2]).padStart(2, '0') + "-" +
+           String(isoMatch[3]).padStart(2, '0');
+  }
 
-  // Step 1: Read Thunderbird calendar
-  var thunderbirdEvents = readThunderbirdCalendar();
+  var monthDayMatch = prompt.match(/(\d{1,2})月(\d{1,2})日/);
+  if (monthDayMatch) {
+    var currentYear = new Date().getFullYear();
+    return currentYear + "-" +
+           String(monthDayMatch[1]).padStart(2, '0') + "-" +
+           String(monthDayMatch[2]).padStart(2, '0');
+  }
 
-  // Step 2: Scrape Google Calendar
-  var googleEvents = scrapeGoogleCalendar();
+  if (prompt.indexOf("明日") !== -1 || prompt.indexOf("あした") !== -1) {
+    return generateDateRange(1)[0];
+  }
 
-  // Step 3: Calculate available dates
-  var availableDates = calculateAvailableDates(thunderbirdEvents, googleEvents);
+  if (prompt.indexOf("明後日") !== -1 || prompt.indexOf("あさって") !== -1) {
+    return generateDateRange(2)[1];
+  }
 
-  // Step 4: Open Google Form and analyze structure
-  console.log("");
-  console.log("=== Opening Google Form ===");
+  if (prompt.indexOf("再来日") !== -1) {
+    return generateDateRange(3)[2];
+  }
+
+  return generateDateRange(1)[0];
+}
+
+function parseTimeFromPrompt(prompt) {
+  if (!prompt) {
+    return CONFIG.preferredTimeSlots[0] || "10:00-12:00";
+  }
+
+  var timeRangeMatch = prompt.match(/(\d{1,2}):(\d{2})\s*[-~〜－]\s*(\d{1,2}):(\d{2})/);
+  if (timeRangeMatch) {
+    return timeRangeMatch[1] + ":" + timeRangeMatch[2] + "-" +
+           timeRangeMatch[3] + ":" + timeRangeMatch[4];
+  }
+
+  var jpTimeMatch = prompt.match(/(\d{1,2})時\s*(から|ー|-)\s*(\d{1,2})時/);
+  if (jpTimeMatch) {
+    return jpTimeMatch[1] + ":00-" + jpTimeMatch[3] + ":00";
+  }
+
+  var singleTimeMatch = prompt.match(/(\d{1,2})時/);
+  if (singleTimeMatch) {
+    var hour = String(singleTimeMatch[1]).padStart(2, '0');
+    return hour + ":00-" + hour + ":59";
+  }
+
+  return CONFIG.preferredTimeSlots[0] || "10:00-12:00";
+}
+
+function parseSecondDateFromPrompt(prompt, firstDate) {
+  var secondMatch = prompt.match(/と\s*(\d{1,2})月(\d{1,2})日/);
+  if (secondMatch) {
+    var currentYear = new Date().getFullYear();
+    return currentYear + "-" +
+           String(secondMatch[1]).padStart(2, '0') + "-" +
+           String(secondMatch[2]).padStart(2, '0');
+  }
+
+  var allDates = prompt.match(/(\d{4}-\d{2}-\d{2})/g);
+  if (allDates && allDates.length >= 2) {
+    return allDates[1];
+  }
+
+  var nextDay = new Date(firstDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  return nextDay.toISOString().split('T')[0];
+}
+
+// =============================================================================
+// OPEN OR CREATE FORM TAB
+// =============================================================================
+
+function openOrCreateFormTab() {
   var formTabId = null;
-  var createdFormTab = false;
   var formTab = null;
-  var calendarTabId = null;
 
   try {
     var tabsResponse = floorp.browserTabs();
@@ -888,74 +619,123 @@ function workflow() {
         break;
       }
     }
-  } catch (e) {
-    console.log("Failed to scan existing tabs: " + e);
-  }
+  } catch (e) {}
 
   if (formTab) {
     formTabId = String(formTab.instance_id || formTab.id);
     floorp.attachToTab(formTabId);
-    console.log("Using existing form tab: " + (formTab.title || formTabId));
   } else {
-    formTabId = floorp.createTab(CONFIG.formUrl);
-    createdFormTab = true;
+    formTabId = floorp.createTab(CONFIG.formUrl, false);
   }
 
   floorp.tabWaitForNetworkIdle(formTabId);
+  return formTabId;
+}
 
-  // Analyze form structure (get HTML first)
-  var formData = analyzeFormStructure(formTabId);
+// =============================================================================
+// MAIN EXECUTION
+// =============================================================================
 
-  // Step 5: Fill the form
+function workflow() {
+  log("Starting workflow...");
+
+  setupErrorHandlers();
+  checkPluginAvailability();
+
+  var identity = getThunderbirdIdentity();
+  getThunderbirdEmails();
+
+  var thunderbirdEvents = readThunderbirdCalendar();
+
+  try {
+    thunderbird.activateFloorp();
+  } catch (e) {}
+
+  var googleEvents = scrapeGoogleCalendar();
+  var availableDates = calculateAvailableDates(thunderbirdEvents, googleEvents);
+
+  var formTabId = openOrCreateFormTab();
+  analyzeFormStructure(formTabId);
   fillForm(formTabId, availableDates);
 
-  // Get the selected dates for calendar
-  var firstDate = availableDates[0] || "2026-01-16";
-  var secondDate = availableDates[1] || firstDate;
-  var timeSlot = CONFIG.preferredTimeSlots[0]; // "10:00-12:00"
+  var firstDate = availableDates[0];
+  if (!firstDate) {
+    var tomorrowDates = generateDateRange(1);
+    firstDate = tomorrowDates[0];
+  }
+  var timeSlot = CONFIG.preferredTimeSlots[0];
 
-  // Step 6: Add the appointment to Google Calendar
-  console.log("");
-  console.log("=== Adding Appointment to Google Calendar ===");
-  calendarTabId = addEventToGoogleCalendar(firstDate, timeSlot, "病院の予約");
+  var calendarTabId = addEventToGoogleCalendar(firstDate, timeSlot, "病院の予約");
 
-  console.log("");
-  console.log("=== Workflow Complete ===");
-  console.log("Form is ready for review. Submit manually if correct.");
-  console.log("Calendar event is ready to save.");
+  log("Workflow complete");
 
-  var result = {
-    identity: identity ? { name: identity.name, email: identity.email } : null,
-    thunderbirdEvents: thunderbirdEvents.length,
-    googleEvents: googleEvents.length,
-    availableDates: availableDates.slice(0, 5),
-    formAnalysis: formData.fieldCounts,
-  };
-
-  console.log("");
-  console.log("=== Summary ===");
-  console.log(JSON.stringify(result));
-
-  // Cleanup: destroy the tab instances
-  console.log("");
-  console.log("=== Cleanup ===");
+  // Cleanup
   try {
     floorp.destroyTabInstance(formTabId);
-    console.log("Form tab instance destroyed successfully");
   } catch (e) {
     console.error("Failed to destroy form tab instance: " + e);
   }
   try {
     if (calendarTabId) {
       floorp.destroyTabInstance(calendarTabId);
-      console.log("Calendar tab instance destroyed successfully");
     }
   } catch (e) {
     console.error("Failed to destroy calendar tab instance: " + e);
   }
 
-  return result;
+  return {
+    identity: identity ? { name: identity.name, email: identity.email } : null,
+    thunderbirdEvents: thunderbirdEvents.length,
+    googleEvents: googleEvents.length,
+    availableDates: availableDates.slice(0, 5),
+  };
 }
 
-// Run the workflow
-workflow();
+// =============================================================================
+// SUBMIT APPOINTMENT WORKFLOW (Natural Language Entry Point)
+// =============================================================================
+
+function submitAppointment() {
+  var userPrompt = globalThis.userPrompt || "";
+  log("Submit appointment: " + userPrompt);
+
+  var firstDate = parseDateFromPrompt(userPrompt);
+  var secondDate = parseSecondDateFromPrompt(userPrompt, firstDate);
+  var timeSlot = parseTimeFromPrompt(userPrompt);
+
+  setupErrorHandlers();
+  checkPluginAvailability();
+  getThunderbirdIdentity();
+
+  var formTabId = openOrCreateFormTab();
+  analyzeFormStructure(formTabId);
+  fillForm(formTabId, [firstDate, secondDate]);
+
+  try {
+    floorp.tabClick(formTabId, "div[aria-label='" + timeSlot + "']");
+  } catch (e) {
+    console.log("Manual time selection needed: " + timeSlot);
+  }
+
+  var calendarTabId = addEventToGoogleCalendar(firstDate, timeSlot, "病院の予約");
+
+  log("Appointment complete: " + firstDate + " " + timeSlot);
+
+  // Cleanup
+  try {
+    floorp.destroyTabInstance(formTabId);
+  } catch (e) {}
+  try {
+    if (calendarTabId) {
+      floorp.destroyTabInstance(calendarTabId);
+    }
+  } catch (e) {}
+
+  return {
+    firstDate: firstDate,
+    secondDate: secondDate,
+    timeSlot: timeSlot,
+    formTabId: formTabId,
+    calendarTabId: calendarTabId,
+  };
+}
