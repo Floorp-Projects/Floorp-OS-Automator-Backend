@@ -13,6 +13,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTr
 
 /// Creates a new external plugin package record in the database.
 ///
+/// Also creates a corresponding entry in the plugin_package table so that
+/// external plugins appear in the plugin list.
+///
 /// # Arguments
 ///
 /// * `db` - Database connection
@@ -27,13 +30,44 @@ pub async fn create_ext_plugin_package(
     plugin_package_id: String,
     install_dir: String,
 ) -> Result<Model, DbErr> {
+    use entity::entity::plugin_package;
+    use sea_orm::ActiveValue::Set;
+    
+    // Parse plugin_package_id to extract author, package, version
+    let parts: Vec<&str> = plugin_package_id.split('/').collect();
+    let (package_name, package_version) = if parts.len() >= 2 {
+        (parts[1].to_string(), parts.get(2).unwrap_or(&"1.0.0").to_string())
+    } else {
+        (plugin_package_id.clone(), "1.0.0".to_string())
+    };
+    
+    // Create entry in ext_plugin_package table
     let active_model = ActiveModel {
-        plugin_package_id: Set(plugin_package_id),
+        plugin_package_id: Set(plugin_package_id.clone()),
         install_dir: Set(install_dir),
         missing: Set(false),
     };
-
-    active_model.insert(db).await
+    let result = active_model.insert(db).await;
+    
+    // Also create entry in plugin_package table for listing
+    let now = chrono::Utc::now();
+    let plugin_pkg = plugin_package::ActiveModel {
+        package_id: Set(plugin_package_id.clone()),
+        package_name: Set(package_name),
+        package_version: Set(package_version),
+        description: Set(Some("External plugin".to_string())),
+        plugin_store_url: Set(None),
+        internal_plugin: Set(false),
+        verified: Set(false),
+        deprecated: Set(false),
+        installed_at: Set(Some(now)),
+        updated_at: Set(None),
+    };
+    
+    // Ignore error if already exists (duplicate package_id)
+    let _ = plugin_pkg.insert(db).await;
+    
+    result
 }
 
 /// Retrieves an external plugin package by its ID.

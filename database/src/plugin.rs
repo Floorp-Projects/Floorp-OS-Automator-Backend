@@ -13,6 +13,8 @@ use sea_orm::{DatabaseConnection, DbErr};
 
 use sapphillon_core::proto::sapphillon::v1::PluginPackage as ProtoPluginPackage;
 
+use crate::ext_plugin;
+
 /// Lists plugin packages and returns protobuf `PluginPackage` messages.
 ///
 /// This wraps the lower-level CRUD implementation in `plugin_package_crud` and
@@ -82,6 +84,35 @@ pub async fn list_plugins(
             &pkg_entity,
             Some(&proto_funcs),
         );
+        out.push(proto_pkg);
+    }
+
+    // Also add external plugins
+    let ext_plugins = ext_plugin::list_ext_plugin_packages(db).await?;
+    for ext in ext_plugins {
+        // Parse package_id to extract name (format: author/package/version)
+        let parts: Vec<&str> = ext.plugin_package_id.split('/').collect();
+        let (package_name, package_version) = if parts.len() >= 3 {
+            (parts[1].to_string(), parts[2].to_string())
+        } else {
+            (ext.plugin_package_id.clone(), "1.0.0".to_string())
+        };
+
+        // Convert to ProtoPluginPackage
+        let proto_pkg = ProtoPluginPackage {
+            package_id: ext.plugin_package_id,
+            package_name,
+            provider_id: String::new(),
+            package_version,
+            description: "External plugin".to_string(),
+            functions: vec![], // External plugins don't have functions in DB
+            plugin_store_url: String::new(),
+            internal_plugin: Some(false),
+            verified: Some(false),
+            deprecated: Some(false),
+            installed_at: None,
+            updated_at: None,
+        };
         out.push(proto_pkg);
     }
 
