@@ -34,7 +34,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.17",
- "thunderbird",
  "tokio",
  "tokio-stream",
  "tonic 0.14.2",

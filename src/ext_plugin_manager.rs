@@ -27,6 +27,7 @@ use std::path::Path;
 /// * `package_id` - Plugin package identifier
 /// * `version` - Plugin version
 /// * `package_js_content` - The JavaScript content to save
+/// * `metadata_content` - Optional metadata.json content to save
 ///
 /// # Returns
 ///
@@ -38,12 +39,14 @@ pub async fn install_ext_plugin(
     package_id: &str,
     version: &str,
     package_js_content: &[u8],
+    metadata_content: Option<&[u8]>,
 ) -> Result<String> {
     use database::ext_plugin::{create_ext_plugin_package, get_ext_plugin_package};
 
     let plugin_package_id = format!("{author_id}/{package_id}/{version}");
     let install_dir = format!("{save_dir}/{author_id}/{package_id}/{version}");
     let package_js_path = format!("{install_dir}/package.js");
+    let metadata_path = format!("{install_dir}/metadata.json");
 
     // Check if plugin already exists
     let existing = get_ext_plugin_package(db, &plugin_package_id).await?;
@@ -58,6 +61,12 @@ pub async fn install_ext_plugin(
     // Write package.js file
     fs::write(&package_js_path, package_js_content)
         .with_context(|| format!("Failed to write package.js: {package_js_path}"))?;
+    
+    // Write metadata.json file if provided
+    if let Some(metadata) = metadata_content {
+        fs::write(&metadata_path, metadata)
+            .with_context(|| format!("Failed to write metadata.json: {metadata_path}"))?;
+    }
 
     // Register in database
     create_ext_plugin_package(db, plugin_package_id.clone(), install_dir)
@@ -218,6 +227,7 @@ mod tests {
             "test-package",
             "1.0.0",
             b"console.log('hello');",
+            None, // No metadata
         )
         .await?;
 
@@ -253,11 +263,11 @@ mod tests {
         let save_dir = temp_dir.path().to_string_lossy().to_string();
 
         // Install first time
-        install_ext_plugin(&db, &save_dir, "author", "pkg", "1.0.0", b"content").await?;
+        install_ext_plugin(&db, &save_dir, "author", "pkg", "1.0.0", b"content", None).await?;
 
         // Try to install again
         let result =
-            install_ext_plugin(&db, &save_dir, "author", "pkg", "1.0.0", b"new content").await;
+            install_ext_plugin(&db, &save_dir, "author", "pkg", "1.0.0", b"new content", None).await;
 
         assert!(result.is_err());
         assert!(

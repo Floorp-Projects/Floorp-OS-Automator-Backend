@@ -136,6 +136,8 @@ pub async fn mark_ext_plugin_missing(
 
 /// Deletes an external plugin package record from the database.
 ///
+/// Also deletes the corresponding entry from plugin_package table.
+///
 /// # Arguments
 ///
 /// * `db` - Database connection
@@ -148,9 +150,18 @@ pub async fn delete_ext_plugin_package(
     db: &DatabaseConnection,
     plugin_package_id: &str,
 ) -> Result<u64, DbErr> {
+    use entity::entity::plugin_package;
+    
+    // Delete from ext_plugin_package table
     let result = ExtPluginPackage::delete_by_id(plugin_package_id.to_string())
         .exec(db)
         .await?;
+    
+    // Also delete from plugin_package table
+    let _ = plugin_package::Entity::delete_by_id(plugin_package_id.to_string())
+        .exec(db)
+        .await?;
+    
     Ok(result.rows_affected)
 }
 

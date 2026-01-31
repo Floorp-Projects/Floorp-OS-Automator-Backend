@@ -179,8 +179,18 @@ pub async fn install_plugin_from_uri(
     let (scheme, path) = UriScheme::parse(uri)?;
     let metadata = PluginMetadata::from_uri_path(path, &scheme)?;
 
-    // Fetch content
+    // Fetch package.js content
     let content = fetch_plugin_content(uri).await?;
+    
+    // Fetch metadata.json content (try to get from same directory)
+    let metadata_uri = uri.replace("package.js", "metadata.json");
+    let metadata_content = match fetch_plugin_content(&metadata_uri).await {
+        Ok(content) => Some(content),
+        Err(_) => {
+            log::warn!("Could not fetch metadata.json from {}", metadata_uri);
+            None
+        }
+    };
 
     // Install
     let plugin_package_id = install_ext_plugin(
@@ -190,6 +200,7 @@ pub async fn install_plugin_from_uri(
         &metadata.package_id,
         &metadata.version,
         &content,
+        metadata_content.as_deref(),
     )
     .await
     .map_err(|e| {

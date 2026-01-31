@@ -87,9 +87,25 @@ pub async fn list_plugins(
         out.push(proto_pkg);
     }
 
-    // Also add external plugins
+    // Also add external plugins (avoid duplicates with internal plugins)
+    use std::collections::HashSet;
+    let mut existing_ids: HashSet<String> = out.iter().map(|p| p.package_id.clone()).collect();
+
     let ext_plugins = ext_plugin::list_ext_plugin_packages(db).await?;
     for ext in ext_plugins {
+        // Skip if already exists (avoid duplicates)
+        if existing_ids.contains(&ext.plugin_package_id) {
+            continue;
+        }
+
+        // Try to load metadata.json for richer plugin info
+        let metadata_path = format!("{}/metadata.json", ext.install_dir);
+        let (description, functions) = if let Ok(metadata_content) = tokio::fs::read_to_string(&metadata_path).await {
+            parse_external_plugin_metadata(&metadata_content)
+        } else {
+            ("External plugin".to_string(), vec![])
+        };
+
         // Parse package_id to extract name (format: author/package/version)
         let parts: Vec<&str> = ext.plugin_package_id.split('/').collect();
         let (package_name, package_version) = if parts.len() >= 3 {
@@ -100,12 +116,12 @@ pub async fn list_plugins(
 
         // Convert to ProtoPluginPackage
         let proto_pkg = ProtoPluginPackage {
-            package_id: ext.plugin_package_id,
+            package_id: ext.plugin_package_id.clone(),
             package_name,
             provider_id: String::new(),
             package_version,
-            description: "External plugin".to_string(),
-            functions: vec![], // External plugins don't have functions in DB
+            description,
+            functions, // Now populated from metadata!
             plugin_store_url: String::new(),
             internal_plugin: Some(false),
             verified: Some(false),
@@ -114,9 +130,50 @@ pub async fn list_plugins(
             updated_at: None,
         };
         out.push(proto_pkg);
+        existing_ids.insert(ext.plugin_package_id);
     }
 
     Ok((out, token))
+}
+
+/// Parses external plugin metadata.json and extracts description and functions.
+/// 
+/// Returns (description, Vec<PluginFunction>) from the metadata.
+fn parse_external_plugin_metadata(content: &str) -> (String, Vec<sapphillon_core::proto::sapphillon::v1::PluginFunction>) {
+    use serde_json::Value;
+    
+    let mut description = "External plugin".to_string();
+    let mut functions = vec![];
+    
+    if let Ok(json) = serde_json::from_str::<Value>(content) {
+        // Extract description
+        if let Some(desc) = json.get("description").and_then(|v| v.as_str()) {
+            description = desc.to_string();
+        }
+        
+        // Extract functions
+        if let Some(funcs) = json.get("functions").and_then(|v| v.as_array()) {
+            for (idx, func) in funcs.iter().enumerate() {
+                let name = func.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let func_desc = func.get("description").and_then(|v| v.as_str()).unwrap_or("");
+                
+                // Build function ID: package_id.function_name
+                let function_id = format!("ext.function.{}", idx);
+                
+                let proto_func = sapphillon_core::proto::sapphillon::v1::PluginFunction {
+                    function_id,
+                    function_name: name.to_string(),
+                    version: "".to_string(),
+                    description: func_desc.to_string(),
+                    permissions: vec![],
+                    function_define: None,
+                };
+                functions.push(proto_func);
+            }
+        }
+    }
+    
+    (description, functions)
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

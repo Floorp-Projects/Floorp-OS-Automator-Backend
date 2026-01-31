@@ -93,7 +93,7 @@ git = { path = "./plugins/git" }
 iniad = { path = "./plugins/iniad-ai-mop" }
 excel = { path = "./plugins/excel" }
 finder = { path = "./plugins/finder" }
-thunderbird = { path = "./plugins/thunderbird" }
+# thunderbird = { path = "./plugins/thunderbird" }  # Disabled - replaced by external plugin
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.14.2"
 tower-http = { version = "0.5.2", features = ["cors"] }
