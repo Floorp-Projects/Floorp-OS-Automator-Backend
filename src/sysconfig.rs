@@ -8,7 +8,7 @@ use std::env;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::dummy_plugin::dummy_plugin_package;
+// use crate::dummy_plugin::dummy_plugin_package;  // Disabled - not needed
 use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
@@ -66,7 +66,7 @@ pub fn sysconfig() -> SysConfig {
             iniad_ai_mop_plugin_package(),
             excel_plugin_package(),
             // thunderbird_plugin_package(),  // Disabled - replaced by external plugin
-            dummy_plugin_package(),
+            // dummy_plugin_package(),  // Disabled - not needed
         ],
 
         initial_workflows: vec![],
