@@ -15,7 +15,7 @@ dependencies = [
  "env_logger",
  "excel",
  "exec",
- "ext_plugin",
+ "ext_plugin 0.17.0 (git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.17.0)",
  "fetch",
  "filesystem",
  "finder",
@@ -26,6 +26,7 @@ dependencies = [
  "migration",
  "prost 0.14.3",
  "prost-types",
+ "regex",
  "reqwest 0.12.28",
  "sapphillon_core",
  "sea-orm",
@@ -4320,6 +4321,31 @@ dependencies = [
 [[package]]
 name = "ext_plugin"
 version = "0.17.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "deno_lib",
+ "deno_permissions",
+ "deno_resolver",
+ "deno_runtime",
+ "deno_tls",
+ "deno_web",
+ "ipc-channel",
+ "node_resolver",
+ "once_cell",
+ "proto 0.10.0",
+ "serde",
+ "serde_json",
+ "sys_traits",
+ "tokio",
+ "url",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "ext_plugin"
+version = "0.17.0"
 source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.17.0#fc0d90d833965e054ff1580003e210c8ba94ec80"
 dependencies = [
  "anyhow",
@@ -4334,7 +4360,7 @@ dependencies = [
  "ipc-channel",
  "node_resolver",
  "once_cell",
- "proto",
+ "proto 0.10.0 (git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.17.0)",
  "serde",
  "serde_json",
  "sys_traits",
@@ -8090,6 +8116,21 @@ dependencies = [
 [[package]]
 name = "proto"
 version = "0.10.0"
+dependencies = [
+ "bytes",
+ "pbjson",
+ "pbjson-build",
+ "pbjson-types",
+ "prost 0.14.3",
+ "prost-types",
+ "serde",
+ "tonic 0.14.2",
+ "tonic-prost",
+]
+
+[[package]]
+name = "proto"
+version = "0.10.0"
 source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.17.0#fc0d90d833965e054ff1580003e210c8ba94ec80"
 dependencies = [
  "bytes",
@@ -9040,7 +9081,6 @@ dependencies = [
 [[package]]
 name = "sapphillon_core"
 version = "0.17.0"
-source = "git+ssh://git@github.com/Sapphillon/Sapphillon-Core.git?tag=v0.17.0#fc0d90d833965e054ff1580003e210c8ba94ec80"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9051,7 +9091,7 @@ dependencies = [
  "deno_resolver",
  "deno_runtime",
  "env_logger",
- "ext_plugin",
+ "ext_plugin 0.17.0",
  "indexmap 2.13.0",
  "ipc-channel",
  "log",
@@ -9059,7 +9099,7 @@ dependencies = [
  "once_cell",
  "prost 0.14.3",
  "prost-types",
- "proto",
+ "proto 0.10.0",
  "regex",
  "serde",
  "serde_json",

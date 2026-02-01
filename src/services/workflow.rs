@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use database::workflow::{get_workflow_by_id, update_workflow_from_proto};
 use entity::entity::workflow as workflow_entity;
+use crate::ext_plugin_manager;
 use log::{debug, error, info, warn};
 use sapphillon_core::permission::{Permissions, PluginFunctionPermissions};
 use sapphillon_core::proto::google::protobuf::Timestamp;
@@ -621,6 +622,7 @@ impl WorkflowService for MyWorkflowService {
         ))
     }
 
+    #[allow(clippy::arc_with_non_send_sync)]
     async fn run_workflow(
         &self,
         request: Request<RunWorkflowRequest>,
@@ -693,10 +695,53 @@ impl WorkflowService for MyWorkflowService {
         let (required_permissions, allowed_permissions) =
             Self::build_core_permissions(workflow_code);
 
+        // Get internal plugins count before any awaits
+        let internal_count = crate::sysconfig::sysconfig().core_plugin_package.len();
+        info!("Internal plugins: {}", internal_count);
+
+        // Load external plugins from database (returns only external plugins)
+        #[allow(clippy::arc_with_non_send_sync)]
+        let external_plugins = match ext_plugin_manager::load_external_plugins(&self.db).await {
+            Ok(plugins) => {
+                let external_count = plugins.len();
+                info!("Loaded {} external plugin(s) from database", external_count);
+                for p in &plugins {
+                    info!("  - {} ({})", p.get_package_id(), p.get_package_name());
+                }
+                info!("Total plugins available to workflow: {} ({} internal + {} external)",
+                    internal_count + external_count,
+                    internal_count,
+                    external_count
+                );
+                plugins
+            }
+            Err(e) => {
+                error!("Failed to load external plugins: {}", e);
+                info!("Total plugins available to workflow: {} ({} internal + 0 external)",
+                    internal_count,
+                    internal_count
+                );
+                Vec::new()
+            }
+        };
+
+        // Get internal plugins and combine with external
+        // Note: All async operations are complete, so it's safe to use non-Send Arcs
+        #[allow(clippy::arc_with_non_send_sync)]
+        let all_plugins: Vec<Arc<dyn sapphillon_core::plugin::PluginPackageTrait>> = {
+            let internal = crate::sysconfig::sysconfig().core_plugin_package.clone();
+            internal.into_iter().chain(external_plugins).collect()
+        };
+
+        // Execute workflow with all plugins
         let results = {
+            let all_plugins = all_plugins;
+
+            info!("Total plugins available to workflow: {} (internal only)", all_plugins.len());
+
             let mut workflow_core = CoreWorkflowCode::new_from_proto(
                 workflow_code,
-                crate::sysconfig::sysconfig().core_plugin_package,
+                all_plugins,
                 required_permissions,
                 allowed_permissions,
             );

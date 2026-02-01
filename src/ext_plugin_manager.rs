@@ -12,8 +12,7 @@ use anyhow::{Context, Result};
 use sea_orm::DatabaseConnection;
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
-
+use std::path::Path;use std::sync::Arc;
 /// Installs an external plugin package.
 ///
 /// Creates the directory structure `{save_dir}/{author_id}/{package_id}/{version}/`
@@ -198,6 +197,217 @@ pub fn scan_ext_plugin_dir(save_dir: &str) -> Result<HashSet<String>> {
     }
 
     Ok(plugin_ids)
+}
+
+/// Extracts function names from package.js content.
+///
+/// Looks for the pattern `functions: { funcName: { ... }, ... }` in the Sapphillon package format.
+/// Returns a vector of function names found in the package.
+///
+/// # Arguments
+///
+/// * `package_js` - The JavaScript content of the package.js file
+///
+/// # Returns
+///
+/// A vector of function names extracted from the package.
+fn extract_function_names(package_js: &str) -> Vec<String> {
+    use regex::Regex;
+    
+    let mut function_names = Vec::new();
+    
+    // Look for function definitions in the Sapphillon.Package.functions object
+    // Pattern: functions: { getIdentity: { ... }, getCalendarEvents: { ... } }
+    // We need to find keys after "functions:" or "functions :"
+    
+    // First, try to find the functions block
+    let functions_pattern = Regex::new(r"functions\s*:\s*\{").ok();
+    
+    if let Some(pattern) = functions_pattern {
+        if let Some(mat) = pattern.find(package_js) {
+            let start_pos = mat.end();
+            let content_after_functions = &package_js[start_pos..];
+            
+            // Find function names: identifiers followed by ":"
+            // Pattern: \b([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{
+            let func_name_pattern = Regex::new(r"^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{").ok();
+            let next_key_pattern = Regex::new(r",\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\{").ok();
+            
+            // Extract the first function name
+            if let Some(ref pattern) = func_name_pattern {
+                if let Some(caps) = pattern.captures(content_after_functions) {
+                    if let Some(name) = caps.get(1) {
+                        function_names.push(name.as_str().to_string());
+                        log::debug!("Found function: {}", name.as_str());
+                    }
+                }
+            }
+            
+            // Extract subsequent function names
+            if let Some(ref pattern) = next_key_pattern {
+                for caps in pattern.captures_iter(content_after_functions) {
+                    if let Some(name) = caps.get(1) {
+                        let func_name = name.as_str().to_string();
+                        if !function_names.contains(&func_name) {
+                            function_names.push(func_name.clone());
+                            log::debug!("Found function: {}", func_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback: also look for handler: async patterns as a backup
+    if function_names.is_empty() {
+        let handler_pattern = Regex::new(r"(\w+)\s*:\s*\{\s*(?:[^{}]*\bhandler\s*:)").ok();
+        if let Some(pattern) = handler_pattern {
+            for caps in pattern.captures_iter(package_js) {
+                if let Some(name) = caps.get(1) {
+                    let func_name = name.as_str().to_string();
+                    // Skip meta and other non-function keys
+                    if func_name != "meta" && func_name != "functions" && func_name != "Package" {
+                        if !function_names.contains(&func_name) {
+                            function_names.push(func_name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    log::info!("Extracted {} function names from package.js", function_names.len());
+    function_names
+}
+
+/// Loads all external plugins from database and merges them with internal plugins.
+///
+/// # Arguments
+///
+/// * `db` - Database connection
+///
+/// # Returns
+///
+/// Returns a vector of `Arc<dyn PluginPackageTrait>` containing only external plugins.
+/// The caller is responsible for merging with internal plugins if needed.
+pub async fn load_external_plugins(
+    db: &DatabaseConnection,
+) -> Result<Vec<Arc<dyn sapphillon_core::plugin::PluginPackageTrait>>> {
+    use database::ext_plugin::list_ext_plugin_packages;
+    use sapphillon_core::plugin::{CorePluginExternalFunction, CorePluginExternalPackage, PluginPackageTrait};
+    use std::fs;
+    use std::path::Path;
+
+    log::info!("Starting to load external plugins from database...");
+
+    let ext_plugins_db = list_ext_plugin_packages(db).await?;
+    log::info!("Found {} external plugins in database", ext_plugins_db.len());
+
+    let mut external_plugins = Vec::new();
+
+    for ext_plugin in ext_plugins_db {
+        log::info!("Processing external plugin: {}", ext_plugin.plugin_package_id);
+
+        if ext_plugin.missing {
+            log::warn!("Skipping missing plugin: {}", ext_plugin.plugin_package_id);
+            continue; // Skip missing plugins
+        }
+
+        let install_dir = &ext_plugin.install_dir;
+        let package_js_path = format!("{install_dir}/package.js");
+
+        if !Path::new(&package_js_path).exists() {
+            log::warn!("External plugin file not found: {package_js_path}");
+            continue;
+        }
+
+        // Read package.js content
+        let package_js = fs::read_to_string(&package_js_path)
+            .with_context(|| format!("Failed to read package.js: {package_js_path}"))?;
+
+        // Parse plugin_package_id to extract parts (format: author/package/version)
+        let parts: Vec<&str> = ext_plugin.plugin_package_id.split('/').collect();
+        if parts.len() < 3 {
+            log::warn!("Invalid plugin_package_id format: {}", ext_plugin.plugin_package_id);
+            continue;
+        }
+
+        let author_id = parts[0];
+        let package_id = parts[1];
+        let version = parts.get(2).unwrap_or(&"1.0.0");
+
+        log::info!("Creating CorePluginExternalPackage for: {} (author={}, package={}, version={})",
+            ext_plugin.plugin_package_id, author_id, package_id, version);
+
+        // Extract function names from package.js
+        let function_names = extract_function_names(&package_js);
+        
+        if function_names.is_empty() {
+            log::warn!("No functions found in package.js for plugin: {}", ext_plugin.plugin_package_id);
+            // Create a default function as fallback
+            let ext_function = CorePluginExternalFunction::new(
+                format!("{}-{}-{}-default", author_id, package_id, version),
+                "default".to_string(),
+                format!("External plugin: {}", package_id),
+                package_id.to_string(),
+                package_js.clone(),
+                author_id.to_string(),
+            );
+
+            // Package ID must match CorePluginExternalFunction::get_package_id()
+            // which returns "{author_id}.{package_name}"
+            let full_package_id = format!("{}.{}", author_id, package_id);
+            log::info!("Creating package with id: {}", full_package_id);
+
+            let ext_package = CorePluginExternalPackage::new(
+                full_package_id, // Must match get_package_id() for rsjs_bridge_core lookup
+                package_id.to_string(),
+                vec![ext_function],
+                package_js,
+            );
+
+            external_plugins.push(Arc::new(ext_package) as Arc<dyn PluginPackageTrait>);
+        } else {
+            log::info!("Found {} functions in package.js: {:?}", function_names.len(), function_names);
+            
+            // Create external functions for each found function
+            let ext_functions: Vec<CorePluginExternalFunction> = function_names
+                .iter()
+                .map(|func_name| {
+                    CorePluginExternalFunction::new(
+                        format!("{}-{}-{}-{}", author_id, package_id, version, func_name),
+                        func_name.clone(),
+                        format!("External plugin function: {}.{}", package_id, func_name),
+                        package_id.to_string(),
+                        package_js.clone(),
+                        author_id.to_string(),
+                    )
+                })
+                .collect();
+
+            log::info!("Created {} CorePluginExternalFunction instances", ext_functions.len());
+
+            // Package ID must match CorePluginExternalFunction::get_package_id()
+            // which returns "{author_id}.{package_name}"
+            // This creates namespace: globalThis.sapphillon.thunderbird.getIdentity()
+            let full_package_id = format!("{}.{}", author_id, package_id);
+            log::info!("Creating package with id: {}", full_package_id);
+
+            let ext_package = CorePluginExternalPackage::new(
+                full_package_id, // Must match get_package_id() for rsjs_bridge_core lookup
+                package_id.to_string(),
+                ext_functions,
+                package_js,
+            );
+
+            external_plugins.push(Arc::new(ext_package) as Arc<dyn PluginPackageTrait>);
+        }
+
+        log::info!("Loaded external plugin: {}", ext_plugin.plugin_package_id);
+    }
+
+    log::info!("Total external plugins loaded: {}", external_plugins.len());
+    Ok(external_plugins)
 }
 
 #[cfg(test)]
