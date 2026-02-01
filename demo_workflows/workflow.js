@@ -436,13 +436,28 @@ function logFormFields(formStructure) {
     };
     var icon = typeIcon[f.type] || "❓";
     var reqMark = f.required ? " *" : "";
-    var optionsStr =
-      f.options.length > 0
-        ? " [" +
-          f.options.slice(0, 3).join(", ") +
-          (f.options.length > 3 ? "..." : "") +
-          "]"
-        : "";
+
+    // オプションを文字列に変換（オブジェクトの場合は値を抽出）
+    var optionsStr = "";
+    if (f.options && f.options.length > 0) {
+      var optionLabels = [];
+      for (var j = 0; j < Math.min(f.options.length, 3); j++) {
+        var opt = f.options[j];
+        if (typeof opt === "string") {
+          optionLabels.push(opt);
+        } else if (opt && typeof opt === "object") {
+          // オブジェクトの場合はlabel, value, textなどのプロパティを探す
+          optionLabels.push(opt.label || opt.value || opt.text || String(opt));
+        }
+      }
+      optionsStr =
+        optionLabels.length > 0
+          ? " [" +
+            optionLabels.join(", ") +
+            (f.options.length > 3 ? "..." : "") +
+            "]"
+          : "";
+    }
 
     console.log(
       "    " +
