@@ -346,104 +346,159 @@ function analyzeFormStructure(tabId) {
   };
 }
 
+// Helper: Fix common JSON issues from AI output
+function fixJsonString(str) {
+  // Remove BOM and zero-width characters
+  str = str.replace(/[\uFEFF\u200B-\u200D\u2028\u2029]/g, "");
+
+  // Remove markdown code blocks
+  str = str.replace(/```json\n?/gi, "").replace(/```\n?/g, "");
+
+  // Extract JSON array
+  var start = str.indexOf("[");
+  var end = str.lastIndexOf("]");
+  if (start < 0 || end < 0 || end <= start) return null;
+  str = str.slice(start, end + 1);
+
+  // Fix common issues
+  str = str
+    // Replace various quote types with standard double quotes
+    .replace(/[""„«»]/g, '"')
+    .replace(/['']/g, "'")
+    // Replace single quotes around property names with double quotes
+    .replace(/'([^']+)'\s*:/g, '"$1":')
+    // Replace single quotes around string values with double quotes
+    .replace(/:\s*'([^']*)'/g, ': "$1"')
+    // Remove trailing commas before ] or }
+    .replace(/,\s*([\]}])/g, "$1")
+    // Fix unquoted property names
+    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+    // Remove control characters
+    .replace(/[\x00-\x1F\x7F]/g, "");
+
+  return str;
+}
+
 // Use INIAD AI MOP to extract form field labels and types
 function extractFormFieldsWithAI(fieldsHtmlArray) {
   var formFields = [];
   var MAX_RETRIES = 3;
 
-  // Build prompt with all field HTML
+  // Build prompt with all field HTML (limit size for better results)
   var fieldsDescription = "";
   for (var i = 0; i < fieldsHtmlArray.length; i++) {
     fieldsDescription +=
-      "=== フィールド " +
+      "フィールド" +
       fieldsHtmlArray[i].index +
-      " ===\n" +
-      fieldsHtmlArray[i].html.substring(0, 3000) +
-      "\n\n";
+      ": " +
+      fieldsHtmlArray[i].html.substring(0, 1500) +
+      "\n";
   }
 
   var systemPrompt =
-    "あなたはHTMLフォーム解析の専門家です。Google Forms のHTMLから各フィールドの情報を正確に抽出してください。必ず有効なJSONのみを出力してください。";
+    "あなたはJSONを出力する専門家です。必ず有効なJSON配列のみを出力してください。" +
+    "プロパティ名と文字列値は必ずダブルクォート(\")で囲んでください。シングルクォート(')は使わないでください。";
 
   var userPrompt =
-    "以下のGoogle FormsのHTMLから、各フィールドの情報を抽出してJSON配列で出力してください。\n\n" +
-    "重要: 有効なJSON配列のみを出力してください。説明やマークダウンは不要です。\n\n" +
-    "出力形式（JSON配列のみ）:\n" +
-    '[{"index":1,"label":"お名前","type":"text","required":true,"options":[]},{"index":2,"label":"メールアドレス","type":"email","required":true,"options":[]}]\n\n' +
-    "type は以下のいずれか: text, email, date, radio, checkbox, textarea, unknown\n" +
-    "radio や checkbox の場合は options に選択肢を配列で含める\n" +
-    "「必須」や「*」マークがあれば required: true\n\n" +
-    "HTMLフィールド一覧:\n" +
+    "Google FormsのHTMLからフィールド情報をJSON配列で出力してください。\n\n" +
+    "【重要なルール】\n" +
+    "1. JSON配列のみを出力（説明文やマークダウン不要）\n" +
+    '2. プロパティ名は必ずダブルクォートで囲む（例: "label"）\n' +
+    '3. 文字列値も必ずダブルクォートで囲む（例: "お名前"）\n' +
+    "4. シングルクォートは絶対に使わない\n\n" +
+    "【出力形式の例】\n" +
+    '[{"index":1,"label":"お名前","type":"text","required":true,"options":[]},{"index":2,"label":"希望日","type":"date","required":true,"options":[]}]\n\n' +
+    "【typeの種類】text, email, date, radio, checkbox, textarea, unknown\n\n" +
+    "【フィールド一覧】\n" +
     fieldsDescription;
 
   var lastError = null;
 
   for (var retry = 0; retry < MAX_RETRIES; retry++) {
     try {
-      var retryPrompt = userPrompt;
+      var currentPrompt = userPrompt;
 
-      // If previous attempt failed, add error context to prompt
-      if (lastError && retry > 0) {
-        retryPrompt =
-          "前回のJSON出力にエラーがありました: " +
+      // On retry, make the prompt stricter
+      if (retry > 0) {
+        currentPrompt =
+          "【警告】前回のJSONが無効でした。エラー: " +
           lastError +
           "\n" +
-          "今回は必ず有効なJSONを出力してください。\n\n" +
+          "今回は特に注意してください:\n" +
+          '- プロパティ名は "label" のようにダブルクォートで囲む\n' +
+          "- シングルクォートは使わない\n" +
+          "- 余計な説明は書かない\n\n" +
           userPrompt;
       }
 
-      var aiResponse = iniad_ai_mop.chat(systemPrompt, retryPrompt);
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, currentPrompt);
 
-      // Clean up response and parse JSON
-      aiResponse = aiResponse
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-
-      var jsonStart = aiResponse.indexOf("[");
-      var jsonEnd = aiResponse.lastIndexOf("]") + 1;
-
-      if (jsonStart >= 0 && jsonEnd > jsonStart) {
-        var jsonStr = aiResponse.slice(jsonStart, jsonEnd);
-
-        // Try to fix common JSON issues before parsing
-        jsonStr = jsonStr
-          .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
-          .replace(/,\s*}/g, "}") // Remove trailing commas in objects
-          .replace(/'/g, '"'); // Replace single quotes with double quotes
-
-        formFields = JSON.parse(jsonStr);
-
-        // Validate and normalize each field
-        for (var j = 0; j < formFields.length; j++) {
-          var f = formFields[j];
-          if (!f.label) f.label = "フィールド " + f.index;
-          if (!f.type) f.type = "unknown";
-          if (f.required === undefined) f.required = false;
-          if (!f.options) f.options = [];
-        }
-
-        // Success - return the parsed fields
-        return formFields;
-      } else {
+      // Fix and extract JSON
+      var jsonStr = fixJsonString(aiResponse);
+      if (!jsonStr) {
         lastError = "JSON配列が見つかりませんでした";
+        continue;
       }
+
+      formFields = JSON.parse(jsonStr);
+
+      // Validate and normalize each field
+      for (var j = 0; j < formFields.length; j++) {
+        var f = formFields[j];
+        if (!f.index) f.index = j + 1;
+        if (!f.label) f.label = "フィールド " + f.index;
+        if (!f.type) f.type = "unknown";
+        if (f.required === undefined) f.required = false;
+        if (!f.options) f.options = [];
+      }
+
+      // Success
+      return formFields;
     } catch (e) {
-      lastError = String(e);
-      console.log("AI form analysis attempt " + (retry + 1) + " failed: " + e);
+      lastError = String(e).substring(0, 100);
     }
   }
 
-  // All retries failed - use fallback
-  console.error(
-    "AI form analysis failed after " + MAX_RETRIES + " retries: " + lastError,
-  );
+  // All retries failed - use fallback with HTML-based detection
   for (var k = 0; k < fieldsHtmlArray.length; k++) {
+    var html = fieldsHtmlArray[k].html.toLowerCase();
+    var detectedType = "unknown";
+    var detectedLabel = "フィールド " + fieldsHtmlArray[k].index;
+    var isRequired = html.indexOf("必須") >= 0 || html.indexOf("required") >= 0;
+
+    // Simple type detection from HTML
+    if (html.indexOf('type="email"') >= 0 || html.indexOf("メール") >= 0) {
+      detectedType = "email";
+      detectedLabel = "メールアドレス";
+    } else if (
+      html.indexOf('type="date"') >= 0 ||
+      html.indexOf("希望日") >= 0
+    ) {
+      detectedType = "date";
+    } else if (html.indexOf('type="text"') >= 0) {
+      detectedType = "text";
+      if (html.indexOf("名前") >= 0 || html.indexOf("氏名") >= 0) {
+        detectedLabel = "名前";
+      }
+    } else if (
+      html.indexOf('role="radiogroup"') >= 0 ||
+      html.indexOf('type="radio"') >= 0
+    ) {
+      detectedType = "radio";
+    } else if (
+      html.indexOf('role="group"') >= 0 &&
+      html.indexOf("checkbox") >= 0
+    ) {
+      detectedType = "checkbox";
+    } else if (html.indexOf("textarea") >= 0) {
+      detectedType = "textarea";
+    }
+
     formFields.push({
       index: fieldsHtmlArray[k].index,
-      label: "フィールド " + fieldsHtmlArray[k].index,
-      type: "unknown",
-      required: false,
+      label: detectedLabel,
+      type: detectedType,
+      required: isRequired,
       options: [],
     });
   }
@@ -680,34 +735,6 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
         start: gTimeRange ? gTimeRange.start : 0,
         end: gTimeRange ? gTimeRange.end : 24,
       });
-    } else {
-      console.log(
-        "[DEBUG] Google event missing date: " +
-          gEvent.title +
-          " time: " +
-          gEvent.time,
-      );
-    }
-  }
-
-  // Debug: Show busy times for upcoming days
-  var debugDates = generateDateRange(7);
-  for (var dd = 0; dd < debugDates.length; dd++) {
-    var dDate = debugDates[dd];
-    var dBusy = busyTimesByDate[dDate] || [];
-    if (dBusy.length > 0) {
-      console.log("[DEBUG] " + dDate + ": " + dBusy.length + " events");
-      for (var de = 0; de < dBusy.length; de++) {
-        console.log(
-          "  - " +
-            dBusy[de].title +
-            " (" +
-            dBusy[de].start +
-            ":00-" +
-            dBusy[de].end +
-            ":00)",
-        );
-      }
     }
   }
 
