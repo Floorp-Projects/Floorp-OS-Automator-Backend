@@ -381,12 +381,15 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
   for (var retry = 0; retry < MAX_RETRIES; retry++) {
     try {
       var retryPrompt = userPrompt;
-      
+
       // If previous attempt failed, add error context to prompt
       if (lastError && retry > 0) {
-        retryPrompt = 
-          "前回のJSON出力にエラーがありました: " + lastError + "\n" +
-          "今回は必ず有効なJSONを出力してください。\n\n" + userPrompt;
+        retryPrompt =
+          "前回のJSON出力にエラーがありました: " +
+          lastError +
+          "\n" +
+          "今回は必ず有効なJSONを出力してください。\n\n" +
+          userPrompt;
       }
 
       var aiResponse = iniad_ai_mop.chat(systemPrompt, retryPrompt);
@@ -402,12 +405,12 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
 
       if (jsonStart >= 0 && jsonEnd > jsonStart) {
         var jsonStr = aiResponse.slice(jsonStart, jsonEnd);
-        
+
         // Try to fix common JSON issues before parsing
         jsonStr = jsonStr
-          .replace(/,\s*]/g, "]")  // Remove trailing commas in arrays
-          .replace(/,\s*}/g, "}")  // Remove trailing commas in objects
-          .replace(/'/g, '"');     // Replace single quotes with double quotes
+          .replace(/,\s*]/g, "]") // Remove trailing commas in arrays
+          .replace(/,\s*}/g, "}") // Remove trailing commas in objects
+          .replace(/'/g, '"'); // Replace single quotes with double quotes
 
         formFields = JSON.parse(jsonStr);
 
@@ -419,7 +422,7 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
           if (f.required === undefined) f.required = false;
           if (!f.options) f.options = [];
         }
-        
+
         // Success - return the parsed fields
         return formFields;
       } else {
@@ -432,7 +435,9 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
   }
 
   // All retries failed - use fallback
-  console.error("AI form analysis failed after " + MAX_RETRIES + " retries: " + lastError);
+  console.error(
+    "AI form analysis failed after " + MAX_RETRIES + " retries: " + lastError,
+  );
   for (var k = 0; k < fieldsHtmlArray.length; k++) {
     formFields.push({
       index: fieldsHtmlArray[k].index,
@@ -510,7 +515,8 @@ function fillForm(tabId, availableDates, timeSlots) {
   var firstDate = availableDates[0] || "";
   var secondDate = availableDates[1] || "";
   var timeSlot1 = (timeSlots && timeSlots[0]) || CONFIG.preferredTimeSlots[0];
-  var timeSlot2 = (timeSlots && timeSlots[1]) || CONFIG.preferredTimeSlots[1] || timeSlot1;
+  var timeSlot2 =
+    (timeSlots && timeSlots[1]) || CONFIG.preferredTimeSlots[1] || timeSlot1;
 
   if (!firstDate) {
     var tomorrowDates = generateDateRange(1);
@@ -559,10 +565,7 @@ function fillForm(tabId, availableDates, timeSlots) {
 
   // Select first time slot
   try {
-    floorp.tabClick(
-      tabId,
-      "div[aria-label='" + timeSlot1 + "']",
-    );
+    floorp.tabClick(tabId, "div[aria-label='" + timeSlot1 + "']");
   } catch (e) {}
 
   // Fill second date
@@ -678,7 +681,12 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
         end: gTimeRange ? gTimeRange.end : 24,
       });
     } else {
-      console.log("[DEBUG] Google event missing date: " + gEvent.title + " time: " + gEvent.time);
+      console.log(
+        "[DEBUG] Google event missing date: " +
+          gEvent.title +
+          " time: " +
+          gEvent.time,
+      );
     }
   }
 
@@ -690,7 +698,15 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
     if (dBusy.length > 0) {
       console.log("[DEBUG] " + dDate + ": " + dBusy.length + " events");
       for (var de = 0; de < dBusy.length; de++) {
-        console.log("  - " + dBusy[de].title + " (" + dBusy[de].start + ":00-" + dBusy[de].end + ":00)");
+        console.log(
+          "  - " +
+            dBusy[de].title +
+            " (" +
+            dBusy[de].start +
+            ":00-" +
+            dBusy[de].end +
+            ":00)",
+        );
       }
     }
   }
