@@ -349,6 +349,7 @@ function analyzeFormStructure(tabId) {
 // Use INIAD AI MOP to extract form field labels and types
 function extractFormFieldsWithAI(fieldsHtmlArray) {
   var formFields = [];
+  var MAX_RETRIES = 3;
 
   // Build prompt with all field HTML
   var fieldsDescription = "";
@@ -362,11 +363,12 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
   }
 
   var systemPrompt =
-    "あなたはHTMLフォーム解析の専門家です。Google Forms のHTMLから各フィールドの情報を正確に抽出してください。";
+    "あなたはHTMLフォーム解析の専門家です。Google Forms のHTMLから各フィールドの情報を正確に抽出してください。必ず有効なJSONのみを出力してください。";
 
   var userPrompt =
     "以下のGoogle FormsのHTMLから、各フィールドの情報を抽出してJSON配列で出力してください。\n\n" +
-    "出力形式（JSON配列のみ、他の説明不要）:\n" +
+    "重要: 有効なJSON配列のみを出力してください。説明やマークダウンは不要です。\n\n" +
+    "出力形式（JSON配列のみ）:\n" +
     '[{"index":1,"label":"お名前","type":"text","required":true,"options":[]},{"index":2,"label":"メールアドレス","type":"email","required":true,"options":[]}]\n\n' +
     "type は以下のいずれか: text, email, date, radio, checkbox, textarea, unknown\n" +
     "radio や checkbox の場合は options に選択肢を配列で含める\n" +
@@ -374,43 +376,71 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
     "HTMLフィールド一覧:\n" +
     fieldsDescription;
 
-  try {
-    var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+  var lastError = null;
 
-    // Clean up response and parse JSON
-    aiResponse = aiResponse
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
-
-    var jsonStart = aiResponse.indexOf("[");
-    var jsonEnd = aiResponse.lastIndexOf("]") + 1;
-
-    if (jsonStart >= 0 && jsonEnd > jsonStart) {
-      var jsonStr = aiResponse.slice(jsonStart, jsonEnd);
-      formFields = JSON.parse(jsonStr);
-
-      // Validate and normalize each field
-      for (var j = 0; j < formFields.length; j++) {
-        var f = formFields[j];
-        if (!f.label) f.label = "フィールド " + f.index;
-        if (!f.type) f.type = "unknown";
-        if (f.required === undefined) f.required = false;
-        if (!f.options) f.options = [];
+  for (var retry = 0; retry < MAX_RETRIES; retry++) {
+    try {
+      var retryPrompt = userPrompt;
+      
+      // If previous attempt failed, add error context to prompt
+      if (lastError && retry > 0) {
+        retryPrompt = 
+          "前回のJSON出力にエラーがありました: " + lastError + "\n" +
+          "今回は必ず有効なJSONを出力してください。\n\n" + userPrompt;
       }
+
+      var aiResponse = iniad_ai_mop.chat(systemPrompt, retryPrompt);
+
+      // Clean up response and parse JSON
+      aiResponse = aiResponse
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
+      var jsonStart = aiResponse.indexOf("[");
+      var jsonEnd = aiResponse.lastIndexOf("]") + 1;
+
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        var jsonStr = aiResponse.slice(jsonStart, jsonEnd);
+        
+        // Try to fix common JSON issues before parsing
+        jsonStr = jsonStr
+          .replace(/,\s*]/g, "]")  // Remove trailing commas in arrays
+          .replace(/,\s*}/g, "}")  // Remove trailing commas in objects
+          .replace(/'/g, '"');     // Replace single quotes with double quotes
+
+        formFields = JSON.parse(jsonStr);
+
+        // Validate and normalize each field
+        for (var j = 0; j < formFields.length; j++) {
+          var f = formFields[j];
+          if (!f.label) f.label = "フィールド " + f.index;
+          if (!f.type) f.type = "unknown";
+          if (f.required === undefined) f.required = false;
+          if (!f.options) f.options = [];
+        }
+        
+        // Success - return the parsed fields
+        return formFields;
+      } else {
+        lastError = "JSON配列が見つかりませんでした";
+      }
+    } catch (e) {
+      lastError = String(e);
+      console.log("AI form analysis attempt " + (retry + 1) + " failed: " + e);
     }
-  } catch (e) {
-    console.error("AI form analysis error: " + e);
-    // Fallback: create basic field entries
-    for (var k = 0; k < fieldsHtmlArray.length; k++) {
-      formFields.push({
-        index: fieldsHtmlArray[k].index,
-        label: "フィールド " + fieldsHtmlArray[k].index,
-        type: "unknown",
-        required: false,
-        options: [],
-      });
-    }
+  }
+
+  // All retries failed - use fallback
+  console.error("AI form analysis failed after " + MAX_RETRIES + " retries: " + lastError);
+  for (var k = 0; k < fieldsHtmlArray.length; k++) {
+    formFields.push({
+      index: fieldsHtmlArray[k].index,
+      label: "フィールド " + fieldsHtmlArray[k].index,
+      type: "unknown",
+      required: false,
+      options: [],
+    });
   }
 
   return formFields;
@@ -476,9 +506,11 @@ function logFormFields(formStructure) {
 // FILL THE FORM
 // =============================================================================
 
-function fillForm(tabId, availableDates) {
+function fillForm(tabId, availableDates, timeSlots) {
   var firstDate = availableDates[0] || "";
   var secondDate = availableDates[1] || "";
+  var timeSlot1 = (timeSlots && timeSlots[0]) || CONFIG.preferredTimeSlots[0];
+  var timeSlot2 = (timeSlots && timeSlots[1]) || CONFIG.preferredTimeSlots[1] || timeSlot1;
 
   if (!firstDate) {
     var tomorrowDates = generateDateRange(1);
@@ -529,7 +561,7 @@ function fillForm(tabId, availableDates) {
   try {
     floorp.tabClick(
       tabId,
-      "div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']",
+      "div[aria-label='" + timeSlot1 + "']",
     );
   } catch (e) {}
 
@@ -552,10 +584,8 @@ function fillForm(tabId, availableDates) {
 
   // Select second time slot
   var timeSlotSelectors = [
+    "div[role='listitem']:nth-child(6) div[aria-label='" + timeSlot2 + "']",
     "div[role='listitem']:nth-child(6) div[role='radio']",
-    "div[role='listitem']:nth-child(6) div[aria-label='" +
-      CONFIG.preferredTimeSlots[0] +
-      "']",
     "li:nth-child(6) div[role='radio']",
   ];
   for (var ti = 0; ti < timeSlotSelectors.length; ti++) {
@@ -573,7 +603,8 @@ function fillForm(tabId, availableDates) {
 function calculateAvailableDates(thunderbirdEvents, googleEvents) {
   var dateRange = generateDateRange(CONFIG.schedulingDaysLookAhead);
   var BUSINESS_START = 10;
-  var BUSINESS_END = 17;
+  var BUSINESS_END = 19;
+  var MIN_GAP_HOURS = 3; // Minimum gap between events to consider as available
 
   function parseJapaneseTime(timeStr) {
     if (!timeStr) return null;
@@ -646,30 +677,104 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
         start: gTimeRange ? gTimeRange.start : 0,
         end: gTimeRange ? gTimeRange.end : 24,
       });
+    } else {
+      console.log("[DEBUG] Google event missing date: " + gEvent.title + " time: " + gEvent.time);
     }
   }
 
-  var availableDates = [];
+  // Debug: Show busy times for upcoming days
+  var debugDates = generateDateRange(7);
+  for (var dd = 0; dd < debugDates.length; dd++) {
+    var dDate = debugDates[dd];
+    var dBusy = busyTimesByDate[dDate] || [];
+    if (dBusy.length > 0) {
+      console.log("[DEBUG] " + dDate + ": " + dBusy.length + " events");
+      for (var de = 0; de < dBusy.length; de++) {
+        console.log("  - " + dBusy[de].title + " (" + dBusy[de].start + ":00-" + dBusy[de].end + ":00)");
+      }
+    }
+  }
+
+  var availableSlots = [];
 
   for (var i = 0; i < dateRange.length; i++) {
     var dateStr = dateRange[i];
     var busyTimes = busyTimesByDate[dateStr] || [];
-    var isAvailable = true;
+
+    // Sort busy times by start hour
+    busyTimes.sort(function (a, b) {
+      return a.start - b.start;
+    });
+
+    // Find gaps of MIN_GAP_HOURS or more within business hours
+    var gaps = [];
+    var currentTime = BUSINESS_START;
 
     for (var b = 0; b < busyTimes.length; b++) {
       var busy = busyTimes[b];
-      if (busy.start < BUSINESS_END && busy.end > BUSINESS_START) {
-        isAvailable = false;
-        break;
+      // Only consider events within business hours
+      var eventStart = Math.max(busy.start, BUSINESS_START);
+      var eventEnd = Math.min(busy.end, BUSINESS_END);
+
+      if (eventStart > currentTime) {
+        // Found a gap before this event
+        var gapDuration = eventStart - currentTime;
+        if (gapDuration >= MIN_GAP_HOURS) {
+          gaps.push({ start: currentTime, end: eventStart });
+        }
+      }
+      // Move current time to end of this event (if within business hours)
+      if (busy.end > currentTime) {
+        currentTime = Math.max(currentTime, busy.end);
       }
     }
 
-    if (isAvailable) {
-      availableDates.push(dateStr);
+    // Check for gap after last event until end of business hours
+    if (currentTime < BUSINESS_END) {
+      var finalGap = BUSINESS_END - currentTime;
+      if (finalGap >= MIN_GAP_HOURS) {
+        gaps.push({ start: currentTime, end: BUSINESS_END });
+      }
+    }
+
+    // Add available slots for this date
+    for (var g = 0; g < gaps.length; g++) {
+      var gap = gaps[g];
+      // Find a matching preferred time slot within this gap
+      for (var p = 0; p < CONFIG.preferredTimeSlots.length; p++) {
+        var slot = CONFIG.preferredTimeSlots[p];
+        var slotParts = slot.split("-");
+        var slotStart = parseInt(slotParts[0].split(":")[0], 10);
+        var slotEnd = parseInt(slotParts[1].split(":")[0], 10);
+
+        if (slotStart >= gap.start && slotEnd <= gap.end) {
+          availableSlots.push({
+            date: dateStr,
+            timeSlot: slot,
+            gapStart: gap.start,
+            gapEnd: gap.end,
+          });
+          break; // Only add first matching slot per gap
+        }
+      }
     }
   }
 
-  return availableDates;
+  // Return unique dates with their best time slots
+  var result = [];
+  var seenDates = {};
+  for (var s = 0; s < availableSlots.length; s++) {
+    var slotInfo = availableSlots[s];
+    if (!seenDates[slotInfo.date]) {
+      seenDates[slotInfo.date] = true;
+      result.push(slotInfo.date);
+    }
+  }
+
+  // Store the full slot info for later use
+  calculateAvailableDates.lastSlots = availableSlots;
+
+  return result;
 }
 
 // =============================================================================
@@ -712,8 +817,6 @@ function addEventToGoogleCalendar(date, timeSlot, title) {
     floorp.tabClick(calendarTabId, "#xSaveBu");
     // Wait for save to complete
     floorp.tabWaitForNetworkIdle(calendarTabId);
-    // Destroy the instance to release control back to user
-    floorp.destroyTabInstance(calendarTabId);
   } catch (e) {
     // Save button click failed - user will need to save manually
   }
@@ -854,8 +957,14 @@ function openOrCreateFormTab() {
   } catch (e) {}
 
   if (formTab) {
-    formTabId = String(formTab.instance_id || formTab.id);
-    floorp.attachToTab(formTabId);
+    // If already have an instanceId, use it; otherwise attach using browserId
+    if (formTab.instanceId) {
+      formTabId = formTab.instanceId;
+    } else {
+      // attachToTab expects browserId and returns new instanceId
+      var browserId = String(formTab.browserId || formTab.id);
+      formTabId = floorp.attachToTab(browserId);
+    }
   } else {
     formTabId = floorp.createTab(CONFIG.formUrl, false);
   }
@@ -921,7 +1030,6 @@ function workflow() {
     availableDates.slice(0, 2).join(", ") +
       (availableDates.length > 2 ? " +" + (availableDates.length - 2) : ""),
   );
-  fillForm(formTabId, availableDates);
 
   var firstDate = availableDates[0];
   var secondDate = availableDates[1];
@@ -933,8 +1041,28 @@ function workflow() {
   if (!secondDate) {
     secondDate = firstDate;
   }
+
+  // Get the actual available time slots from lastSlots
+  var lastSlots = calculateAvailableDates.lastSlots || [];
   var timeSlot1 = CONFIG.preferredTimeSlots[0];
   var timeSlot2 = CONFIG.preferredTimeSlots[1] || timeSlot1;
+  var timeSlot1Found = false;
+  var timeSlot2Found = false;
+
+  // Find the correct time slot for each date
+  for (var si = 0; si < lastSlots.length; si++) {
+    if (lastSlots[si].date === firstDate && !timeSlot1Found) {
+      timeSlot1 = lastSlots[si].timeSlot;
+      timeSlot1Found = true;
+    }
+    if (lastSlots[si].date === secondDate && !timeSlot2Found) {
+      timeSlot2 = lastSlots[si].timeSlot;
+      timeSlot2Found = true;
+    }
+  }
+
+  // Fill the form with correct dates and time slots
+  fillForm(formTabId, [firstDate, secondDate], [timeSlot1, timeSlot2]);
 
   // =========================================================================
   // STEP 6: Add events to Google Calendar (first and second date)
@@ -948,6 +1076,13 @@ function workflow() {
     "病院の予約（第一希望）",
   );
   logResult("第一希望", firstDate + " " + timeSlot1);
+
+  // Close the first calendar tab
+  try {
+    floorp.closeTab(calendarTabId);
+  } catch (e) {
+    // Silent cleanup
+  }
 
   // Register second date
   addEventToGoogleCalendar(secondDate, timeSlot2, "病院の予約（第二希望）");

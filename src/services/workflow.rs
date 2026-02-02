@@ -562,6 +562,9 @@ impl WorkflowService for MyWorkflowService {
             prompt_len = req.prompt.len()
         );
 
+        // Add 10 second delay for testing frontend progress UI
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+
         if let Err(err) = generate_workflow_async(&req.prompt).await {
             warn!("failed to generate workflow via generator (ignoring for demo): {err}");
         }
