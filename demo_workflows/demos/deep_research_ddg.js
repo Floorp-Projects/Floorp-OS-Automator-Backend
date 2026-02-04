@@ -91,8 +91,8 @@ function suggestSearchDirectories(query, homeDir) {
   // LLM を使用してクエリに基づいてディレクトリを推薦
   try {
     if (
-      typeof iniad_ai_mop !== "undefined" &&
-      typeof iniad_ai_mop.chat === "function"
+      typeof llm_chat !== "undefined" &&
+      typeof llm_chat.chat === "function"
     ) {
       console.log("  [LLM] Analyzing query to suggest search directories...");
 
@@ -107,7 +107,7 @@ function suggestSearchDirectories(query, homeDir) {
 
       var userPrompt = "検索クエリ: " + query;
 
-      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+      var aiResponse = llm_chat.chat(systemPrompt, userPrompt);
 
       if (aiResponse) {
         try {
@@ -924,7 +924,7 @@ function workflow() {
         "【コンテンツ】\n" +
         result.pageContent.substring(0, 6000);
 
-      var factList = iniad_ai_mop.chat(
+      var factList = llm_chat.chat(
         "You are a comprehensive analyzer. Extract detailed information, provide context, and explain relationships. Output in structured Japanese markdown format.",
         factExtractionPrompt,
       );
@@ -938,7 +938,7 @@ function workflow() {
 
       var keyClaims = [];
       try {
-        var claimsJson = iniad_ai_mop.chat(
+        var claimsJson = llm_chat.chat(
           "Extract 3 verifiable claims as JSON array only.",
           keyClaimsPrompt,
         );
@@ -1244,7 +1244,7 @@ function workflow() {
   try {
     var sectionJson = retryWithBackoff(
       function () {
-        return iniad_ai_mop.chat(
+        return llm_chat.chat(
           "You are a JSON generator. Output ONLY valid JSON array, no markdown, no explanation.",
           sectionStructurePrompt,
         );
@@ -1713,7 +1713,7 @@ function workflow() {
     });
 
     try {
-      var correlationAnalysis = iniad_ai_mop.chat(
+      var correlationAnalysis = llm_chat.chat(
         "You are an expert researcher analyzing the relationship between web sources and local files. Write in Japanese.",
         correlationPrompt,
       );
@@ -2032,7 +2032,7 @@ function generateAnalysis(type, topic, summaries, count) {
   }
 
   try {
-    return iniad_ai_mop.chat(systemPrompt, prompt);
+    return llm_chat.chat(systemPrompt, prompt);
   } catch (e) {
     console.log("  ⚠ " + type + " generation failed: " + e.message);
     return "（" + type + "の生成に失敗しました）";
@@ -2059,7 +2059,7 @@ function generateDetailedFindings(topic, summaries, sectionType, customPrompt) {
     summaries;
 
   try {
-    return iniad_ai_mop.chat(systemPrompt, fullPrompt);
+    return llm_chat.chat(systemPrompt, fullPrompt);
   } catch (e) {
     return "（" + sectionType + "の詳細分析の生成に失敗しました）";
   }
@@ -2307,7 +2307,7 @@ function performRecursiveSearch(originalQuery, currentFacts, existingResults) {
   var gapsToFill = [];
 
   try {
-    var gapResponse = iniad_ai_mop.chat(
+    var gapResponse = llm_chat.chat(
       "Identify information gaps and suggest search queries. Output JSON array only.",
       gapAnalysisPrompt,
     );
@@ -2446,7 +2446,7 @@ function performRecursiveSearch(originalQuery, currentFacts, existingResults) {
 
             var factList = "(抽出エラー)";
             try {
-              factList = iniad_ai_mop.chat(
+              factList = llm_chat.chat(
                 "You are a fact extractor. Extract ONLY concrete facts. Output in Japanese bullet points.",
                 factExtractionPrompt,
               );
@@ -2606,11 +2606,11 @@ function describeLocalFileWithAI(filePath, extension, content, searchQuery) {
   try {
     // LLM 呼び出し
     if (
-      typeof iniad_ai_mop !== "undefined" &&
-      typeof iniad_ai_mop.chat === "function"
+      typeof llm_chat !== "undefined" &&
+      typeof llm_chat.chat === "function"
     ) {
       console.log("    [LLM] Analyzing: " + fileName);
-      var aiResponse = iniad_ai_mop.chat(systemPrompt, userPrompt);
+      var aiResponse = llm_chat.chat(systemPrompt, userPrompt);
 
       if (aiResponse && aiResponse.length > 0) {
         // LLM レスポンスにファイル情報を追加
@@ -2830,7 +2830,7 @@ function filterRelevantResults(results, query) {
       "上記の各結果について、検索クエリとの関連性をスコアリングしてJSONで出力してください。";
 
     try {
-      var response = iniad_ai_mop.chat(systemPrompt, checkPrompt);
+      var response = llm_chat.chat(systemPrompt, checkPrompt);
       response = response
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -3383,7 +3383,7 @@ function generateDetailedFindingsWithRetry(
     try {
       content = retryWithBackoff(
         function () {
-          return iniad_ai_mop.chat(systemPrompt, basePrompt);
+          return llm_chat.chat(systemPrompt, basePrompt);
         },
         2,
         500,
@@ -3415,7 +3415,7 @@ function generateDetailedFindingsWithRetry(
           content.slice(-500);
 
         try {
-          var completion = iniad_ai_mop.chat(
+          var completion = llm_chat.chat(
             "Complete the following Japanese text naturally. Only add the ending, no repetition.",
             completionPrompt,
           );
@@ -3633,7 +3633,7 @@ function verifyClaimsWithLLM(content, sourceSummaries, rawContentArray) {
     "\n\n最も重要な10件の主張について検証結果をJSON配列で出力してください。";
 
   try {
-    var result = iniad_ai_mop.chat(systemPrompt, checkPrompt);
+    var result = llm_chat.chat(systemPrompt, checkPrompt);
     // Parse JSON from response
     result = result
       .replace(/```json\n?/g, "")
@@ -4830,7 +4830,7 @@ function expandSearchQuery(originalQuery) {
     '[{"category":"basic","query":"検索クエリ1"},{"category":"technical","query":"検索クエリ2"},...]';
 
   try {
-    var expansionResponse = iniad_ai_mop.chat(
+    var expansionResponse = llm_chat.chat(
       "Generate search query expansions. Output JSON array only.",
       expansionPrompt,
     );
@@ -5233,7 +5233,7 @@ function extractInsights(analyzedResults, searchQuery) {
     try {
       var insights = retryWithBackoff(
         function () {
-          return iniad_ai_mop.chat(
+          return llm_chat.chat(
             "You are an expert researcher generating deep insights. Write in Japanese with formal academic tone. " +
               "【言語制約】すべての出力は日本語で記述してください。",
             insightPrompt + "\n\n【情報源】\n" + allFacts.substring(0, 8000),
@@ -5369,7 +5369,7 @@ function performInteractiveExploration(analyzedResults, searchQuery) {
     '[{"question":"質問文","category":"不明点|興味深い視点|代替アプローチ","priority":"high|medium"}]';
 
   try {
-    var response = iniad_ai_mop.chat(
+    var response = llm_chat.chat(
       "Generate clarification questions. Output JSON array only.",
       clarificationPrompt,
     );
@@ -5451,7 +5451,7 @@ function extractRichMetadata(result, pageTab) {
       "【出力形式】JSONのみ:\n" +
       '{"author":"","lastUpdated":"","externalLinks":0,"keywords":[],"hasStructuredData":false}';
 
-    var metaResponse = iniad_ai_mop.chat(
+    var metaResponse = llm_chat.chat(
       "Extract metadata from webpage. Output JSON only.",
       authorityPrompt,
     );
@@ -5526,7 +5526,7 @@ function buildKnowledgeGraph(analyzedResults) {
       '[{"name":"エンティティ名","type":"person|org|product|concept|technology","sources":[1,3]},...]';
 
     try {
-      var entityResponse = iniad_ai_mop.chat(
+      var entityResponse = llm_chat.chat(
         "Extract entities from text. Output JSON array only.",
         entityPrompt,
       );

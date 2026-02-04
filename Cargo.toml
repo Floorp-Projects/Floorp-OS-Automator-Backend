@@ -91,7 +91,7 @@ search = { path = "./plugins/search" }
 floorp = { path = "./plugins/floorp" }
 vscode = { path = "./plugins/vscode" }
 git = { path = "./plugins/git" }
-iniad = { path = "./plugins/iniad-ai-mop" }
+llm_chat = { path = "./plugins/llm-chat" }
 excel = { path = "./plugins/excel" }
 finder = { path = "./plugins/finder" }
 # thunderbird = { path = "./plugins/thunderbird" }  # Disabled - replaced by external plugin

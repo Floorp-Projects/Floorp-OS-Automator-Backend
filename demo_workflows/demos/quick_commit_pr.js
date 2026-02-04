@@ -43,7 +43,7 @@ async function workflow() {
         repoPath +
         "], branch: [" +
         currentBranch +
-        "]"
+        "]",
     );
 
     // Step 2: Get git diff for AI analysis
@@ -63,7 +63,13 @@ async function workflow() {
     let commitMessage = "chore: automated commit";
     if (diffContent.length > 0) {
       try {
-        commitMessage = iniad.generateCommitMessage(diffContent);
+        const systemPrompt =
+          "You are a helpful assistant that generates conventional commit messages. Respond with only the commit message, no explanation.";
+        commitMessage = llm_chat.chat(
+          systemPrompt,
+          "Generate a commit message for this diff: " +
+            diffContent.substring(0, 4000),
+        );
         console.log("AI generated commit message: " + commitMessage);
       } catch (e) {
         console.log("AI commit message failed: " + e + ", using default.");
@@ -164,13 +170,19 @@ async function workflow() {
     console.log("Step 7: Generating PR title/body using AI...");
     let aiResult;
     try {
-      const aiJson = iniad.generatePrDescription(diffContent);
+      const systemPrompt =
+        "You are a helpful assistant that generates pull request descriptions. Respond with a JSON object containing 'title' and 'body' fields. The title should be a short summary and the body should be a detailed description.";
+      const aiJson = llm_chat.chat(
+        systemPrompt,
+        "Generate a PR title and body for this diff: " +
+          diffContent.substring(0, 4000),
+      );
       console.log("DEBUG: AI response JSON: " + aiJson);
       aiResult = JSON.parse(aiJson);
       console.log("DEBUG: Parsed aiResult.title: " + aiResult.title);
       console.log(
         "DEBUG: Parsed aiResult.body length: " +
-          (aiResult.body ? aiResult.body.length : 0)
+          (aiResult.body ? aiResult.body.length : 0),
       );
     } catch (aiError) {
       console.log("AI generation failed: " + aiError);
@@ -195,7 +207,7 @@ async function workflow() {
       const titleResultJson = floorp.tabFillForm(
         instanceId,
         "#pull_request_title",
-        aiResult.title
+        aiResult.title,
       );
       console.log("Title fill result: " + titleResultJson);
       const titleResult = JSON.parse(titleResultJson);
@@ -209,7 +221,7 @@ async function workflow() {
       const bodyResultJson = floorp.tabFillForm(
         instanceId,
         "#pull_request_body",
-        aiResult.body
+        aiResult.body,
       );
       console.log("Body fill result: " + bodyResultJson);
       const bodyResult = JSON.parse(bodyResultJson);
@@ -224,7 +236,7 @@ async function workflow() {
         "ERROR: Form fill failed! Title: " +
           titleFillSuccess +
           ", Body: " +
-          bodyFillSuccess
+          bodyFillSuccess,
       );
       console.log("Aborting PR creation to prevent incomplete PR.");
       return {

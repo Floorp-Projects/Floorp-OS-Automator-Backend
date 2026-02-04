@@ -17,7 +17,7 @@ use search::{core_search_plugin_package, search_plugin_package};
 use vscode::{core_vscode_plugin_package, vscode_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
 use git::{core_git_plugin_package, git_plugin_package};
-use iniad::{core_iniad_ai_mop_plugin_package, iniad_ai_mop_plugin_package};
+use llm_chat::{core_llm_chat_plugin_package, llm_chat_plugin_package};
 use finder::{core_finder_plugin_package, finder_plugin_package};
 use excel::{core_excel_plugin_package, excel_plugin_package};
 // use thunderbird::{core_thunderbird_plugin_package, thunderbird_plugin_package};  // Disabled - replaced by external plugin
@@ -49,7 +49,7 @@ pub fn sysconfig() -> SysConfig {
             Arc::new(core_window_plugin_package()),
             Arc::new(core_exec_plugin_package()),
             Arc::new(core_git_plugin_package()),
-            Arc::new(core_iniad_ai_mop_plugin_package()),
+            Arc::new(core_llm_chat_plugin_package()),
             Arc::new(core_excel_plugin_package()),
             // Arc::new(core_thunderbird_plugin_package()),  // Disabled - replaced by external plugin
         ],
@@ -63,7 +63,7 @@ pub fn sysconfig() -> SysConfig {
             window_plugin_package(),
             exec_plugin_package(),
             git_plugin_package(),
-            iniad_ai_mop_plugin_package(),
+            llm_chat_plugin_package(),
             excel_plugin_package(),
             // thunderbird_plugin_package(),  // Disabled - replaced by external plugin
             // dummy_plugin_package(),  // Disabled - not needed

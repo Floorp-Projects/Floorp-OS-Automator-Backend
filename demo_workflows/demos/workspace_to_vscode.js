@@ -85,7 +85,8 @@ function workflow() {
         // AIにウィンドウを分析してもらう
         const windowsJson = JSON.stringify(allTitles);
         console.log("Sending to AI for analysis...");
-        const toCloseJson = iniad.analyzeWindows(windowsJson);
+        const systemPrompt = "You are a helpful assistant that analyzes window titles. Return a JSON array of window titles that should be closed. Only include windows that are not essential for development work.";
+        const toCloseJson = llm_chat.chat(systemPrompt, "Analyze these windows and return which ones can be closed: " + windowsJson);
         console.log("AI response: " + toCloseJson);
 
         try {

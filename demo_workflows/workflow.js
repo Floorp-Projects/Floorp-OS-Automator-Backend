@@ -379,7 +379,7 @@ function fixJsonString(str) {
   return str;
 }
 
-// Use INIAD AI MOP to extract form field labels and types
+// Use LLM Chat to extract form field labels and types
 function extractFormFieldsWithAI(fieldsHtmlArray) {
   var formFields = [];
   var MAX_RETRIES = 3;
@@ -431,7 +431,7 @@ function extractFormFieldsWithAI(fieldsHtmlArray) {
           userPrompt;
       }
 
-      var aiResponse = iniad_ai_mop.chat(systemPrompt, currentPrompt);
+      var aiResponse = llm_chat.chat(systemPrompt, currentPrompt);
 
       // Fix and extract JSON
       var jsonStr = fixJsonString(aiResponse);

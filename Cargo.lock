@@ -21,7 +21,7 @@ dependencies = [
  "finder",
  "floorp",
  "git",
- "iniad",
+ "llm_chat",
  "log",
  "migration",
  "prost 0.14.3",
@@ -5875,20 +5875,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iniad"
-version = "0.15.0"
-dependencies = [
- "anyhow",
- "deno_core",
- "deno_error",
- "log",
- "sapphillon_core",
- "serde",
- "serde_json",
- "ureq",
-]
-
-[[package]]
 name = "inotify"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6455,6 +6441,20 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+
+[[package]]
+name = "llm_chat"
+version = "0.15.0"
+dependencies = [
+ "anyhow",
+ "deno_core",
+ "deno_error",
+ "log",
+ "sapphillon_core",
+ "serde",
+ "serde_json",
+ "ureq",
+]
 
 [[package]]
 name = "lock_api"
