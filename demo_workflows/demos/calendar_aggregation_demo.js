@@ -1,9 +1,28 @@
 // Calendar Aggregation Demo - Combined Workflow
 // This workflow:
-// 1. Reads calendar events from Thunderbird (via Plugin API)
-// 2. Scrapes events from Google Calendar (web)
-// 3. Analyzes Google Form HTML structure
-// 4. Fills the form with available dates
+// 1. Opens and analyzes Google Form HTML structure
+// 2. Reads user identity from Thunderbird
+// 3. Reads calendar events from Thunderbird (via Plugin API)
+// 4. Scrapes events from Google Calendar (web)
+// 5. Calculates available dates and fills the form
+// 6. Adds an event to Google Calendar
+
+// =============================================================================
+// EXTERNAL PLUGIN LOADING
+// =============================================================================
+
+// Check if external plugins are available (silent check)
+try {
+  // External plugins are loaded as: globalThis["sapphillon"]["thunderbird"]
+  if (
+    typeof sapphillon === "undefined" ||
+    typeof sapphillon.thunderbird === "undefined"
+  ) {
+    // Plugin not available - will use fallback
+  }
+} catch (error) {
+  // Silent error handling
+}
 
 // =============================================================================
 // CONFIGURATION
@@ -33,9 +52,32 @@ var CONFIG = {
 // UTILITY FUNCTIONS
 // =============================================================================
 
-// Show simple progress message
-function log(msg) {
-  console.log("[calendar] " + msg);
+// Demo-friendly progress logging with emojis
+var STEP_ICONS = {
+  form: "📋",
+  identity: "👤",
+  calendar: "📅",
+  google: "🌐",
+  calculate: "🧮",
+  fill: "✏️",
+  add: "➕",
+  complete: "✅",
+  error: "❌",
+  info: "ℹ️",
+};
+
+function log(msg, icon) {
+  var prefix = icon ? STEP_ICONS[icon] + " " : "";
+  console.log(prefix + msg);
+}
+
+function logStep(stepNum, totalSteps, msg, icon) {
+  var iconStr = icon ? STEP_ICONS[icon] + " " : "";
+  console.log("[" + stepNum + "/" + totalSteps + "] " + iconStr + msg);
+}
+
+function logResult(label, value) {
+  console.log("    → " + label + ": " + value);
 }
 
 // Generate date range starting from tomorrow
@@ -48,8 +90,8 @@ function generateDateRange(daysFromNow) {
     date.setDate(today.getDate() + i);
 
     var year = date.getFullYear();
-    var month = String(date.getMonth() + 1).padStart(2, '0');
-    var day = String(date.getDate()).padStart(2, '0');
+    var month = String(date.getMonth() + 1).padStart(2, "0");
+    var day = String(date.getDate()).padStart(2, "0");
 
     dates.push(year + "-" + month + "-" + day);
   }
@@ -68,13 +110,13 @@ function checkPluginAvailability() {
 }
 
 function setupErrorHandlers() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
-  window.addEventListener('error', function(e) {
+  window.addEventListener("error", function (e) {
     console.error("Error: " + e.message);
   });
 
-  window.addEventListener('unhandledrejection', function(e) {
+  window.addEventListener("unhandledrejection", function (e) {
     console.error("Promise rejection: " + e.reason);
   });
 }
@@ -87,8 +129,9 @@ function readThunderbirdCalendar() {
   var events = [];
 
   try {
-    var rawEvents = thunderbird.getCalendarEvents(CONFIG.daysToCheck);
-    log("Thunderbird: " + rawEvents.length + " events");
+    var rawEvents = sapphillon.thunderbird.getCalendarEvents(
+      CONFIG.daysToCheck,
+    );
 
     for (var i = 0; i < rawEvents.length; i++) {
       var ev = rawEvents[i];
@@ -108,23 +151,12 @@ function readThunderbirdCalendar() {
 }
 
 // =============================================================================
-// GET EMAILS FROM THUNDERBIRD (side effects only)
-// =============================================================================
-
-function getThunderbirdEmails() {
-  var emails = { inbox: [], sent: [] };
-  try { emails.inbox = thunderbird.tryGetEmails("inbox", 5); } catch (e) {}
-  try { emails.sent = thunderbird.tryGetEmails("sent", 5); } catch (e) {}
-  return emails;
-}
-
-// =============================================================================
 // GET USER IDENTITY FROM THUNDERBIRD
 // =============================================================================
 
 function getThunderbirdIdentity() {
   try {
-    var identity = thunderbird.getIdentity();
+    var identity = sapphillon.thunderbird.getIdentity();
     CONFIG.userName = identity.name;
     CONFIG.userEmail = identity.email;
     return identity;
@@ -238,57 +270,308 @@ function scrapeGoogleCalendar() {
     console.error("Error parsing events: " + error);
   }
 
-  try { floorp.closeTab(tabId); } catch (e) {}
+  try {
+    floorp.closeTab(tabId);
+  } catch (e) {}
 
-  log("Google Calendar: " + events.length + " events");
   return events;
 }
 
 // =============================================================================
-// ANALYZE FORM HTML STRUCTURE
+// ANALYZE FORM HTML STRUCTURE (AI-Powered)
 // =============================================================================
 
 function analyzeFormStructure(tabId) {
-  var htmlContent = floorp.tabHtml(tabId);
+  var formFields = [];
 
-  var textInputCount = 0;
-  var searchPos = 0;
-  while ((searchPos = htmlContent.indexOf("aria-labelledby=", searchPos)) !== -1) {
-    textInputCount++;
-    searchPos++;
+  // Get all form field containers using Google Forms structure
+  try {
+    var fieldContainersRaw = floorp.tabGetElements(
+      tabId,
+      "div[role='listitem']",
+    );
+    var parsed = JSON.parse(fieldContainersRaw);
+    var containers = parsed.elements || [];
+
+    // Combine all field HTML for AI analysis (limit to first 8000 chars per field)
+    var fieldsHtmlForAI = [];
+    for (var i = 0; i < containers.length; i++) {
+      var html = containers[i];
+      if (html && html.length > 50) {
+        fieldsHtmlForAI.push({
+          index: i + 1,
+          html: html.substring(0, 8000),
+        });
+      }
+    }
+
+    if (fieldsHtmlForAI.length > 0) {
+      // Use AI to extract form field information
+      formFields = extractFormFieldsWithAI(fieldsHtmlForAI);
+    }
+  } catch (e) {
+    console.error("Error analyzing form: " + e);
   }
 
-  var dateInputCount = 0;
-  searchPos = 0;
-  while ((searchPos = htmlContent.indexOf('type="date"', searchPos)) !== -1) {
-    dateInputCount++;
-    searchPos++;
-  }
+  // Count by type
+  var counts = {
+    text: 0,
+    email: 0,
+    date: 0,
+    radio: 0,
+    checkbox: 0,
+    textarea: 0,
+    other: 0,
+  };
 
-  var radioCount = 0;
-  searchPos = 0;
-  while ((searchPos = htmlContent.indexOf('role="radio"', searchPos)) !== -1) {
-    radioCount++;
-    searchPos++;
+  for (var j = 0; j < formFields.length; j++) {
+    var type = formFields[j].type;
+    if (counts[type] !== undefined) {
+      counts[type]++;
+    } else {
+      counts.other++;
+    }
   }
 
   return {
-    htmlContent: htmlContent,
+    fields: formFields,
     fieldCounts: {
-      textInputs: textInputCount,
-      dateInputs: dateInputCount,
-      radioButtons: radioCount,
+      textInputs: counts.text + counts.email,
+      dateInputs: counts.date,
+      radioButtons: counts.radio,
+      checkboxes: counts.checkbox,
+      textareas: counts.textarea,
     },
+    totalFields: formFields.length,
   };
+}
+
+// Helper: Fix common JSON issues from AI output
+function fixJsonString(str) {
+  // Remove BOM and zero-width characters
+  str = str.replace(/[\uFEFF\u200B-\u200D\u2028\u2029]/g, "");
+
+  // Remove markdown code blocks
+  str = str.replace(/```json\n?/gi, "").replace(/```\n?/g, "");
+
+  // Extract JSON array
+  var start = str.indexOf("[");
+  var end = str.lastIndexOf("]");
+  if (start < 0 || end < 0 || end <= start) return null;
+  str = str.slice(start, end + 1);
+
+  // Fix common issues
+  str = str
+    // Replace various quote types with standard double quotes
+    .replace(/[""„«»]/g, '"')
+    .replace(/['']/g, "'")
+    // Replace single quotes around property names with double quotes
+    .replace(/'([^']+)'\s*:/g, '"$1":')
+    // Replace single quotes around string values with double quotes
+    .replace(/:\s*'([^']*)'/g, ': "$1"')
+    // Remove trailing commas before ] or }
+    .replace(/,\s*([\]}])/g, "$1")
+    // Fix unquoted property names
+    .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+    // Remove control characters
+    .replace(/[\x00-\x1F\x7F]/g, "");
+
+  return str;
+}
+
+// Use LLM Chat to extract form field labels and types
+function extractFormFieldsWithAI(fieldsHtmlArray) {
+  var formFields = [];
+  var MAX_RETRIES = 3;
+
+  // Build prompt with all field HTML (limit size for better results)
+  var fieldsDescription = "";
+  for (var i = 0; i < fieldsHtmlArray.length; i++) {
+    fieldsDescription +=
+      "フィールド" +
+      fieldsHtmlArray[i].index +
+      ": " +
+      fieldsHtmlArray[i].html.substring(0, 1500) +
+      "\n";
+  }
+
+  var systemPrompt =
+    "あなたはJSONを出力する専門家です。必ず有効なJSON配列のみを出力してください。" +
+    "プロパティ名と文字列値は必ずダブルクォート(\")で囲んでください。シングルクォート(')は使わないでください。";
+
+  var userPrompt =
+    "Google FormsのHTMLからフィールド情報をJSON配列で出力してください。\n\n" +
+    "【重要なルール】\n" +
+    "1. JSON配列のみを出力（説明文やマークダウン不要）\n" +
+    '2. プロパティ名は必ずダブルクォートで囲む（例: "label"）\n' +
+    '3. 文字列値も必ずダブルクォートで囲む（例: "お名前"）\n' +
+    "4. シングルクォートは絶対に使わない\n\n" +
+    "【出力形式の例】\n" +
+    '[{"index":1,"label":"お名前","type":"text","required":true,"options":[]},{"index":2,"label":"希望日","type":"date","required":true,"options":[]}]\n\n' +
+    "【typeの種類】text, email, date, radio, checkbox, textarea, unknown\n\n" +
+    "【フィールド一覧】\n" +
+    fieldsDescription;
+
+  var lastError = null;
+
+  for (var retry = 0; retry < MAX_RETRIES; retry++) {
+    try {
+      var currentPrompt = userPrompt;
+
+      // On retry, make the prompt stricter
+      if (retry > 0) {
+        currentPrompt =
+          "【警告】前回のJSONが無効でした。エラー: " +
+          lastError +
+          "\n" +
+          "今回は特に注意してください:\n" +
+          '- プロパティ名は "label" のようにダブルクォートで囲む\n' +
+          "- シングルクォートは使わない\n" +
+          "- 余計な説明は書かない\n\n" +
+          userPrompt;
+      }
+
+      var aiResponse = llm_chat.chat(systemPrompt, currentPrompt);
+
+      // Fix and extract JSON
+      var jsonStr = fixJsonString(aiResponse);
+      if (!jsonStr) {
+        lastError = "JSON配列が見つかりませんでした";
+        continue;
+      }
+
+      formFields = JSON.parse(jsonStr);
+
+      // Validate and normalize each field
+      for (var j = 0; j < formFields.length; j++) {
+        var f = formFields[j];
+        if (!f.index) f.index = j + 1;
+        if (!f.label) f.label = "フィールド " + f.index;
+        if (!f.type) f.type = "unknown";
+        if (f.required === undefined) f.required = false;
+        if (!f.options) f.options = [];
+      }
+
+      // Success
+      return formFields;
+    } catch (e) {
+      lastError = String(e).substring(0, 100);
+    }
+  }
+
+  // All retries failed - use fallback with HTML-based detection
+  for (var k = 0; k < fieldsHtmlArray.length; k++) {
+    var html = fieldsHtmlArray[k].html.toLowerCase();
+    var detectedType = "unknown";
+    var detectedLabel = "フィールド " + fieldsHtmlArray[k].index;
+    var isRequired = html.indexOf("必須") >= 0 || html.indexOf("required") >= 0;
+
+    // Simple type detection from HTML
+    if (html.indexOf('type="email"') >= 0 || html.indexOf("メール") >= 0) {
+      detectedType = "email";
+      detectedLabel = "メールアドレス";
+    } else if (
+      html.indexOf('type="date"') >= 0 ||
+      html.indexOf("希望日") >= 0
+    ) {
+      detectedType = "date";
+    } else if (html.indexOf('type="text"') >= 0) {
+      detectedType = "text";
+      if (html.indexOf("名前") >= 0 || html.indexOf("氏名") >= 0) {
+        detectedLabel = "名前";
+      }
+    } else if (
+      html.indexOf('role="radiogroup"') >= 0 ||
+      html.indexOf('type="radio"') >= 0
+    ) {
+      detectedType = "radio";
+    } else if (
+      html.indexOf('role="group"') >= 0 &&
+      html.indexOf("checkbox") >= 0
+    ) {
+      detectedType = "checkbox";
+    } else if (html.indexOf("textarea") >= 0) {
+      detectedType = "textarea";
+    }
+
+    formFields.push({
+      index: fieldsHtmlArray[k].index,
+      label: detectedLabel,
+      type: detectedType,
+      required: isRequired,
+      options: [],
+    });
+  }
+
+  return formFields;
+}
+
+function logFormFields(formStructure) {
+  var fields = formStructure.fields;
+  if (!fields || fields.length === 0) {
+    console.log("    → フォームフィールドが見つかりませんでした");
+    return;
+  }
+
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var typeIcon = {
+      text: "📝",
+      email: "✉️",
+      date: "📅",
+      radio: "🔘",
+      checkbox: "☑️",
+      textarea: "📄",
+      unknown: "❓",
+    };
+    var icon = typeIcon[f.type] || "❓";
+    var reqMark = f.required ? " *" : "";
+
+    // オプションを文字列に変換（オブジェクトの場合は値を抽出）
+    var optionsStr = "";
+    if (f.options && f.options.length > 0) {
+      var optionLabels = [];
+      for (var j = 0; j < Math.min(f.options.length, 3); j++) {
+        var opt = f.options[j];
+        if (typeof opt === "string") {
+          optionLabels.push(opt);
+        } else if (opt && typeof opt === "object") {
+          // オブジェクトの場合はlabel, value, textなどのプロパティを探す
+          optionLabels.push(opt.label || opt.value || opt.text || String(opt));
+        }
+      }
+      optionsStr =
+        optionLabels.length > 0
+          ? " [" +
+            optionLabels.join(", ") +
+            (f.options.length > 3 ? "..." : "") +
+            "]"
+          : "";
+    }
+
+    console.log(
+      "    " +
+        f.index +
+        ". " +
+        icon +
+        " " +
+        (f.label || "(ラベルなし)") +
+        reqMark +
+        optionsStr,
+    );
+  }
 }
 
 // =============================================================================
 // FILL THE FORM
 // =============================================================================
 
-function fillForm(tabId, availableDates) {
+function fillForm(tabId, availableDates, timeSlots) {
   var firstDate = availableDates[0] || "";
   var secondDate = availableDates[1] || "";
+  var timeSlot1 = (timeSlots && timeSlots[0]) || CONFIG.preferredTimeSlots[0];
+  var timeSlot2 =
+    (timeSlots && timeSlots[1]) || CONFIG.preferredTimeSlots[1] || timeSlot1;
 
   if (!firstDate) {
     var tomorrowDates = generateDateRange(1);
@@ -329,13 +612,15 @@ function fillForm(tabId, availableDates) {
     try {
       floorp.tabInput(tabId, "input[type='date']:nth-of-type(1)", firstDate);
     } catch (e) {
-      try { floorp.tabInput(tabId, "input[type='date']", firstDate); } catch (e2) {}
+      try {
+        floorp.tabInput(tabId, "input[type='date']", firstDate);
+      } catch (e2) {}
     }
   }
 
   // Select first time slot
   try {
-    floorp.tabClick(tabId, "div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']");
+    floorp.tabClick(tabId, "div[aria-label='" + timeSlot1 + "']");
   } catch (e) {}
 
   // Fill second date
@@ -357,8 +642,8 @@ function fillForm(tabId, availableDates) {
 
   // Select second time slot
   var timeSlotSelectors = [
+    "div[role='listitem']:nth-child(6) div[aria-label='" + timeSlot2 + "']",
     "div[role='listitem']:nth-child(6) div[role='radio']",
-    "div[role='listitem']:nth-child(6) div[aria-label='" + CONFIG.preferredTimeSlots[0] + "']",
     "li:nth-child(6) div[role='radio']",
   ];
   for (var ti = 0; ti < timeSlotSelectors.length; ti++) {
@@ -367,8 +652,6 @@ function fillForm(tabId, availableDates) {
       break;
     } catch (e) {}
   }
-
-  log("Form filled: " + firstDate + ", " + secondDate);
 }
 
 // =============================================================================
@@ -378,7 +661,8 @@ function fillForm(tabId, availableDates) {
 function calculateAvailableDates(thunderbirdEvents, googleEvents) {
   var dateRange = generateDateRange(CONFIG.schedulingDaysLookAhead);
   var BUSINESS_START = 10;
-  var BUSINESS_END = 17;
+  var BUSINESS_END = 19;
+  var MIN_GAP_HOURS = 3; // Minimum gap between events to consider as available
 
   function parseJapaneseTime(timeStr) {
     if (!timeStr) return null;
@@ -454,28 +738,86 @@ function calculateAvailableDates(thunderbirdEvents, googleEvents) {
     }
   }
 
-  var availableDates = [];
+  var availableSlots = [];
 
   for (var i = 0; i < dateRange.length; i++) {
     var dateStr = dateRange[i];
     var busyTimes = busyTimesByDate[dateStr] || [];
-    var isAvailable = true;
+
+    // Sort busy times by start hour
+    busyTimes.sort(function (a, b) {
+      return a.start - b.start;
+    });
+
+    // Find gaps of MIN_GAP_HOURS or more within business hours
+    var gaps = [];
+    var currentTime = BUSINESS_START;
 
     for (var b = 0; b < busyTimes.length; b++) {
       var busy = busyTimes[b];
-      if (busy.start < BUSINESS_END && busy.end > BUSINESS_START) {
-        isAvailable = false;
-        break;
+      // Only consider events within business hours
+      var eventStart = Math.max(busy.start, BUSINESS_START);
+      var eventEnd = Math.min(busy.end, BUSINESS_END);
+
+      if (eventStart > currentTime) {
+        // Found a gap before this event
+        var gapDuration = eventStart - currentTime;
+        if (gapDuration >= MIN_GAP_HOURS) {
+          gaps.push({ start: currentTime, end: eventStart });
+        }
+      }
+      // Move current time to end of this event (if within business hours)
+      if (busy.end > currentTime) {
+        currentTime = Math.max(currentTime, busy.end);
       }
     }
 
-    if (isAvailable) {
-      availableDates.push(dateStr);
+    // Check for gap after last event until end of business hours
+    if (currentTime < BUSINESS_END) {
+      var finalGap = BUSINESS_END - currentTime;
+      if (finalGap >= MIN_GAP_HOURS) {
+        gaps.push({ start: currentTime, end: BUSINESS_END });
+      }
+    }
+
+    // Add available slots for this date
+    for (var g = 0; g < gaps.length; g++) {
+      var gap = gaps[g];
+      // Find a matching preferred time slot within this gap
+      for (var p = 0; p < CONFIG.preferredTimeSlots.length; p++) {
+        var slot = CONFIG.preferredTimeSlots[p];
+        var slotParts = slot.split("-");
+        var slotStart = parseInt(slotParts[0].split(":")[0], 10);
+        var slotEnd = parseInt(slotParts[1].split(":")[0], 10);
+
+        if (slotStart >= gap.start && slotEnd <= gap.end) {
+          availableSlots.push({
+            date: dateStr,
+            timeSlot: slot,
+            gapStart: gap.start,
+            gapEnd: gap.end,
+          });
+          break; // Only add first matching slot per gap
+        }
+      }
     }
   }
 
-  log("Available dates: " + availableDates.join(", "));
-  return availableDates;
+  // Return unique dates with their best time slots
+  var result = [];
+  var seenDates = {};
+  for (var s = 0; s < availableSlots.length; s++) {
+    var slotInfo = availableSlots[s];
+    if (!seenDates[slotInfo.date]) {
+      seenDates[slotInfo.date] = true;
+      result.push(slotInfo.date);
+    }
+  }
+
+  // Store the full slot info for later use
+  calculateAvailableDates.lastSlots = availableSlots;
+
+  return result;
 }
 
 // =============================================================================
@@ -492,9 +834,14 @@ function addEventToGoogleCalendar(date, timeSlot, title) {
 
   var calendarUrl =
     "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-    "&text=" + encodeURIComponent(title) +
-    "&dates=" + startDateTime + "/" + endDateTime +
-    "&details=" + encodeURIComponent("Floorp OS Automator により自動追加された予定です。");
+    "&text=" +
+    encodeURIComponent(title) +
+    "&dates=" +
+    startDateTime +
+    "/" +
+    endDateTime +
+    "&details=" +
+    encodeURIComponent("Floorp OS Automator により自動追加された予定です。");
 
   var calendarTabRaw = floorp.createTab(calendarUrl, false);
   var calendarTabId = calendarTabRaw;
@@ -506,7 +853,17 @@ function addEventToGoogleCalendar(date, timeSlot, title) {
     }
   } catch (e) {}
 
-  log("Calendar event created: " + date + " " + timeSlot);
+  // Wait for page to load and click the save button
+  try {
+    floorp.tabWaitForNetworkIdle(calendarTabId);
+    floorp.tabWaitForElement(calendarTabId, "#xSaveBu", 10000);
+    floorp.tabClick(calendarTabId, "#xSaveBu");
+    // Wait for save to complete
+    floorp.tabWaitForNetworkIdle(calendarTabId);
+  } catch (e) {
+    // Save button click failed - user will need to save manually
+  }
+
   return calendarTabId;
 }
 
@@ -521,17 +878,25 @@ function parseDateFromPrompt(prompt) {
 
   var isoMatch = prompt.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (isoMatch) {
-    return isoMatch[1] + "-" +
-           String(isoMatch[2]).padStart(2, '0') + "-" +
-           String(isoMatch[3]).padStart(2, '0');
+    return (
+      isoMatch[1] +
+      "-" +
+      String(isoMatch[2]).padStart(2, "0") +
+      "-" +
+      String(isoMatch[3]).padStart(2, "0")
+    );
   }
 
   var monthDayMatch = prompt.match(/(\d{1,2})月(\d{1,2})日/);
   if (monthDayMatch) {
     var currentYear = new Date().getFullYear();
-    return currentYear + "-" +
-           String(monthDayMatch[1]).padStart(2, '0') + "-" +
-           String(monthDayMatch[2]).padStart(2, '0');
+    return (
+      currentYear +
+      "-" +
+      String(monthDayMatch[1]).padStart(2, "0") +
+      "-" +
+      String(monthDayMatch[2]).padStart(2, "0")
+    );
   }
 
   if (prompt.indexOf("明日") !== -1 || prompt.indexOf("あした") !== -1) {
@@ -554,10 +919,19 @@ function parseTimeFromPrompt(prompt) {
     return CONFIG.preferredTimeSlots[0] || "10:00-12:00";
   }
 
-  var timeRangeMatch = prompt.match(/(\d{1,2}):(\d{2})\s*[-~〜－]\s*(\d{1,2}):(\d{2})/);
+  var timeRangeMatch = prompt.match(
+    /(\d{1,2}):(\d{2})\s*[-~〜－]\s*(\d{1,2}):(\d{2})/,
+  );
   if (timeRangeMatch) {
-    return timeRangeMatch[1] + ":" + timeRangeMatch[2] + "-" +
-           timeRangeMatch[3] + ":" + timeRangeMatch[4];
+    return (
+      timeRangeMatch[1] +
+      ":" +
+      timeRangeMatch[2] +
+      "-" +
+      timeRangeMatch[3] +
+      ":" +
+      timeRangeMatch[4]
+    );
   }
 
   var jpTimeMatch = prompt.match(/(\d{1,2})時\s*(から|ー|-)\s*(\d{1,2})時/);
@@ -567,7 +941,7 @@ function parseTimeFromPrompt(prompt) {
 
   var singleTimeMatch = prompt.match(/(\d{1,2})時/);
   if (singleTimeMatch) {
-    var hour = String(singleTimeMatch[1]).padStart(2, '0');
+    var hour = String(singleTimeMatch[1]).padStart(2, "0");
     return hour + ":00-" + hour + ":59";
   }
 
@@ -578,9 +952,13 @@ function parseSecondDateFromPrompt(prompt, firstDate) {
   var secondMatch = prompt.match(/と\s*(\d{1,2})月(\d{1,2})日/);
   if (secondMatch) {
     var currentYear = new Date().getFullYear();
-    return currentYear + "-" +
-           String(secondMatch[1]).padStart(2, '0') + "-" +
-           String(secondMatch[2]).padStart(2, '0');
+    return (
+      currentYear +
+      "-" +
+      String(secondMatch[1]).padStart(2, "0") +
+      "-" +
+      String(secondMatch[2]).padStart(2, "0")
+    );
   }
 
   var allDates = prompt.match(/(\d{4}-\d{2}-\d{2})/g);
@@ -590,7 +968,7 @@ function parseSecondDateFromPrompt(prompt, firstDate) {
 
   var nextDay = new Date(firstDate);
   nextDay.setDate(nextDay.getDate() + 1);
-  return nextDay.toISOString().split('T')[0];
+  return nextDay.toISOString().split("T")[0];
 }
 
 // =============================================================================
@@ -622,8 +1000,14 @@ function openOrCreateFormTab() {
   } catch (e) {}
 
   if (formTab) {
-    formTabId = String(formTab.instance_id || formTab.id);
-    floorp.attachToTab(formTabId);
+    // If already have an instanceId, use it; otherwise attach using browserId
+    if (formTab.instanceId) {
+      formTabId = formTab.instanceId;
+    } else {
+      // attachToTab expects browserId and returns new instanceId
+      var browserId = String(formTab.browserId || formTab.id);
+      formTabId = floorp.attachToTab(browserId);
+    }
   } else {
     formTabId = floorp.createTab(CONFIG.formUrl, false);
   }
@@ -637,50 +1021,131 @@ function openOrCreateFormTab() {
 // =============================================================================
 
 function workflow() {
-  log("Starting workflow...");
+  console.log("🚀 フォームの解析と入力を実行...");
+  console.log("─".repeat(30));
 
   setupErrorHandlers();
   checkPluginAvailability();
 
-  var identity = getThunderbirdIdentity();
-  getThunderbirdEmails();
+  var TOTAL_STEPS = 6;
 
-  var thunderbirdEvents = readThunderbirdCalendar();
-
-  try {
-    thunderbird.activateFloorp();
-  } catch (e) {}
-
-  var googleEvents = scrapeGoogleCalendar();
-  var availableDates = calculateAvailableDates(thunderbirdEvents, googleEvents);
-
+  // =========================================================================
+  // STEP 1: Open and analyze the Google Form first
+  // =========================================================================
+  logStep(1, TOTAL_STEPS, "フォームを開いて構造を解析中...", "form");
   var formTabId = openOrCreateFormTab();
-  analyzeFormStructure(formTabId);
-  fillForm(formTabId, availableDates);
+  var formStructure = analyzeFormStructure(formTabId);
+  logResult("フィールド数", formStructure.totalFields + "個");
+  logFormFields(formStructure);
+
+  // =========================================================================
+  // STEP 2: Get user identity from Thunderbird
+  // =========================================================================
+  logStep(2, TOTAL_STEPS, "Thunderbird ユーザー情報取得", "identity");
+  var identity = getThunderbirdIdentity();
+  logResult("名前", identity.name);
+  logResult("Email", identity.email);
+
+  // =========================================================================
+  // STEP 3: Gather calendar events from Thunderbird
+  // =========================================================================
+  logStep(3, TOTAL_STEPS, "Thunderbird カレンダー取得", "calendar");
+  var thunderbirdEvents = readThunderbirdCalendar();
+  logResult("予定", thunderbirdEvents.length + "件");
+
+  // =========================================================================
+  // STEP 4: Activate Floorp and scrape Google Calendar
+  // =========================================================================
+  logStep(4, TOTAL_STEPS, "Google Calendar 取得", "google");
+  try {
+    sapphillon.thunderbird.activateFloorp();
+  } catch (e) {}
+  var googleEvents = scrapeGoogleCalendar();
+  logResult("予定", googleEvents.length + "件");
+
+  // =========================================================================
+  // STEP 5: Calculate available dates and fill the form
+  // =========================================================================
+  logStep(5, TOTAL_STEPS, "空き日程計算・入力", "calculate");
+  var availableDates = calculateAvailableDates(thunderbirdEvents, googleEvents);
+  logResult(
+    "空き",
+    availableDates.slice(0, 2).join(", ") +
+      (availableDates.length > 2 ? " +" + (availableDates.length - 2) : ""),
+  );
 
   var firstDate = availableDates[0];
+  var secondDate = availableDates[1];
   if (!firstDate) {
-    var tomorrowDates = generateDateRange(1);
+    var tomorrowDates = generateDateRange(2);
     firstDate = tomorrowDates[0];
+    secondDate = tomorrowDates[1];
   }
-  var timeSlot = CONFIG.preferredTimeSlots[0];
+  if (!secondDate) {
+    secondDate = firstDate;
+  }
 
-  var calendarTabId = addEventToGoogleCalendar(firstDate, timeSlot, "病院の予約");
+  // Get the actual available time slots from lastSlots
+  var lastSlots = calculateAvailableDates.lastSlots || [];
+  var timeSlot1 = CONFIG.preferredTimeSlots[0];
+  var timeSlot2 = CONFIG.preferredTimeSlots[1] || timeSlot1;
+  var timeSlot1Found = false;
+  var timeSlot2Found = false;
 
-  log("Workflow complete");
+  // Find the correct time slot for each date
+  for (var si = 0; si < lastSlots.length; si++) {
+    if (lastSlots[si].date === firstDate && !timeSlot1Found) {
+      timeSlot1 = lastSlots[si].timeSlot;
+      timeSlot1Found = true;
+    }
+    if (lastSlots[si].date === secondDate && !timeSlot2Found) {
+      timeSlot2 = lastSlots[si].timeSlot;
+      timeSlot2Found = true;
+    }
+  }
+
+  // Fill the form with correct dates and time slots
+  fillForm(formTabId, [firstDate, secondDate], [timeSlot1, timeSlot2]);
+
+  // =========================================================================
+  // STEP 6: Add events to Google Calendar (first and second date)
+  // =========================================================================
+  logStep(6, TOTAL_STEPS, "Google Calendar 登録", "add");
+
+  // Register first date
+  var calendarTabId = addEventToGoogleCalendar(
+    firstDate,
+    timeSlot1,
+    "病院の予約（第一希望）",
+  );
+  logResult("第一希望", firstDate + " " + timeSlot1);
+
+  // Close the first calendar tab
+  try {
+    floorp.closeTab(calendarTabId);
+  } catch (e) {
+    // Silent cleanup
+  }
+
+  // Register second date
+  addEventToGoogleCalendar(secondDate, timeSlot2, "病院の予約（第二希望）");
+  logResult("第二希望", secondDate + " " + timeSlot2);
+
+  console.log("─".repeat(30));
+  console.log("✅ 完了");
 
   // Cleanup
   try {
     floorp.destroyTabInstance(formTabId);
   } catch (e) {
-    console.error("Failed to destroy form tab instance: " + e);
+    // Silent cleanup
   }
   try {
     if (calendarTabId) {
       floorp.destroyTabInstance(calendarTabId);
     }
   } catch (e) {
-    console.error("Failed to destroy calendar tab instance: " + e);
+    // Silent cleanup
   }
 
   return {
@@ -697,7 +1162,7 @@ function workflow() {
 
 function submitAppointment() {
   var userPrompt = globalThis.userPrompt || "";
-  log("Submit appointment: " + userPrompt);
+  console.log("📅 予約登録: " + userPrompt);
 
   var firstDate = parseDateFromPrompt(userPrompt);
   var secondDate = parseSecondDateFromPrompt(userPrompt, firstDate);
@@ -714,12 +1179,16 @@ function submitAppointment() {
   try {
     floorp.tabClick(formTabId, "div[aria-label='" + timeSlot + "']");
   } catch (e) {
-    console.log("Manual time selection needed: " + timeSlot);
+    // Silent fallback
   }
 
-  var calendarTabId = addEventToGoogleCalendar(firstDate, timeSlot, "病院の予約");
+  var calendarTabId = addEventToGoogleCalendar(
+    firstDate,
+    timeSlot,
+    "病院の予約",
+  );
 
-  log("Appointment complete: " + firstDate + " " + timeSlot);
+  console.log("✅ 予約完了: " + firstDate + " " + timeSlot);
 
   // Cleanup
   try {

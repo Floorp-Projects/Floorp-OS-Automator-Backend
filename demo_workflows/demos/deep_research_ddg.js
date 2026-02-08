@@ -1647,7 +1647,8 @@ function workflow() {
         report += "#### [" + a.result.rank + "] " + a.result.title + "\n\n";
         if (a.result.isLocalFile) {
           report += "- **パス**: `" + a.result.filePath + "`\n";
-          report += "- **種類**: " + (a.result.fileExtension || "不明") + "\n\n";
+          report +=
+            "- **種類**: " + (a.result.fileExtension || "不明") + "\n\n";
           // ローカルファイルの場合は、LLM生成の詳細説明（snippet）を使用
           // snippet には describeLocalFileWithAI の結果が保存されている
           if (a.result.snippet && a.result.snippet.length > 100) {
