@@ -94,6 +94,7 @@ git = { path = "./plugins/git" }
 llm_chat = { path = "./plugins/llm-chat" }
 excel = { path = "./plugins/excel" }
 finder = { path = "./plugins/finder" }
+ocr = { path = "./plugins/ocr" }
 # thunderbird = { path = "./plugins/thunderbird" }  # Disabled - replaced by external plugin
 uuid = { version = "1.18.0", features = ["v4"] }
 tonic-reflection = "0.14.2"

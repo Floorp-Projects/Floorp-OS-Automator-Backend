@@ -1,0 +1,24 @@
+[package]
+name = "ocr"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+log.workspace = true
+deno_core.workspace = true
+deno_error.workspace = true
+sapphillon_core.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tempfile = "3"
+base64.workspace = true
+ureq = { version = "3.1.0", features = ["json"] }
+regex = "1.11"
+chrono.workspace = true
+image = "0.25"

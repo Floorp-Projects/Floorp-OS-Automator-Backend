@@ -20,6 +20,7 @@ use git::{core_git_plugin_package, git_plugin_package};
 use llm_chat::{core_llm_chat_plugin_package, llm_chat_plugin_package};
 use finder::{core_finder_plugin_package, finder_plugin_package};
 use excel::{core_excel_plugin_package, excel_plugin_package};
+use ocr::{core_ocr_plugin_package, ocr_plugin_package};
 // use thunderbird::{core_thunderbird_plugin_package, thunderbird_plugin_package};  // Disabled - replaced by external plugin
 
 /// Builds the static system configuration used during application startup.
@@ -51,6 +52,7 @@ pub fn sysconfig() -> SysConfig {
             Arc::new(core_git_plugin_package()),
             Arc::new(core_llm_chat_plugin_package()),
             Arc::new(core_excel_plugin_package()),
+            Arc::new(core_ocr_plugin_package()),
             // Arc::new(core_thunderbird_plugin_package()),  // Disabled - replaced by external plugin
         ],
         initial_plugins: vec![
@@ -65,6 +67,7 @@ pub fn sysconfig() -> SysConfig {
             git_plugin_package(),
             llm_chat_plugin_package(),
             excel_plugin_package(),
+            ocr_plugin_package(),
             // thunderbird_plugin_package(),  // Disabled - replaced by external plugin
             // dummy_plugin_package(),  // Disabled - not needed
         ],

@@ -24,6 +24,7 @@ dependencies = [
  "llm_chat",
  "log",
  "migration",
+ "ocr",
  "prost 0.14.3",
  "prost-types",
  "regex",
@@ -7203,6 +7204,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ocr"
+version = "0.15.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "chrono",
+ "deno_core",
+ "deno_error",
+ "image",
+ "log",
+ "regex",
+ "sapphillon_core",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "ureq",
 ]
 
 [[package]]
