@@ -320,6 +320,16 @@ pub fn core_excel_write_range_with_images_plugin() -> CorePluginFunction {
     )
 }
 
+pub fn core_excel_write_workbook_plugin() -> CorePluginFunction {
+    CorePluginFunction::new(
+        "app.sapphillon.core.excel.writeWorkbook".to_string(),
+        "Write Workbook".to_string(),
+        "Write a complete workbook with multiple sheets, column widths, and formatting in one call (no AppleScript)".to_string(),
+        op_excel_write_workbook(),
+        None,
+    )
+}
+
 pub fn core_excel_plugin_package() -> CorePluginPackage {
     CorePluginPackage::new(
         "app.sapphillon.core.excel".to_string(),
@@ -341,6 +351,7 @@ pub fn core_excel_plugin_package() -> CorePluginPackage {
             core_excel_save_base64_image_plugin(),
             core_excel_insert_pictures_batch_plugin(),
             core_excel_write_range_with_images_plugin(),
+            core_excel_write_workbook_plugin(),
             // Edit existing Excel files
             core_excel_edit_cell_plugin(),
             core_excel_edit_range_plugin(),
@@ -939,6 +950,103 @@ pub fn op_excel_write_range_with_images(
         "rows": values.len(),
         "cols": if values.is_empty() { 0 } else { values[0].len() },
         "imagesInserted": inserted_count,
+    });
+
+    Ok(serde_json::to_string(&result).unwrap())
+}
+
+/// Input for a single sheet in writeWorkbook
+#[derive(serde::Deserialize)]
+struct SheetInput {
+    /// Sheet name
+    name: String,
+    /// Starting cell (e.g. "A1")
+    #[serde(default = "default_start_cell")]
+    start_cell: String,
+    /// 2D array of cell values
+    data: Vec<Vec<String>>,
+    /// Optional column widths (index → width)
+    #[serde(default)]
+    column_widths: Vec<f64>,
+}
+
+fn default_start_cell() -> String {
+    "A1".to_string()
+}
+
+/// Write a complete workbook with multiple sheets, column widths, and header
+/// formatting in a single operation using rust_xlsxwriter (no AppleScript).
+#[op2]
+#[string]
+pub fn op_excel_write_workbook(
+    _state: &mut OpState,
+    #[string] file_path: String,
+    #[string] sheets_json: String,
+) -> Result<String, JsErrorBox> {
+    let sheets: Vec<SheetInput> = serde_json::from_str(&sheets_json)
+        .map_err(|e| JsErrorBox::new("Error", format!("Invalid sheets JSON: {}", e)))?;
+
+    if sheets.is_empty() {
+        return Err(JsErrorBox::new("Error", "At least one sheet is required"));
+    }
+
+    let mut workbook = Workbook::new();
+
+    let header_format = rust_xlsxwriter::Format::new()
+        .set_bold()
+        .set_font_size(11.0);
+
+    let cell_format = rust_xlsxwriter::Format::new()
+        .set_font_size(11.0);
+
+    let mut sheet_count = 0u32;
+
+    for sheet_input in &sheets {
+        let worksheet = workbook.add_worksheet();
+        worksheet
+            .set_name(&sheet_input.name)
+            .map_err(|e| JsErrorBox::new("Error", format!("Failed to set sheet name '{}': {}", sheet_input.name, e)))?;
+
+        let (start_row, start_col) = parse_cell_ref(&sheet_input.start_cell)?;
+
+        // Write data
+        for (row_idx, row_values) in sheet_input.data.iter().enumerate() {
+            for (col_idx, value) in row_values.iter().enumerate() {
+                let row = start_row + row_idx as u32;
+                let col: u16 = (start_col + col_idx as u32).try_into().unwrap();
+                let format = if row_idx == 0 { &header_format } else { &cell_format };
+
+                if let Ok(num) = value.parse::<f64>() {
+                    worksheet
+                        .write_number_with_format(row, col, num, format)
+                        .map_err(|e| JsErrorBox::new("Error", format!("Write error: {}", e)))?;
+                } else {
+                    worksheet
+                        .write_string_with_format(row, col, value, format)
+                        .map_err(|e| JsErrorBox::new("Error", format!("Write error: {}", e)))?;
+                }
+            }
+        }
+
+        // Set column widths
+        for (col_idx, &width) in sheet_input.column_widths.iter().enumerate() {
+            if width > 0.0 {
+                worksheet.set_column_width(col_idx as u16, width)
+                    .map_err(|e| JsErrorBox::new("Error", format!("Column width error: {}", e)))?;
+            }
+        }
+
+        sheet_count += 1;
+    }
+
+    workbook
+        .save(&file_path)
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to save workbook: {}", e)))?;
+
+    let result = serde_json::json!({
+        "success": true,
+        "filePath": file_path,
+        "sheetsCreated": sheet_count,
     });
 
     Ok(serde_json::to_string(&result).unwrap())

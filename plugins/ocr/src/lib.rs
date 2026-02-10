@@ -17,7 +17,13 @@ use std::cmp;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
+use image::GenericImageView;
+use image::codecs::jpeg::JpegEncoder;
+
+/// Maximum width/height for images sent to Ollama (pixels).
+const MAX_IMAGE_DIMENSION: u32 = 1024;
+/// Target JPEG quality when compressing for Ollama (0-100).
+const JPEG_QUALITY: u8 = 80;
 
 const MIN_VALID_AMOUNT: i64 = 10;
 const MAX_VALID_AMOUNT: i64 = 100_000_000;
@@ -190,13 +196,23 @@ fn op2_ocr_extract_document(
     let heuristic = heuristic_extract_document(&path, &text_result.text);
     let temp_dir = tempfile::tempdir()
         .map_err(|e| JsErrorBox::new("Error", format!("Failed to create temp dir: {e}")))?;
-    let image_path = render_all_pages_image(&path, temp_dir.path())
-        .map_err(|e| JsErrorBox::new("Error", format!("Failed to render PDF pages: {e}")))?;
-    let llm_structured = call_ollama_document(&model, &base_url, &image_path, &text_result.text)
-        .map_err(|e| JsErrorBox::new("Error", format!("Ollama request failed: {e}")))?
-        .ok_or_else(|| JsErrorBox::new("Error", "Ollama did not return JSON payload"))?;
 
-    let structured = merge_structured(heuristic, Some(llm_structured));
+    // Render each page as a separate image (no merging)
+    let page_images = render_pages_separately(&path, temp_dir.path())
+        .map_err(|e| JsErrorBox::new("Error", format!("Failed to render PDF pages: {e}")))?;
+
+    log::info!(
+        "Processing {} page(s) individually for {}",
+        page_images.len(),
+        path.display()
+    );
+
+    // Call Ollama once per page and merge the results
+    let llm_structured =
+        call_ollama_per_page(&model, &base_url, &page_images, &text_result.text)
+            .map_err(|e| JsErrorBox::new("Error", format!("Ollama request failed: {e}")))?;
+
+    let structured = merge_structured(heuristic, llm_structured);
     text_result.warnings = dedupe_sorted(text_result.warnings);
 
     let payload = OcrDocumentOutput {
@@ -348,6 +364,8 @@ fn render_first_page_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<P
             "-f",
             "1",
             "-singlefile",
+            "-r",
+            "150",
             "-png",
             &pdf_path.to_string_lossy(),
             &out_prefix.to_string_lossy(),
@@ -365,6 +383,8 @@ fn render_first_page_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<P
             "-f",
             "1",
             "-singlefile",
+            "-r",
+            "150",
             "-png",
             &pdf_path.to_string_lossy(),
             &out_prefix.to_string_lossy(),
@@ -379,14 +399,17 @@ fn render_first_page_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<P
     Err(anyhow!("failed to render first PDF page: {}", image_path.display()))
 }
 
-fn render_all_pages_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<PathBuf> {
+/// Render each PDF page as a separate PNG image (at 150 DPI).
+/// Returns a Vec of paths, one per page, in page order.
+fn render_pages_separately(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let out_prefix = work_dir.join("page");
-    let merged_path = work_dir.join("merged.png");
 
-    // Render all pages as separate images
+    // Render all pages as separate images (at controlled DPI)
     let pdftoppm_result = run_command_output(
         "pdftoppm",
         &[
+            "-r",
+            "150",
             "-png",
             &pdf_path.to_string_lossy(),
             &out_prefix.to_string_lossy(),
@@ -398,6 +421,8 @@ fn render_all_pages_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<Pa
         let pdftocairo_result = run_command_output(
             "pdftocairo",
             &[
+                "-r",
+                "150",
                 "-png",
                 &pdf_path.to_string_lossy(),
                 &out_prefix.to_string_lossy(),
@@ -412,14 +437,14 @@ fn render_all_pages_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<Pa
     let mut page_images: Vec<PathBuf> = Vec::new();
     let mut page_num = 1;
     loop {
-        let page_path = out_prefix.with_extension(format!("png",)); // pdftoppm uses -1, -2, etc.
+        let page_path = out_prefix.with_extension("png"); // pdftoppm uses -1, -2, etc.
         // pdftoppm naming: page-1.png, page-2.png, etc.
         let alt_page_path = work_dir.join(format!("page-{}.png", page_num));
 
         if alt_page_path.exists() {
             page_images.push(alt_page_path);
             page_num += 1;
-        } else if page_path.exists() {
+        } else if page_path.exists() && page_num == 1 {
             page_images.push(page_path);
             page_num += 1;
         } else {
@@ -429,50 +454,83 @@ fn render_all_pages_image(pdf_path: &Path, work_dir: &Path) -> anyhow::Result<Pa
 
     if page_images.is_empty() {
         // Try single page fallback
-        return render_first_page_image(pdf_path, work_dir);
+        let single = render_first_page_image(pdf_path, work_dir)?;
+        return Ok(vec![single]);
     }
 
-    // Merge all pages vertically
-    if page_images.len() == 1 {
-        return Ok(page_images.into_iter().next().unwrap());
+    log::info!(
+        "Rendered {} page(s) separately from {}",
+        page_images.len(),
+        pdf_path.display()
+    );
+
+    Ok(page_images)
+}
+
+/// Downscale an image if it exceeds MAX_IMAGE_DIMENSION on either axis.
+/// Returns the path to a JPEG-compressed smaller image, or None if no resize was needed.
+fn downscale_if_needed(image_path: &Path) -> anyhow::Result<Option<PathBuf>> {
+    let img = image::open(image_path)
+        .with_context(|| format!("failed to open image for downscale: {}", image_path.display()))?;
+
+    let (w, h) = img.dimensions();
+    if w <= MAX_IMAGE_DIMENSION && h <= MAX_IMAGE_DIMENSION {
+        return Ok(None);
     }
 
-    // Load and combine images
-    let mut combined_height = 0u32;
-    let mut max_width = 0u32;
-    let mut images: Vec<DynamicImage> = Vec::new();
+    // Calculate new dimensions preserving aspect ratio
+    let scale = f64::min(
+        MAX_IMAGE_DIMENSION as f64 / w as f64,
+        MAX_IMAGE_DIMENSION as f64 / h as f64,
+    );
+    let new_w = (w as f64 * scale).round() as u32;
+    let new_h = (h as f64 * scale).round() as u32;
 
-    for img_path in &page_images {
-        let img = image::open(img_path)
-            .with_context(|| format!("failed to load image: {}", img_path.display()))?;
-        max_width = cmp::max(max_width, img.width());
-        combined_height += img.height();
-        images.push(img);
+    // Round both dimensions DOWN to nearest multiple of 28.
+    // Vision transformers split images into patches (typically 14px or 28px).
+    // Dimensions not divisible by the patch size cause GGML_ASSERT failures
+    // in the vision encoder (e.g. glm-ocr / CogVLM2).
+    const PATCH_ALIGN: u32 = 28;
+    // CogVLM2 uses 14px patches with 2×2 merge → 28px effective patches.
+    // The model's position embeddings support at most ~900 merged patches.
+    // Exceeding this causes GGML_ASSERT(a->ne[2] * 4 == b->ne[0]).
+    const MAX_MERGED_PATCHES: u32 = 900;
+
+    let mut new_w = (new_w / PATCH_ALIGN) * PATCH_ALIGN;
+    let mut new_h = (new_h / PATCH_ALIGN) * PATCH_ALIGN;
+    // Safety: ensure we don't go to zero
+    new_w = new_w.max(PATCH_ALIGN);
+    new_h = new_h.max(PATCH_ALIGN);
+
+    // If total merged patches exceed the model's capacity, scale down further
+    let patches_w = new_w / PATCH_ALIGN;
+    let patches_h = new_h / PATCH_ALIGN;
+    if patches_w * patches_h > MAX_MERGED_PATCHES {
+        let shrink = ((MAX_MERGED_PATCHES as f64) / (patches_w * patches_h) as f64).sqrt();
+        new_w = ((new_w as f64 * shrink) as u32 / PATCH_ALIGN) * PATCH_ALIGN;
+        new_h = ((new_h as f64 * shrink) as u32 / PATCH_ALIGN) * PATCH_ALIGN;
+        new_w = new_w.max(PATCH_ALIGN);
+        new_h = new_h.max(PATCH_ALIGN);
     }
 
-    // Create combined image
-    let mut combined_image = ImageBuffer::new(max_width, combined_height);
-    let mut y_offset = 0u32;
+    log::info!(
+        "Downscaling image {}x{} -> {}x{} for Ollama",
+        w, h, new_w, new_h
+    );
 
-    for img in images {
-        for (x, y, pixel) in img.pixels() {
-            if x < max_width {
-                combined_image.put_pixel(x, y_offset + y, pixel);
-            }
-        }
-        y_offset += img.height();
-    }
+    let resized = img.resize(new_w, new_h, image::imageops::FilterType::Lanczos3);
 
-    // Save combined image
-    combined_image.save(&merged_path)
-        .with_context(|| format!("failed to save merged image: {}", merged_path.display()))?;
+    // Save as JPEG for much smaller file size
+    let out_path = image_path.with_extension("compressed.jpg");
+    let file = fs::File::create(&out_path)
+        .with_context(|| format!("failed to create compressed image: {}", out_path.display()))?;
+    let mut buf = std::io::BufWriter::new(file);
+    let encoder = JpegEncoder::new_with_quality(&mut buf, JPEG_QUALITY);
+    resized
+        .write_with_encoder(encoder)
+        .with_context(|| "failed to write compressed JPEG")?;
 
-    // Clean up individual page images
-    for img_path in page_images {
-        let _ = fs::remove_file(img_path);
-    }
-
-    Ok(merged_path)
+    Ok(Some(out_path))
 }
 
 fn parse_amount(raw: &str) -> Option<i64> {
@@ -718,28 +776,294 @@ fn parse_json_candidate(raw: &str) -> Option<Value> {
         return None;
     }
 
+    // Strip markdown code fences (```json ... ``` or ``` ... ```)
     let stripped = trimmed
         .trim_start_matches("```json")
+        .trim_start_matches("```JSON")
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim();
 
+    // Try direct parse first
     if let Ok(value) = serde_json::from_str::<Value>(stripped)
         && value.is_object()
     {
         return Some(value);
     }
 
-    let start = stripped.find('{')?;
-    let end = stripped.rfind('}')?;
-    if end <= start {
-        return None;
+    // Fix unquoted / partially-quoted keys BEFORE brace-matching,
+    // because stray quotes in `identifier":` confuse the in_string tracker.
+    let fixed = fix_unquoted_json_keys(stripped);
+
+    // Try parsing the fixed text directly
+    if let Ok(value) = serde_json::from_str::<Value>(&fixed)
+        && value.is_object()
+    {
+        return Some(value);
     }
 
-    let fragment = &stripped[start..=end];
+    // Find the outermost { ... } by brace-matching on the fixed text
+    let bytes = fixed.as_bytes();
+    let start = bytes.iter().position(|&b| b == b'{')?;
+    let mut depth = 0i32;
+    let mut end: Option<usize> = None;
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    for (i, &b) in bytes.iter().enumerate().skip(start) {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        if b == b'\\' && in_string {
+            escape_next = true;
+            continue;
+        }
+        if b == b'"' {
+            in_string = !in_string;
+            continue;
+        }
+        if in_string {
+            continue;
+        }
+        if b == b'{' {
+            depth += 1;
+        } else if b == b'}' {
+            depth -= 1;
+            if depth == 0 {
+                end = Some(i);
+                break;
+            }
+        }
+    }
+
+    let end = end?;
+    let fragment = &fixed[start..=end];
+
     serde_json::from_str::<Value>(fragment)
         .ok()
         .filter(|value| value.is_object())
+}
+
+/// Normalize Japanese keys returned by the LLM into the expected English keys.
+/// e.g. "税抜金額" → "subtotal_amount", "消費税" → "tax_amount"
+fn normalize_japanese_keys(mut val: Value) -> Value {
+    let key_map: &[(&str, &str)] = &[
+        ("税抜金額", "subtotal_amount"),
+        ("税_amount", "tax_amount"),
+        ("消費税", "tax_amount"),
+        ("税込金額", "total_amount"),
+        ("合計金額", "total_amount"),
+        ("合計", "total_amount"),
+        ("小計", "subtotal_amount"),
+        ("請求番号", "invoice_number"),
+        ("注文番号", "order_number"),
+        ("支払方法", "payment_method"),
+        ("発行日", "issue_date"),
+        ("通貨", "currency"),
+        ("取引先", "vendor_name"),
+        ("書類種別", "doc_type"),
+        ("明細", "line_items"),
+        ("品名", "description"),
+        ("数量", "quantity"),
+        ("単価", "unit_price"),
+        ("金額", "amount"),
+    ];
+
+    if let Value::Object(ref mut map) = val {
+        let keys_to_fix: Vec<(String, String)> = map
+            .keys()
+            .filter_map(|k| {
+                key_map
+                    .iter()
+                    .find(|(jp, _)| k == *jp)
+                    .map(|(_, en)| (k.clone(), en.to_string()))
+            })
+            .collect();
+
+        for (jp_key, en_key) in keys_to_fix {
+            if !map.contains_key(&en_key) {
+                if let Some(v) = map.remove(&jp_key) {
+                    log::info!("Normalized Japanese key: \"{}\" → \"{}\"", jp_key, en_key);
+                    map.insert(en_key, v);
+                }
+            } else {
+                // English key already exists; discard the Japanese duplicate
+                map.remove(&jp_key);
+            }
+        }
+
+        // Recursively normalize arrays (e.g. line_items)
+        for v in map.values_mut() {
+            match v {
+                Value::Array(arr) => {
+                    for item in arr.iter_mut() {
+                        *item = normalize_japanese_keys(item.clone());
+                    }
+                }
+                Value::Object(_) => {
+                    *v = normalize_japanese_keys(v.clone());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    val
+}
+
+/// Extract a numeric amount from a JSON value (number or string like "¥4,345").
+fn extract_amount_from_value(v: &Value) -> Option<i64> {
+    match v {
+        Value::Number(n) => n.as_i64().or_else(|| n.as_f64().map(|f| f.round() as i64)),
+        Value::String(s) => parse_amount(s),
+        _ => None,
+    }
+}
+
+/// Validate and fix amount consistency among subtotal, tax, and total.
+///
+/// Common LLM errors:
+///   - total == subtotal (tax forgotten): fix → total = subtotal + tax
+///   - total == subtotal + tax but subtotal is missing: fix → subtotal = total - tax
+///   - tax is exactly 10% of subtotal but total is wrong: fix accordingly
+fn fix_amount_consistency(mut val: Value) -> Value {
+    if let Value::Object(ref mut map) = val {
+        let subtotal = map.get("subtotal_amount").and_then(extract_amount_from_value);
+        let tax = map.get("tax_amount").and_then(extract_amount_from_value);
+        let total = map.get("total_amount").and_then(extract_amount_from_value);
+
+        match (subtotal, tax, total) {
+            (Some(sub), Some(tx), Some(tot)) => {
+                let expected = sub + tx;
+                if tot != expected && expected > 0 {
+                    // total doesn't match subtotal + tax → model likely copied the wrong field
+                    log::warn!(
+                        "Amount inconsistency: subtotal({}) + tax({}) = {}, but total = {}. Correcting total.",
+                        sub, tx, expected, tot
+                    );
+                    map.insert("total_amount".to_string(), Value::Number(expected.into()));
+                }
+            }
+            (Some(sub), None, Some(tot)) if tot > sub => {
+                // tax is missing → derive it
+                let derived_tax = tot - sub;
+                log::info!("Derived missing tax_amount: {} (total {} - subtotal {})", derived_tax, tot, sub);
+                map.insert("tax_amount".to_string(), Value::Number(derived_tax.into()));
+            }
+            (None, Some(tx), Some(tot)) if tot > tx => {
+                // subtotal is missing → derive it
+                let derived_sub = tot - tx;
+                log::info!("Derived missing subtotal_amount: {} (total {} - tax {})", derived_sub, tot, tx);
+                map.insert("subtotal_amount".to_string(), Value::Number(derived_sub.into()));
+            }
+            _ => {} // Can't validate with fewer than 2 values
+        }
+    }
+    val
+}
+
+/// Convert JS-style object notation to valid JSON by quoting unquoted keys.
+/// e.g. `{ doc_type: "invoice" }` → `{ "doc_type": "invoice" }`
+fn fix_unquoted_json_keys(input: &str) -> String {
+    // Regex: match an unquoted key (word chars, possibly with underscores/hyphens)
+    // that appears after `{`, `[`, or `,` followed by optional whitespace, then `:`.
+    // We must avoid matching inside string values.
+    let mut result = String::with_capacity(input.len() + 64);
+    let mut chars = input.chars().peekable();
+    let mut in_string = false;
+    let mut escape_next = false;
+
+    while let Some(ch) = chars.next() {
+        if escape_next {
+            result.push(ch);
+            escape_next = false;
+            continue;
+        }
+        if ch == '\\' && in_string {
+            result.push(ch);
+            escape_next = true;
+            continue;
+        }
+        if ch == '"' {
+            in_string = !in_string;
+            result.push(ch);
+            continue;
+        }
+        if in_string {
+            result.push(ch);
+            continue;
+        }
+
+        // Outside a string: look for unquoted key patterns
+        // An unquoted key is a sequence of word-like chars followed by `:`
+        if ch.is_alphabetic() || ch == '_' {
+            // Collect the identifier
+            let mut ident = String::new();
+            ident.push(ch);
+            while let Some(&next) = chars.peek() {
+                if next.is_alphanumeric() || next == '_' || next == '-' {
+                    ident.push(next);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            // Skip whitespace between identifier and potential colon
+            let mut ws = String::new();
+            while let Some(&next) = chars.peek() {
+                if next == ' ' || next == '\t' {
+                    ws.push(next);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+            // Check if followed by colon → it's an unquoted key
+            if chars.peek() == Some(&':') {
+                result.push('"');
+                result.push_str(&ident);
+                result.push('"');
+                result.push_str(&ws);
+            } else if chars.peek() == Some(&'"') {
+                // Handle partially-quoted keys like: line_items": [
+                // where LLM put a stray quote after the identifier
+                chars.next(); // consume the stray '"'
+                // Check for optional whitespace then colon
+                let mut ws2 = String::new();
+                while let Some(&next) = chars.peek() {
+                    if next == ' ' || next == '\t' {
+                        ws2.push(next);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                if chars.peek() == Some(&':') {
+                    // It was  identifier": → emit as "identifier":
+                    result.push('"');
+                    result.push_str(&ident);
+                    result.push('"');
+                    result.push_str(&ws);
+                    result.push_str(&ws2);
+                } else {
+                    // Not a key pattern, output as-is
+                    result.push_str(&ident);
+                    result.push_str(&ws);
+                    result.push('"');
+                    result.push_str(&ws2);
+                }
+            } else {
+                // Not a key, keep as-is (e.g. `true`, `false`, `null`)
+                result.push_str(&ident);
+                result.push_str(&ws);
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
 }
 
 fn call_ollama_document(
@@ -748,43 +1072,98 @@ fn call_ollama_document(
     image_path: &Path,
     text: &str,
 ) -> anyhow::Result<Option<Value>> {
-    let image_bytes = fs::read(image_path)
-        .with_context(|| format!("failed to read image: {}", image_path.display()))?;
-    let image_b64 = base64::engine::general_purpose::STANDARD.encode(image_bytes);
+    // Downscale the image before sending to Ollama to avoid 500 errors on large payloads
+    let compressed_path = downscale_if_needed(image_path)?;
+    let send_path = compressed_path.as_deref().unwrap_or(image_path);
+    let image_bytes = fs::read(send_path)
+        .with_context(|| format!("failed to read image: {}", send_path.display()))?;
+    let image_b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
+    log::info!(
+        "OCR image for Ollama: {} bytes (base64: {} bytes)",
+        image_bytes.len(),
+        image_b64.len()
+    );
 
     let prompt = format!(
-        "Extract accounting fields and return strict JSON only. \
-         Keys: doc_type,vendor_name,issue_date,currency,subtotal_amount,tax_amount,total_amount,invoice_number,order_number,payment_method,line_items,warnings. \
-         Use null when unknown and integer amounts in JPY.\n\nOCR_TEXT:\n{}",
+        "You are a JSON-only extractor. Look at this document image and the OCR text below. \
+         Return ONLY a single JSON object with NO explanation, NO markdown, NO extra text. \
+         The JSON must have exactly these keys: \
+         doc_type, vendor_name, issue_date, currency, subtotal_amount, tax_amount, total_amount, \
+         invoice_number, order_number, payment_method, line_items, warnings. \
+         Rules: Use null for unknown values. Amounts must be integers in JPY (no decimals). \
+         line_items is an array of objects with keys: description, quantity, unit_price, amount. \
+         Output must start with {{ and end with }}.\n\nOCR_TEXT:\n{}",
         text.chars().take(6000).collect::<String>()
     );
 
     let payload = json!({
         "model": model,
         "stream": false,
-        "messages": [{
-            "role": "user",
-            "content": prompt,
-            "images": [image_b64]
-        }]
+        "options": {
+            "temperature": 0.1
+        },
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a structured data extractor. You MUST respond with a single JSON object only. Never include explanations, markdown formatting, or any text outside the JSON object."
+            },
+            {
+                "role": "user",
+                "content": prompt,
+                "images": [image_b64]
+            }
+        ]
     });
 
     let url = format!("{}/api/chat", base_url.trim_end_matches('/'));
-    let mut response = ureq::post(&url)
-        .header("Content-Type", "application/json")
-        .send(serde_json::to_string(&payload)?)
-        .map_err(|err| anyhow!("ollama request failed: {err}"))?;
+    let body_str = serde_json::to_string(&payload)?;
 
-    if response.status() != 200 {
-        let status = response.status();
-        let body = response.body_mut().read_to_string().unwrap_or_default();
-        return Err(anyhow!("ollama status {}: {}", status, body));
-    }
+    // Use an agent that does NOT treat 4xx/5xx as Err so we can read error bodies
+    let agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .build()
+        .new_agent();
 
-    let body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|err| anyhow!("failed to read ollama response: {err}"))?;
+    // Retry up to 3 times with exponential backoff (5s, 10s, 20s)
+    let body = {
+        let mut last_err: Option<anyhow::Error> = None;
+        let mut result_body: Option<String> = None;
+        let backoff_secs: &[u64] = &[5, 10, 20];
+        for attempt in 0..3u32 {
+            if attempt > 0 {
+                let wait = backoff_secs.get(attempt as usize - 1).copied().unwrap_or(20);
+                log::info!("Retrying Ollama request (attempt {}, backoff {}s)...", attempt + 1, wait);
+                std::thread::sleep(std::time::Duration::from_secs(wait));
+            }
+            match agent.post(&url)
+                .header("Content-Type", "application/json")
+                .send(&body_str)
+            {
+                Ok(mut response) => {
+                    if response.status() != 200 {
+                        let status = response.status();
+                        let err_body = response.body_mut().read_to_string().unwrap_or_default();
+                        log::warn!("Ollama returned status {} (attempt {}): {}", status, attempt + 1, err_body);
+                        last_err = Some(anyhow!("ollama status {}: {}", status, err_body));
+                        continue;
+                    }
+                    match response.body_mut().read_to_string() {
+                        Ok(b) => { result_body = Some(b); break; }
+                        Err(e) => { last_err = Some(anyhow!("failed to read ollama response: {e}")); continue; }
+                    }
+                }
+                Err(err) => {
+                    log::warn!("Ollama request error (attempt {}): {}", attempt + 1, err);
+                    last_err = Some(anyhow!("ollama request failed: {err}"));
+                    continue;
+                }
+            }
+        }
+        match result_body {
+            Some(b) => b,
+            None => return Err(last_err.unwrap_or_else(|| anyhow!("ollama request failed after retries"))),
+        }
+    };
 
     let root: Value = serde_json::from_str(&body)
         .map_err(|err| anyhow!("invalid ollama response json: {err}"))?;
@@ -794,7 +1173,152 @@ fn call_ollama_document(
         .and_then(Value::as_str)
         .ok_or_else(|| anyhow!("missing message.content in ollama response"))?;
 
-    Ok(parse_json_candidate(content))
+    log::debug!("Ollama raw content ({} chars): {}", content.len(), &content[..content.len().min(500)]);
+
+    let parsed = parse_json_candidate(content);
+    match &parsed {
+        None => {
+            log::warn!(
+                "Failed to parse JSON from Ollama response ({} chars): {}",
+                content.len(),
+                &content[..content.len().min(800)]
+            );
+        }
+        Some(val) => {
+            // Normalize any Japanese keys that the model sometimes returns
+            let normalized = normalize_japanese_keys(val.clone());
+            // Fix common LLM errors: total != subtotal + tax
+            let fixed = fix_amount_consistency(normalized);
+            return Ok(Some(fixed));
+        }
+    }
+    Ok(parsed)
+}
+
+/// Call Ollama once per page image and merge the structured results.
+/// For single-page PDFs this behaves like the old path.
+/// For multi-page PDFs each page produces its own JSON, then we merge them
+/// (line_items are concatenated; scalar fields prefer the first non-null value).
+fn call_ollama_per_page(
+    model: &str,
+    base_url: &str,
+    page_images: &[PathBuf],
+    text: &str,
+) -> anyhow::Result<Option<Value>> {
+    if page_images.is_empty() {
+        return Ok(None);
+    }
+
+    let total_pages = page_images.len();
+    let mut page_results: Vec<Value> = Vec::new();
+
+    for (i, page_path) in page_images.iter().enumerate() {
+        // Cooldown between pages to let Ollama release GPU memory
+        if i > 0 {
+            log::info!("Cooldown 2s before page {}/{}", i + 1, total_pages);
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+        log::info!(
+            "Sending page {}/{} to Ollama: {}",
+            i + 1,
+            total_pages,
+            page_path.display()
+        );
+        match call_ollama_document(model, base_url, page_path, text) {
+            Ok(Some(value)) => {
+                log::info!("Page {}/{}: got structured result", i + 1, total_pages);
+                page_results.push(value);
+            }
+            Ok(None) => {
+                log::warn!("Page {}/{}: Ollama returned no JSON", i + 1, total_pages);
+            }
+            Err(e) => {
+                log::warn!("Page {}/{}: Ollama error: {}", i + 1, total_pages, e);
+                // Continue with remaining pages rather than failing entirely
+            }
+        }
+    }
+
+    if page_results.is_empty() {
+        return Ok(None);
+    }
+
+    // Single page: return as-is
+    if page_results.len() == 1 {
+        return Ok(Some(page_results.into_iter().next().unwrap()));
+    }
+
+    // Multi-page: merge all page results
+    Ok(Some(merge_page_results(page_results)))
+}
+
+/// Merge structured JSON results from multiple pages.
+/// - Scalar fields (vendor_name, total_amount, etc.): first non-null wins
+/// - line_items: concatenated from all pages
+/// - warnings: concatenated and deduplicated
+fn merge_page_results(pages: Vec<Value>) -> Value {
+    let mut merged = Map::new();
+
+    let scalar_keys = [
+        "doc_type",
+        "vendor_name",
+        "issue_date",
+        "currency",
+        "subtotal_amount",
+        "tax_amount",
+        "total_amount",
+        "invoice_number",
+        "order_number",
+        "payment_method",
+    ];
+
+    // Scalar fields: take the first non-null value across pages
+    for key in scalar_keys {
+        for page in &pages {
+            if let Some(val) = page.get(key) {
+                if !val.is_null() {
+                    if let Some(s) = val.as_str() {
+                        if s.trim().is_empty() {
+                            continue;
+                        }
+                    }
+                    merged.insert(key.to_string(), val.clone());
+                    break;
+                }
+            }
+        }
+        // If no page had a value, insert null
+        merged.entry(key.to_string()).or_insert(Value::Null);
+    }
+
+    // line_items: concatenate from all pages
+    let mut all_items: Vec<Value> = Vec::new();
+    for page in &pages {
+        if let Some(Value::Array(items)) = page.get("line_items") {
+            all_items.extend(items.iter().cloned());
+        }
+    }
+    merged.insert("line_items".to_string(), Value::Array(all_items));
+
+    // warnings: concatenate and deduplicate
+    let mut all_warnings: Vec<String> = Vec::new();
+    for page in &pages {
+        if let Some(Value::Array(warns)) = page.get("warnings") {
+            for w in warns {
+                if let Some(s) = w.as_str() {
+                    all_warnings.push(s.to_string());
+                }
+            }
+        }
+    }
+    all_warnings.sort();
+    all_warnings.dedup();
+    merged.insert(
+        "warnings".to_string(),
+        Value::Array(all_warnings.into_iter().map(Value::String).collect()),
+    );
+
+    Value::Object(merged)
 }
 
 fn merge_structured(heuristic: Value, llm: Option<Value>) -> Value {
@@ -872,11 +1396,143 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_json_candidate_unquoted_keys() {
+        // glm-ocr often returns JS-style objects with unquoted keys
+        let raw = r#"```json
+{
+    doc_type: "納品書",
+    vendor_name: "Apple Japan, Inc.",
+    issue_date: "",
+    currency: "JPY",
+    subtotal_amount: 146909,
+    tax_amount: 14691,
+    total_amount: 161600
+}
+```"#;
+        let parsed = parse_json_candidate(raw).unwrap();
+        assert_eq!(parsed["doc_type"], "納品書");
+        assert_eq!(parsed["vendor_name"], "Apple Japan, Inc.");
+        assert_eq!(parsed["total_amount"], 161600);
+    }
+
+    #[test]
+    fn test_parse_json_candidate_mixed_keys() {
+        // Some keys quoted, some not
+        let raw = r#"{
+    "doc_type": "請求書",
+    vendor_name: "Test Corp",
+    line_items: [
+        {
+            description: "Item 1",
+            "quantity": 1,
+            unit_price: 1000,
+            amount: 1000
+        }
+    ]
+}"#;
+        let parsed = parse_json_candidate(raw).unwrap();
+        assert_eq!(parsed["doc_type"], "請求書");
+        assert_eq!(parsed["vendor_name"], "Test Corp");
+        assert_eq!(parsed["line_items"][0]["description"], "Item 1");
+        assert_eq!(parsed["line_items"][0]["amount"], 1000);
+    }
+
+    #[test]
+    fn test_fix_unquoted_preserves_values() {
+        // Ensure true/false/null values are NOT quoted
+        let input = r#"{ doc_type: "invoice", is_paid: true, notes: null }"#;
+        let fixed = fix_unquoted_json_keys(input);
+        let parsed: Value = serde_json::from_str(&fixed).unwrap();
+        assert_eq!(parsed["doc_type"], "invoice");
+        assert_eq!(parsed["is_paid"], true);
+        assert!(parsed["notes"].is_null());
+    }
+
+    #[test]
+    fn test_fix_partially_quoted_key() {
+        // glm-ocr sometimes returns: line_items": [ ... ] (stray quote after key)
+        let input = r#"{
+    doc_type: "请求书",
+    vendor_name: "Apple Japan, Inc.",
+    line_items": [
+        {
+            description: "iPad",
+            quantity: 1,
+            unit_price: 141800,
+            amount: 141800
+        }
+    ]
+}"#;
+        let parsed = parse_json_candidate(input).unwrap();
+        assert_eq!(parsed["doc_type"], "请求书");
+        assert_eq!(parsed["line_items"][0]["description"], "iPad");
+        assert_eq!(parsed["line_items"][0]["amount"], 141800);
+    }
+
+    #[test]
     fn test_detect_doc_type_by_filename() {
         let ty = detect_doc_type("Apple_Care_Recipt.pdf", "");
         assert_eq!(ty, "receipt");
 
         let ty = detect_doc_type("MB48595477.pdf", "");
         assert_eq!(ty, "receipt");
+    }
+
+    #[test]
+    fn test_normalize_japanese_keys() {
+        let input = json!({
+            "doc_type": "請求書",
+            "vendor_name": "Apple Japan",
+            "subtotal_amount": 113800,
+            "税抜金額": 103455,
+            "消費税": 10345,
+            "total_amount": 113800
+        });
+        let result = normalize_japanese_keys(input);
+        // "税抜金額" should NOT overwrite existing "subtotal_amount"
+        assert_eq!(result.get("subtotal_amount").unwrap(), 113800);
+        // "消費税" should become "tax_amount"
+        assert_eq!(result.get("tax_amount").unwrap(), 10345);
+        // Japanese keys should be removed
+        assert!(result.get("税抜金額").is_none());
+        assert!(result.get("消費税").is_none());
+    }
+
+    #[test]
+    fn test_fix_amount_consistency() {
+        // Case 1: total == subtotal (tax forgotten)
+        let input = json!({
+            "subtotal_amount": 161600,
+            "tax_amount": 14691,
+            "total_amount": 161600
+        });
+        let fixed = fix_amount_consistency(input);
+        assert_eq!(fixed["total_amount"], 176291); // 161600 + 14691
+
+        // Case 2: already correct → no change
+        let input2 = json!({
+            "subtotal_amount": 100000,
+            "tax_amount": 10000,
+            "total_amount": 110000
+        });
+        let fixed2 = fix_amount_consistency(input2);
+        assert_eq!(fixed2["total_amount"], 110000);
+
+        // Case 3: string amounts with yen sign
+        let input3 = json!({
+            "subtotal_amount": "¥4,345",
+            "tax_amount": "¥434",
+            "total_amount": "¥4,345"
+        });
+        let fixed3 = fix_amount_consistency(input3);
+        assert_eq!(fixed3["total_amount"], 4779); // 4345 + 434
+
+        // Case 4: tax missing, total > subtotal → derive tax
+        let input4 = json!({
+            "subtotal_amount": 100000,
+            "total_amount": 110000
+        });
+        let fixed4 = fix_amount_consistency(input4);
+        assert_eq!(fixed4["tax_amount"], 10000);
     }
 }

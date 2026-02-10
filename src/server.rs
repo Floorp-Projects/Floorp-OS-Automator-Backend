@@ -154,7 +154,8 @@ pub async fn start_server() -> Result<(), Box<dyn std::error::Error>> {
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
         .allow_methods(tower_http::cors::Any)
-        .allow_headers(tower_http::cors::Any);
+        .allow_headers(tower_http::cors::Any)
+        .expose_headers(tower_http::cors::Any);  // ← gRPC ヘッダーの露出
 
     Server::builder()
         .trace_fn(|_| tracing::info_span!("grpc_server")) // Add tracing span

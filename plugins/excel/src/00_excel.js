@@ -26,7 +26,7 @@ function excelWriteCell(filePath, sheetName, cellRef, value) {
     filePath,
     sheetName,
     cellRef,
-    String(value)
+    String(value),
   );
 }
 
@@ -36,7 +36,7 @@ function excelWriteRange(filePath, sheetName, startCell, values) {
     filePath,
     sheetName,
     startCell,
-    valuesJson
+    valuesJson,
   );
 }
 
@@ -61,7 +61,7 @@ function excelSetColumnWidth(filePath, sheetName, columnRange, width) {
     filePath,
     sheetName,
     columnRange,
-    String(width)
+    String(width),
   );
 }
 
@@ -70,7 +70,7 @@ function excelSetRowHeight(filePath, sheetName, rowRange, height) {
     filePath,
     sheetName,
     rowRange,
-    String(height)
+    String(height),
   );
 }
 
@@ -84,7 +84,7 @@ function excelCreateChart(
   dataRange,
   chartType,
   chartTitle,
-  options
+  options,
 ) {
   const { left, top, width, height } = options || {};
   return Deno.core.ops.op_excel_create_chart(
@@ -96,7 +96,7 @@ function excelCreateChart(
     left ?? null,
     top ?? null,
     width ?? null,
-    height ?? null
+    height ?? null,
   );
 }
 
@@ -109,7 +109,7 @@ function excelInsertPicture(filePath, sheetName, imagePath, options) {
     left ?? null,
     top ?? null,
     width ?? null,
-    height ?? null
+    height ?? null,
   );
 }
 
@@ -117,7 +117,7 @@ function excelInsertPicturesBatch(filePath, sheetName, items) {
   return Deno.core.ops.op_excel_insert_pictures_batch(
     filePath,
     sheetName,
-    JSON.stringify(items)
+    JSON.stringify(items),
   );
 }
 
@@ -127,7 +127,7 @@ function excelWriteRangeWithImages(
   startCell,
   values,
   images,
-  options
+  options,
 ) {
   // Options: { rowHeight, columnWidths, imageScale }
   return Deno.core.ops.op_excel_write_range_with_images(
@@ -136,7 +136,7 @@ function excelWriteRangeWithImages(
     startCell,
     JSON.stringify(values),
     JSON.stringify(images),
-    options ? JSON.stringify(options) : null
+    options ? JSON.stringify(options) : null,
   );
 }
 
@@ -151,7 +151,7 @@ function excelEditRange(filePath, sheetName, startCell, values) {
     filePath,
     sheetName,
     startCell,
-    JSON.stringify(values)
+    JSON.stringify(values),
   );
 }
 
@@ -161,6 +161,13 @@ function excelInsertRow(filePath, sheetName, rowIndex) {
 
 function excelDeleteRow(filePath, sheetName, rowIndex) {
   return Deno.core.ops.op_excel_delete_row(filePath, sheetName, rowIndex);
+}
+
+function excelWriteWorkbook(filePath, sheets) {
+  return Deno.core.ops.op_excel_write_workbook(
+    filePath,
+    JSON.stringify(sheets),
+  );
 }
 
 // --- Export ---
@@ -175,6 +182,7 @@ globalThis.excel = {
   writeCell: excelWriteCell,
   writeRange: excelWriteRange,
   writeRangeWithImages: excelWriteRangeWithImages,
+  writeWorkbook: excelWriteWorkbook,
   addSheet: excelAddSheet,
   // Edit operations (existing file)
   editCell: excelEditCell,
