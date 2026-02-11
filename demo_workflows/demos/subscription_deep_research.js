@@ -9,6 +9,14 @@
  * 5) Write Markdown report to demo_workflows/demos
  */
 
+var DEBUG = true;
+
+function debugLog(message) {
+  if (DEBUG) {
+    console.log("[DEBUG] " + message);
+  }
+}
+
 function workflow() {
   var config = {
     outputPath:
@@ -246,54 +254,96 @@ function collectSourceText(tabId, sourceId, config) {
     config.sourceKeywords,
   );
 
+  debugLog("collectSourceText sourceId=" + sourceId);
+  debugLog("selectors=" + JSON.stringify(selectors));
+
   if (sourceId === "link") {
     if (selectors.inactiveToggle) {
       try {
+        debugLog("click inactiveToggle=" + selectors.inactiveToggle);
         floorp.tabClick(tabId, selectors.inactiveToggle);
         safeSleep(800);
       } catch (e) {}
     }
-    var listText = readSelectorText(tabId, selectors.list);
-    var detailText = readSelectorText(tabId, selectors.detail);
+    var listText = readSelectorText(tabId, selectors.list, "link.list");
+    var detailText = readSelectorText(tabId, selectors.detail, "link.detail");
     var combined = [listText, detailText].filter(Boolean).join("\n");
+    debugLog("link combined length=" + combined.length);
     return combined ? combined.slice(0, maxChars) : fallback;
   }
 
   if (sourceId === "zai") {
     if (selectors.promoClose) {
       try {
+        debugLog("click promoClose=" + selectors.promoClose);
         floorp.tabClick(tabId, selectors.promoClose);
         safeSleep(500);
       } catch (e) {}
     }
-    var panelText = readSelectorText(tabId, selectors.tabpanel);
+    var panelText = readSelectorText(tabId, selectors.tabpanel, "zai.tabpanel");
+    debugLog("zai tabpanel length=" + panelText.length);
     return panelText ? panelText.slice(0, maxChars) : fallback;
   }
 
   if (sourceId === "github_copilot") {
-    var planText = readSelectorText(tabId, selectors.planCard);
+    var planText = readSelectorText(
+      tabId,
+      selectors.planCard,
+      "github_copilot.planCard",
+    );
     if (planText) {
+      debugLog("github_copilot planCard length=" + planText.length);
       return planText.slice(0, maxChars);
     }
-    var billingText = readSelectorText(tabId, selectors.billingContainer);
+    var billingText = readSelectorText(
+      tabId,
+      selectors.billingContainer,
+      "github_copilot.billingContainer",
+    );
+    debugLog("github_copilot billing length=" + billingText.length);
     return billingText ? billingText.slice(0, maxChars) : fallback;
   }
 
   if (sourceId === "google_subscriptions") {
-    var mainText = readSelectorText(tabId, selectors.main);
+    var mainText = readSelectorText(
+      tabId,
+      selectors.main,
+      "google_subscriptions.main",
+    );
+    debugLog("google_subscriptions main length=" + mainText.length);
     return mainText ? mainText.slice(0, maxChars) : fallback;
   }
 
   return fallback;
 }
 
-function readSelectorText(tabId, selector) {
-  if (!selector) return "";
+function readSelectorText(tabId, selector, label) {
+  if (!selector) {
+    debugLog("missing selector" + (label ? " for " + label : ""));
+    return "";
+  }
   try {
     var json = floorp.tabElementText(tabId, selector);
     var obj = safeJsonParse(json);
-    return obj && obj.text ? obj.text : String(json || "");
+    var text = obj && obj.text ? obj.text : String(json || "");
+    debugLog(
+      "selector ok" +
+        (label ? " " + label : "") +
+        " length=" +
+        text.length +
+        " selector=" +
+        selector,
+    );
+    return text;
   } catch (e) {
+    debugLog(
+      "selector error" +
+        (label ? " " + label : "") +
+        " selector=" +
+        selector +
+        " error=" +
+        e,
+    );
     return "";
   }
 }
