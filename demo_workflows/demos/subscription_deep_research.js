@@ -155,9 +155,7 @@ function workflow() {
     } catch (e) {
       console.log("  [WARN] Failed to collect from " + src.label + ": " + e);
     } finally {
-      if (tabId) {
-        floorp.destroyTabInstance(tabId);
-      }
+      closeTabAndDestroy(tabId);
     }
   }
 
@@ -346,6 +344,11 @@ function readSelectorText(tabId, selector, label) {
     );
     return "";
   }
+}
+function closeTabAndDestroy(tabId) {
+  if (!tabId) return;
+  debugLog("closeTab tabId=" + tabId);
+  floorp.closeTab(tabId);
 }
 
 function collectPricingText(tabId, serviceKey, maxChars, serviceKeywords) {
