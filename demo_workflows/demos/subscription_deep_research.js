@@ -124,6 +124,47 @@ function workflow() {
       claude: ["claude", "anthropic", "pricing", "api"],
       zai: ["z.ai", "zai", "pricing", "token"],
     },
+    aiFilterKeywords: [
+      "ai",
+      "llm",
+      "gpt",
+      "copilot",
+      "cursor",
+      "claude",
+      "anthropic",
+      "openai",
+      "z.ai",
+      "zai",
+      "model",
+      "token",
+      "chatgpt", // 追加
+      "x premium", // 追加（X は AI ツールではないが誤認防止）
+    ],
+    aiExcludeKeywords: ["buildjet", "payment", "merchant"], // merchant 関連キーワードも追加
+    linkShowInactive: true,
+    inactiveKeywords: [
+      "inactive",
+      "canceled",
+      "cancelled",
+      "cancel",
+      "キャンセル",
+      "解約",
+      "非アクティブ",
+      "停止",
+      "終了",
+      "downgrade pending",
+    ],
+    linkNoiseKeywords: [
+      "履歴",
+      "取引",
+      "明細",
+      "transaction",
+      "transactions",
+      "history",
+      "receipt",
+    ],
+    zeroPriceKeepKeywords: ["free", "trial", "promo", "credit", "無料"],
+    includeInactive: true,
     maxPageChars: 14000,
   };
 
@@ -169,12 +210,35 @@ function workflow() {
   }
 
   var normalized = normalizeSubscriptions(subscriptionEntries);
-  var pricingCatalog = buildPricingCatalog(normalized, config.pricingUrls);
+  var aiSubscriptions = filterAiSubscriptions(
+    normalized,
+    config.aiFilterKeywords,
+    config.aiExcludeKeywords,
+  );
+  aiSubscriptions = markSubscriptionStatus(
+    aiSubscriptions,
+    config.inactiveKeywords,
+  );
+  aiSubscriptions = filterNoiseSubscriptions(
+    aiSubscriptions,
+    config.linkNoiseKeywords,
+  );
+  aiSubscriptions = filterZeroPriceNoise(
+    aiSubscriptions,
+    config.zeroPriceKeepKeywords,
+  );
+  if (!config.includeInactive) {
+    aiSubscriptions = filterByStatus(aiSubscriptions, "active");
+  }
+  aiSubscriptions = dedupeSubscriptions(aiSubscriptions);
 
-  var recommendations = llmRecommend(normalized, pricingCatalog);
+  var pricingCatalog = buildPricingCatalog(aiSubscriptions, config.pricingUrls);
+
+  var recommendInput = filterRecommendable(aiSubscriptions);
+  var recommendations = llmRecommend(recommendInput, pricingCatalog);
 
   var markdown = buildMarkdownReport(
-    normalized,
+    aiSubscriptions,
     pricingCatalog,
     recommendations,
   );
@@ -185,7 +249,7 @@ function workflow() {
   return {
     ok: true,
     outputPath: config.outputPath,
-    subscriptions: normalized.length,
+    subscriptions: aiSubscriptions.length,
     pricing: pricingCatalog.length,
     recommendations: recommendations.length || 0,
   };
@@ -256,18 +320,20 @@ function collectSourceText(tabId, sourceId, config) {
   debugLog("selectors=" + JSON.stringify(selectors));
 
   if (sourceId === "link") {
-    if (selectors.inactiveToggle) {
+    if (config.linkShowInactive && selectors.inactiveToggle) {
       try {
         debugLog("click inactiveToggle=" + selectors.inactiveToggle);
         floorp.tabClick(tabId, selectors.inactiveToggle);
         safeSleep(800);
       } catch (e) {}
     }
-    var listText = readSelectorText(tabId, selectors.list, "link.list");
-    var detailText = readSelectorText(tabId, selectors.detail, "link.detail");
-    var combined = [listText, detailText].filter(Boolean).join("\n");
-    debugLog("link combined length=" + combined.length);
-    return combined ? combined.slice(0, maxChars) : fallback;
+
+    // 各サブスクリプションアイテムをクリックして詳細を収集
+    var allDetails = collectLinkSubscriptions(tabId, selectors, config);
+    debugLog(
+      "link collected entries count=" + (allDetails.split("---").length || 0),
+    );
+    return allDetails;
   }
 
   if (sourceId === "zai") {
@@ -315,6 +381,132 @@ function collectSourceText(tabId, sourceId, config) {
   return fallback;
 }
 
+function collectLinkSubscriptions(tabId, selectors, config) {
+  var items = [];
+  var listSelector = selectors.list;
+  var detailSelector = selectors.detail;
+
+  // listText を取得して、そこから推定されるアイテム数をカウント
+  var listText = readSelectorText(tabId, listSelector, "link.list");
+  var lines = listText.split(/\n+/);
+
+  // アイテム数をカウント（非アクティブセクション以降の金額パターンを含む行をカウント）
+  var itemCount = 0;
+  var inInactiveSection = false;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (
+      line.indexOf("非アクティブ") !== -1 ||
+      line.toLowerCase().indexOf("inactive") !== -1
+    ) {
+      inInactiveSection = true;
+    }
+    // 金額パターンを含む行をアイテムとしてカウント
+    if (inInactiveSection && /\$|￥|¥/.test(line)) {
+      itemCount++;
+    }
+  }
+
+  debugLog("link estimated item count=" + itemCount);
+
+  // 各アイテムをクリックして詳細を取得
+  for (var i = 0; i < itemCount; i++) {
+    // JavaScript を使ってi番目のアイテムをクリック
+    var clickScript = [
+      "(function() {",
+      '  var items = document.querySelectorAll("' +
+        listSelector +
+        " > div > ul > li[role='listitem']\");",
+      "  if (items.length > " + i + ") {",
+      "    items[" + i + "].click();",
+      "  }",
+      "})()",
+    ].join("\n");
+
+    // script タグの中身を一度セット
+    floorp.tabSetInnerHTML(tabId, "script", clickScript);
+    safeSleep(500);
+
+    // スクリプトを実行
+    floorp.tabClick(tabId, "script");
+    safeSleep(300);
+
+    // 詳細パネルのテキストを取得
+    var detailText = readSelectorText(tabId, detailSelector, "link.detail");
+    debugLog("link detail " + i + " length=" + detailText.length);
+
+    // LLMで単一アイテムをパース
+    var parsed = llmParseSingleSubscription(detailText);
+    if (parsed) {
+      items.push(parsed);
+    }
+  }
+
+  return items.join("\n---\n");
+}
+
+function llmParseSingleSubscription(detailText) {
+  var systemPrompt =
+    "Extract a SINGLE subscription entry from detail panel text. " +
+    "IMPORTANT: Distinguish between MERCHANT and SERVICE names. " +
+    "- Merchant names (BUILDJET OÜ, OpenAI OpCo) are payment processors, NOT the actual service. " +
+    "- Look for the actual service name in the detail panel heading (e.g., Cursor, ChatGPT Plus, Claude Pro, X Premium). " +
+    "- If a merchant name is mentioned, treat it as a note, not the service name. " +
+    "Return ONLY JSON object with: service, plan, price, currency, billing_period, next_billing_date, notes. " +
+    "If unknown, use empty string.";
+
+  var userPrompt = "Detail panel text:\n" + detailText;
+  var raw = llm_chat.chat(systemPrompt, userPrompt);
+  var json = extractJsonObject(sanitizeLlmOutput(raw));
+  var parsed = safeJsonParse(json);
+  return parsed || null;
+}
+
+function filterAiSubscriptions(subscriptions, keywords, excludeKeywords) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  if (!keywords || !keywords.length) return subscriptions.slice();
+
+  var lowerKeywords = [];
+  for (var i = 0; i < keywords.length; i++) {
+    lowerKeywords.push(String(keywords[i]).toLowerCase());
+  }
+
+  var result = [];
+  for (var j = 0; j < subscriptions.length; j++) {
+    var s = subscriptions[j] || {};
+    var serviceText = String(s.service || "");
+    var planText = String(s.plan || "");
+    var aiMatch = lineHasKeyword(serviceText + " " + planText, lowerKeywords);
+    if (!aiMatch) continue;
+    if (excludeKeywords && excludeKeywords.length) {
+      if (lineHasKeyword(serviceText, excludeKeywords)) {
+        if (lineHasKeyword(planText, lowerKeywords)) {
+          var merchantNote = serviceText ? "Merchant: " + serviceText : "";
+          var updatedPlan = planText;
+          if (
+            planText &&
+            planText.toLowerCase() === serviceText.toLowerCase()
+          ) {
+            updatedPlan = "";
+          }
+          result.push(
+            Object.assign({}, s, {
+              service: planText || serviceText,
+              plan: updatedPlan,
+              notes: [merchantNote, s.notes].filter(Boolean).join(" "),
+            }),
+          );
+        }
+        continue;
+      }
+    }
+    {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
 function readSelectorText(tabId, selector, label) {
   if (!selector) {
     debugLog("missing selector" + (label ? " for " + label : ""));
@@ -353,6 +545,9 @@ function closeTabAndDestroy(tabId) {
 
 function collectPricingText(tabId, serviceKey, maxChars, serviceKeywords) {
   var text = getPageText(tabId, maxChars * 2);
+  if (serviceKey === "cursor" || serviceKey === "copilot") {
+    return text.length > maxChars ? text.slice(0, maxChars) : text;
+  }
   var keywords = (serviceKeywords && serviceKeywords[serviceKey]) || [];
   return reduceTextForLlm(text, keywords, maxChars);
 }
@@ -410,9 +605,15 @@ function lineHasKeyword(line, keywords) {
 function llmExtractSubscriptions(pageText, sourceId) {
   var systemPrompt =
     "You extract subscription entries from billing page text. " +
+    "IMPORTANT Distinguish between MERCHANT and SERVICE names: " +
+    "- Merchant names (BUILDJET OÜ, OpenAI OpCo) are payment processors, NOT the actual service. " +
+    "- Look for the actual service name in the detail panel heading (e.g., Cursor, ChatGPT Plus, Claude Pro, X Premium). " +
+    "- If a merchant name is mentioned, treat it as a note, not the service name. " +
     "Return ONLY JSON array. Each item must include: " +
     "service, plan, price, currency, billing_period, next_billing_date, source, notes. " +
-    "If unknown, use empty string. Do not add extra fields.";
+    "If unknown, use empty string. Preserve currency symbols like $, €, £, ¥, ￥ in price. " +
+    "For period: '年' = yearly, '月' = monthly, '日' should be ignored (likely a parse error). " +
+    "Do not add extra fields.";
 
   var userPrompt = "Source: " + sourceId + "\nText:\n" + pageText;
 
@@ -441,23 +642,244 @@ function normalizeSubscriptions(entries) {
   var normalized = [];
   for (var i = 0; i < entries.length; i++) {
     var it = entries[i] || {};
-    var priceInfo = parsePrice(String(it.price || ""));
+    var rawPrice = String(it.price || "");
+    var priceInfo = parsePrice(rawPrice);
+    var currency = priceInfo.currency || String(it.currency || "").trim();
+    if (!currency) {
+      currency = detectCurrency(rawPrice);
+    }
+
+    // 年間プランの推定: Cursor で $200 前後なら年間としてマーク
+    if (
+      String(it.service || "")
+        .toLowerCase()
+        .indexOf("cursor") !== -1
+    ) {
+      if (
+        priceInfo.amount >= 180 &&
+        priceInfo.amount <= 220 &&
+        !priceInfo.period
+      ) {
+        priceInfo.period = "yearly";
+      }
+    }
 
     normalized.push({
       service: String(it.service || "").trim(),
       plan: String(it.plan || "").trim(),
       price: priceInfo.amount,
-      currency: priceInfo.currency || String(it.currency || "").trim(),
+      currency: currency,
       billing_period: normalizePeriod(
         String(it.billing_period || priceInfo.period || ""),
       ),
       next_billing_date: String(it.next_billing_date || "").trim(),
       source: String(it.source || "").trim(),
-      notes: String(it.notes || "").trim(),
-      raw_price: String(it.price || "").trim(),
+      status: "",
+      notes: normalizeNotes(String(it.notes || "")),
+      raw_price: rawPrice.trim(),
     });
   }
   return normalized;
+}
+
+function filterAiSubscriptions(subscriptions, keywords, excludeKeywords) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  if (!keywords || !keywords.length) return subscriptions.slice();
+
+  var lowerKeywords = [];
+  for (var i = 0; i < keywords.length; i++) {
+    lowerKeywords.push(String(keywords[i]).toLowerCase());
+  }
+
+  var result = [];
+  for (var j = 0; j < subscriptions.length; j++) {
+    var s = subscriptions[j] || {};
+    var serviceText = String(s.service || "");
+    var planText = String(s.plan || "");
+    var aiMatch = lineHasKeyword(serviceText + " " + planText, lowerKeywords);
+    if (!aiMatch) continue;
+    if (excludeKeywords && excludeKeywords.length) {
+      if (lineHasKeyword(serviceText, excludeKeywords)) {
+        if (lineHasKeyword(planText, lowerKeywords)) {
+          var merchantNote = serviceText ? "Merchant: " + serviceText : "";
+          var updatedPlan = planText;
+          if (
+            planText &&
+            planText.toLowerCase() === serviceText.toLowerCase()
+          ) {
+            updatedPlan = "";
+          }
+          result.push(
+            Object.assign({}, s, {
+              service: planText || serviceText,
+              plan: updatedPlan,
+              notes: [merchantNote, s.notes].filter(Boolean).join(" "),
+            }),
+          );
+        }
+        continue;
+      }
+    }
+    {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+function markSubscriptionStatus(subscriptions, inactiveKeywords) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var result = [];
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    var status = isInactiveEntry(s, inactiveKeywords) ? "inactive" : "active";
+    var updated = Object.assign({}, s, { status: status });
+    result.push(updated);
+  }
+  return result;
+}
+
+function filterNoiseSubscriptions(subscriptions, noiseKeywords) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var result = [];
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    if (!hasNoiseKeywords(s, noiseKeywords)) {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+function hasNoiseKeywords(entry, noiseKeywords) {
+  if (!entry) return false;
+  var haystack =
+    String(entry.service || "") +
+    " " +
+    String(entry.plan || "") +
+    " " +
+    String(entry.notes || "");
+  return lineHasKeyword(haystack, noiseKeywords);
+}
+
+function filterZeroPriceNoise(subscriptions, keepKeywords) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var result = [];
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    var priceValue = Number(s.price || 0);
+    if (priceValue > 0) {
+      result.push(s);
+      continue;
+    }
+    var rawPrice = String(s.raw_price || "");
+    var keep = lineHasKeyword(rawPrice, keepKeywords);
+    if (keep) {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+function isInactiveEntry(entry, inactiveKeywords) {
+  if (!entry) return false;
+  var haystack =
+    String(entry.service || "") +
+    " " +
+    String(entry.plan || "") +
+    " " +
+    String(entry.notes || "") +
+    " " +
+    String(entry.billing_period || "");
+  if (lineHasKeyword(haystack, inactiveKeywords)) return true;
+  return false;
+}
+
+function filterByStatus(subscriptions, status) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var result = [];
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    if (String(s.status || "") === status) {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+function dedupeSubscriptions(subscriptions) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var seen = {};
+  var result = [];
+
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    var key =
+      String(s.service || "").toLowerCase() +
+      "|" +
+      String(s.plan || "").toLowerCase() +
+      "|" +
+      String(s.price || "") +
+      "|" +
+      String(s.currency || "").toLowerCase() +
+      "|" +
+      String(s.billing_period || "").toLowerCase();
+
+    if (!seen[key]) {
+      seen[key] = s;
+      result.push(s);
+      continue;
+    }
+
+    var existing = seen[key];
+    var existingTime = parseDateLike(existing.next_billing_date);
+    var currentTime = parseDateLike(s.next_billing_date);
+    if (currentTime && (!existingTime || currentTime < existingTime)) {
+      seen[key] = s;
+      for (var j = 0; j < result.length; j++) {
+        if (result[j] === existing) {
+          result[j] = s;
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+function parseDateLike(value) {
+  var text = String(value || "").trim();
+  if (!text) return 0;
+  var normalized = text
+    .replace(/年/g, "-")
+    .replace(/月/g, "-")
+    .replace(/日/g, "")
+    .replace(/\//g, "-");
+  var ms = Date.parse(normalized);
+  return isNaN(ms) ? 0 : ms;
+}
+
+function filterRecommendable(subscriptions) {
+  if (!Array.isArray(subscriptions) || !subscriptions.length) return [];
+  var result = [];
+  for (var i = 0; i < subscriptions.length; i++) {
+    var s = subscriptions[i] || {};
+    var hasPrice = Number(s.price || 0) > 0 || String(s.raw_price || "");
+    if (hasPrice) {
+      result.push(s);
+    }
+  }
+  return result;
+}
+
+function normalizeNotes(value) {
+  var text = String(value || "").trim();
+  if (!text) return "";
+  text = text.replace(/\s+/g, " ");
+  text = text.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+  text = text.replace(/×(?!\s)/g, "× ");
+  return text.trim();
 }
 
 function buildPricingCatalog(subscriptions, pricingUrls) {
@@ -525,7 +947,7 @@ function llmExtractPricing(pageText, serviceName, pricingUrl) {
     "You extract pricing plans from a pricing page. " +
     "Return ONLY JSON object with fields: service, pricing_url, plans, notes. " +
     "Each plan item: name, price, currency, billing_period, tokens, model_notes. " +
-    "Use empty strings for unknown values.";
+    "Use empty strings for unknown values. Preserve currency symbols like $, €, £, ¥, ￥ in price.";
 
   var userPrompt =
     "Service: " +
@@ -592,9 +1014,9 @@ function buildMarkdownReport(subscriptions, pricingCatalog, recommendations) {
   lines.push("## Subscriptions");
   lines.push("");
   lines.push(
-    "| Service | Plan | Price | Currency | Period | Next Billing | Source | Notes |",
+    "| Service | Plan | Price | Currency | Period | Next Billing | Status | Source | Notes |",
   );
-  lines.push("|---|---|---:|---|---|---|---|---|");
+  lines.push("|---|---|---:|---|---|---|---|---|---|");
 
   for (var i = 0; i < subscriptions.length; i++) {
     var s = subscriptions[i];
@@ -611,6 +1033,8 @@ function buildMarkdownReport(subscriptions, pricingCatalog, recommendations) {
         safeMd(s.billing_period) +
         " | " +
         safeMd(s.next_billing_date) +
+        " | " +
+        safeMd(s.status) +
         " | " +
         safeMd(s.source) +
         " | " +
@@ -705,41 +1129,72 @@ function formatPrice(price, raw) {
 
 function parsePrice(text) {
   var cleaned = text.trim();
-  var match = cleaned.match(/([\$€¥£])?\s*([0-9]+(?:\.[0-9]+)?)/);
+  // ￥9,180 のような形式もマッチ（カンマ許容）
+  var match = cleaned.match(/([\$€¥£￥])?\s*([0-9,]+(?:\.[0-9]+)?)/);
+
   if (!match) {
     return { amount: 0, currency: "", period: "" };
   }
 
   var currencySymbol = match[1] || "";
-  var amount = parseFloat(match[2] || "0");
+  // カンマを削除して数値化
+  var amount = parseFloat(String(match[2] || "0").replace(/,/g, "")) || 0;
   var currency = "";
-  if (currencySymbol === "$" || currencySymbol === "") {
+
+  if (currencySymbol === "$" || cleaned.indexOf("USD") !== -1) {
     currency = "USD";
-  } else if (currencySymbol === "€") {
+  } else if (currencySymbol === "€" || cleaned.indexOf("EUR") !== -1) {
     currency = "EUR";
-  } else if (currencySymbol === "¥") {
+  } else if (
+    (currencySymbol === "¥" || currencySymbol === "￥") &&
+    cleaned.indexOf("JPY") === -1
+  ) {
+    // 日本円の判断を改善
     currency = "JPY";
-  } else if (currencySymbol === "£") {
+  } else if (currencySymbol === "£" || cleaned.indexOf("GBP") !== -1) {
     currency = "GBP";
+  } else if (cleaned.indexOf("JPY") !== -1) {
+    currency = "JPY";
   }
 
   var period = "";
-  if (/year|annual|yr/i.test(cleaned)) {
+  if (/年|year|annual|yr/i.test(cleaned)) {
     period = "yearly";
-  } else if (/month|mo/i.test(cleaned)) {
+  } else if (/月|month|mo/i.test(cleaned)) {
     period = "monthly";
   }
 
   return { amount: amount, currency: currency, period: period };
 }
 
+function detectCurrency(text) {
+  var t = String(text || "");
+  if (/￥|¥|JPY|円/i.test(t)) return "JPY";
+  if (/\$/i.test(t)) return "USD";
+  if (/€|EUR/i.test(t)) return "EUR";
+  if (/£|GBP/i.test(t)) return "GBP";
+  return "";
+}
+
 function normalizePeriod(period) {
   var p = String(period || "").toLowerCase();
-  if (p.indexOf("year") !== -1 || p.indexOf("annual") !== -1) {
+  if (
+    p.indexOf("年") !== -1 ||
+    p.indexOf("year") !== -1 ||
+    p.indexOf("annual") !== -1
+  ) {
     return "yearly";
   }
-  if (p.indexOf("month") !== -1 || p.indexOf("mo") !== -1) {
+  if (
+    p.indexOf("月") !== -1 ||
+    p.indexOf("month") !== -1 ||
+    p.indexOf("mo") !== -1
+  ) {
     return "monthly";
+  }
+  // 「日」はパースエラーの可能性が高いので空文字に
+  if (p.indexOf("日") !== -1 || p === "日") {
+    return "";
   }
   return p;
 }

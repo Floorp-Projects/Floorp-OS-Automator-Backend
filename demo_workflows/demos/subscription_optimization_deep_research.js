@@ -995,11 +995,18 @@ function buildSubscriptionInventory() {
       } else {
         var extracted = llmExtractSubscriptions(pageText, src.url, src.label);
         // Fallback: if LLM failed for GitHub Copilot, extract manually from known plan patterns
-        if ((!extracted || extracted.length === 0) && src.id === "github_copilot") {
+        if (
+          (!extracted || extracted.length === 0) &&
+          src.id === "github_copilot"
+        ) {
           debugLog("GitHub Copilot LLM failed, trying manual extraction...");
           extracted = manualGitHubCopilotFallback(pageText);
           if (extracted && extracted.length) {
-            debugLog("GitHub Copilot manual fallback: extracted " + extracted.length + " entries");
+            debugLog(
+              "GitHub Copilot manual fallback: extracted " +
+                extracted.length +
+                " entries",
+            );
           }
         }
         if (extracted && extracted.length) {
@@ -1210,7 +1217,13 @@ function collectSourceText(tabId, source, maxChars) {
     // Plan-relevant info (plan name, next billing, payment method) is in the first ~2000 chars
     var maxBillingChars = 2000;
     if (billingText && billingText.length > maxBillingChars) {
-      debugLog("github: truncating billingContainer from " + billingText.length + " to " + maxBillingChars + " chars");
+      debugLog(
+        "github: truncating billingContainer from " +
+          billingText.length +
+          " to " +
+          maxBillingChars +
+          " chars",
+      );
       billingText = billingText.slice(0, maxBillingChars);
     }
     // Always combine both: planCard has the plan name, billingContainer has details
@@ -1367,12 +1380,12 @@ function manualGitHubCopilotFallback(pageText) {
 
   // Known GitHub Copilot plans and their monthly USD prices (as of 2025/2026)
   var plans = [
-    { pattern: "copilot pro+",  plan: "Pro+",       price: "$39" },
-    { pattern: "pro+",          plan: "Pro+",       price: "$39" },
+    { pattern: "copilot pro+", plan: "Pro+", price: "$39" },
+    { pattern: "pro+", plan: "Pro+", price: "$39" },
     { pattern: "copilot enterprise", plan: "Enterprise", price: "$39" },
-    { pattern: "copilot business",   plan: "Business",   price: "$19" },
-    { pattern: "copilot pro",   plan: "Pro",        price: "$10" },
-    { pattern: "copilot free",  plan: "Free",       price: "$0" },
+    { pattern: "copilot business", plan: "Business", price: "$19" },
+    { pattern: "copilot pro", plan: "Pro", price: "$10" },
+    { pattern: "copilot free", plan: "Free", price: "$0" },
   ];
 
   var matched = null;
@@ -1388,17 +1401,26 @@ function manualGitHubCopilotFallback(pageText) {
   if (lower.indexOf("downgrade pending") !== -1) notes = "Downgrade Pending";
   if (lower.indexOf("upgrade pending") !== -1) notes = "Upgrade Pending";
 
-  debugLog("manualGitHubCopilotFallback matched: " + matched.plan + " " + matched.price);
-  return [{
-    service: "GitHub Copilot",
-    plan: matched.plan,
-    price: matched.price,
-    currency: "USD",
-    billing_period: "monthly",
-    next_billing_date: "",
-    status: "active",
-    notes: notes ? notes + " (manual extraction)" : "(manual extraction — LLM failed)",
-  }];
+  debugLog(
+    "manualGitHubCopilotFallback matched: " +
+      matched.plan +
+      " " +
+      matched.price,
+  );
+  return [
+    {
+      service: "GitHub Copilot",
+      plan: matched.plan,
+      price: matched.price,
+      currency: "USD",
+      billing_period: "monthly",
+      next_billing_date: "",
+      status: "active",
+      notes: notes
+        ? notes + " (manual extraction)"
+        : "(manual extraction — LLM failed)",
+    },
+  ];
 }
 
 function llmExtractSubscriptions(pageText, sourceUrl, sourceTitle) {
@@ -1443,13 +1465,23 @@ function llmExtractSubscriptions(pageText, sourceUrl, sourceTitle) {
 
   // Helper: attempt LLM extraction with given prompt text
   function tryLlmExtract(promptText, attempt) {
-    var up = "Page URL: " + sourceUrl + "\n" +
-      "Page title: " + sourceTitle + "\n" +
-      "Page text:\n" + promptText;
+    var up =
+      "Page URL: " +
+      sourceUrl +
+      "\n" +
+      "Page title: " +
+      sourceTitle +
+      "\n" +
+      "Page text:\n" +
+      promptText;
     var r = llmChat(systemPrompt, up);
     debugLog(
-      "LLM extract raw response" + (attempt > 1 ? " (retry " + attempt + ")" : "") +
-        " (" + sourceUrl + "): " + String(r || "").substring(0, 500),
+      "LLM extract raw response" +
+        (attempt > 1 ? " (retry " + attempt + ")" : "") +
+        " (" +
+        sourceUrl +
+        "): " +
+        String(r || "").substring(0, 500),
     );
     var j = extractJsonArray(r);
     if (!j) return null;
@@ -1464,7 +1496,13 @@ function llmExtractSubscriptions(pageText, sourceUrl, sourceTitle) {
   // If first attempt failed and input was long, retry with truncated text
   if ((!parsed || parsed.length === 0) && pageText.length > 2500) {
     var shortLen = Math.min(2000, Math.floor(pageText.length / 2));
-    debugLog("LLM retry with truncated input (" + shortLen + " chars from " + pageText.length + ")...");
+    debugLog(
+      "LLM retry with truncated input (" +
+        shortLen +
+        " chars from " +
+        pageText.length +
+        ")...",
+    );
     safeSleep(1200);
     parsed = tryLlmExtract(pageText.substring(0, shortLen), 2);
   }
@@ -2639,7 +2677,9 @@ function webExploreAndVerify(subscriptions, apps) {
               billing_period: "monthly",
               next_billing_date: "",
               status: "active",
-              notes: "Detected via web exploration — verify manually" + (hasRealPrice ? "" : " (price unknown)"),
+              notes:
+                "Detected via web exploration — verify manually" +
+                (hasRealPrice ? "" : " (price unknown)"),
               source_url: result.url,
               source_type: "web_exploration",
               source_title: "DuckDuckGo → " + result.domain,
@@ -3227,12 +3267,19 @@ function buildSubsSummaryForLlm(subs) {
   for (var i = 0; i < subs.length; i++) {
     var s = subs[i];
     parts.push(
-      (i + 1) + ". " + (s.service || "?") +
-        " — plan: " + (s.plan || "?") +
-        ", price: " + (s.raw_price || formatJpy(s.monthly_jpy) + "/月") +
-        ", billing: " + (s.billing_period || "?") +
-        ", status: " + (s.status || "?") +
-        (s.notes ? ", notes: " + s.notes : "")
+      i +
+        1 +
+        ". " +
+        (s.service || "?") +
+        " — plan: " +
+        (s.plan || "?") +
+        ", price: " +
+        (s.raw_price || formatJpy(s.monthly_jpy) + "/月") +
+        ", billing: " +
+        (s.billing_period || "?") +
+        ", status: " +
+        (s.status || "?") +
+        (s.notes ? ", notes: " + s.notes : ""),
     );
   }
   return parts.join("\n");
@@ -3246,9 +3293,12 @@ function buildAppsSummaryForLlm(apps) {
   for (var i = 0; i < apps.length; i++) {
     var a = apps[i];
     parts.push(
-      (i + 1) + ". " + (a.name || "?") +
+      i +
+        1 +
+        ". " +
+        (a.name || "?") +
         (a.lastUsed ? " (last used: " + a.lastUsed + ")" : "") +
-        (a.source ? " [" + a.source + "]" : "")
+        (a.source ? " [" + a.source + "]" : ""),
     );
   }
   return parts.join("\n");
@@ -3264,8 +3314,15 @@ function buildRecsSummaryForLlm(recs) {
     for (var i = 0; i < recs.downgrades.length; i++) {
       var d = recs.downgrades[i];
       parts.push(
-        "  - " + d.service + ": " + d.current_plan + " → " + (d.suggested_plan || d.suggested_action) +
-          " (savings: " + formatJpy(d.estimated_monthly_savings_jpy || 0) + "/月)"
+        "  - " +
+          d.service +
+          ": " +
+          d.current_plan +
+          " → " +
+          (d.suggested_plan || d.suggested_action) +
+          " (savings: " +
+          formatJpy(d.estimated_monthly_savings_jpy || 0) +
+          "/月)",
       );
     }
   }
@@ -3274,8 +3331,13 @@ function buildRecsSummaryForLlm(recs) {
     for (var j = 0; j < recs.duplicates.length; j++) {
       var o = recs.duplicates[j];
       parts.push(
-        "  - " + o.category + ": " + (o.services || []).join(", ") +
-          " (savings: " + formatJpy(o.potential_savings_jpy || 0) + "/月)"
+        "  - " +
+          o.category +
+          ": " +
+          (o.services || []).join(", ") +
+          " (savings: " +
+          formatJpy(o.potential_savings_jpy || 0) +
+          "/月)",
       );
     }
   }
@@ -3284,7 +3346,12 @@ function buildRecsSummaryForLlm(recs) {
     for (var k = 0; k < recs.unused.length; k++) {
       var u = recs.unused[k];
       parts.push(
-        "  - " + u.service + " (" + formatJpy(u.monthly_jpy) + "/月) — " + (u.reason || "低使用率")
+        "  - " +
+          u.service +
+          " (" +
+          formatJpy(u.monthly_jpy) +
+          "/月) — " +
+          (u.reason || "低使用率"),
       );
     }
   }
@@ -3313,20 +3380,35 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
 
   // ─── Title ───
   report += "# AI コーディングツール サブスクリプション最適化レポート\n\n";
-  report += "**Subscription Optimization Deep Research** | Generated: " + today + "\n\n";
+  report +=
+    "**Subscription Optimization Deep Research** | Generated: " +
+    today +
+    "\n\n";
   report += "---\n\n";
 
   // ─── Quality Metrics Box ───
   report += "> **データ収集サマリー**\n>\n";
   report += "> - 検出サブスクリプション数: " + subs.length + "\n>\n";
   report += "> - ローカルAIツール数: " + localApps.length + "\n>\n";
-  report += "> - 月額合計 (推定): " + formatJpy(analysis.totalMonthlyJpy) + "\n>\n";
-  report += "> - 潜在的月間節約額: " + formatJpy(recs.total_potential_monthly_savings_jpy || 0) + "\n>\n";
-  report += "> - 重複カテゴリ: " + (analysis.overlaps ? analysis.overlaps.length : 0) + "\n>\n";
-  report += "> - 未使用の可能性: " + (analysis.unused ? analysis.unused.length : 0) + "\n>\n";
-  report += "> - データソース: ブラウザ課金ページ, ローカルアプリ, DuckDuckGo Web探索\n>\n";
+  report +=
+    "> - 月額合計 (推定): " + formatJpy(analysis.totalMonthlyJpy) + "\n>\n";
+  report +=
+    "> - 潜在的月間節約額: " +
+    formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+    "\n>\n";
+  report +=
+    "> - 重複カテゴリ: " +
+    (analysis.overlaps ? analysis.overlaps.length : 0) +
+    "\n>\n";
+  report +=
+    "> - 未使用の可能性: " +
+    (analysis.unused ? analysis.unused.length : 0) +
+    "\n>\n";
+  report +=
+    "> - データソース: ブラウザ課金ページ, ローカルアプリ, DuckDuckGo Web探索\n>\n";
   report += ">\n";
-  report += "> ⚠ このレポートは読み取り専用の分析結果です。サブスクリプションの変更は一切行いません。\n\n";
+  report +=
+    "> ⚠ このレポートは読み取り専用の分析結果です。サブスクリプションの変更は一切行いません。\n\n";
   report += "---\n\n";
 
   // ─── Table of Contents ───
@@ -3349,10 +3431,17 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     sysBase,
     "以下のデータに基づき、AIコーディングツールのサブスクリプション最適化調査のエグゼクティブサマリーを200〜400語で作成してください。" +
       "現在の月額総コスト、検出した主要サブスクリプション、主要な最適化機会、推定節約額を含めてください。\n\n" +
-      "■ サブスクリプション一覧:\n" + subsSummary + "\n\n" +
-      "■ 月額合計: " + formatJpy(analysis.totalMonthlyJpy) + "\n" +
-      "■ 推定節約可能額: " + formatJpy(recs.total_potential_monthly_savings_jpy || 0) + "/月\n\n" +
-      "■ 推奨事項概要:\n" + recsSummary
+      "■ サブスクリプション一覧:\n" +
+      subsSummary +
+      "\n\n" +
+      "■ 月額合計: " +
+      formatJpy(analysis.totalMonthlyJpy) +
+      "\n" +
+      "■ 推定節約可能額: " +
+      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+      "/月\n\n" +
+      "■ 推奨事項概要:\n" +
+      recsSummary,
   );
   report += "## 1. エグゼクティブサマリー\n\n";
   report += execSummary + "\n\n";
@@ -3363,16 +3452,25 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "## 2. 調査方法\n\n";
   report += "### 2.1 データ収集プロセス\n\n";
   report += "本調査では、以下の多層的アプローチでデータを収集しました：\n\n";
-  report += "1. **ローカルアプリ走査**: `/Applications`、`~/Applications`、Homebrew Cask から AI コーディングツールを検出\n";
-  report += "2. **使用シグナル取得**: `mdls` コマンドで各アプリの最終使用日を取得\n";
-  report += "3. **AI ツールフィルタリング**: 既知のキーワードリスト + DuckDuckGo 検索による AI ツール判定\n";
-  report += "4. **課金ページ自動収集**: " + (auditObj.read_sources ? auditObj.read_sources.length : 4) + " のソースからサブスクリプション情報を自動抽出\n";
-  report += "5. **LLM 抽出**: 各課金ページのテキストから構造化データを LLM で抽出\n";
-  report += "6. **Web 探索**: DuckDuckGo で未検出サブスクリプションの料金情報を補完\n\n";
+  report +=
+    "1. **ローカルアプリ走査**: `/Applications`、`~/Applications`、Homebrew Cask から AI コーディングツールを検出\n";
+  report +=
+    "2. **使用シグナル取得**: `mdls` コマンドで各アプリの最終使用日を取得\n";
+  report +=
+    "3. **AI ツールフィルタリング**: 既知のキーワードリスト + DuckDuckGo 検索による AI ツール判定\n";
+  report +=
+    "4. **課金ページ自動収集**: " +
+    (auditObj.read_sources ? auditObj.read_sources.length : 4) +
+    " のソースからサブスクリプション情報を自動抽出\n";
+  report +=
+    "5. **LLM 抽出**: 各課金ページのテキストから構造化データを LLM で抽出\n";
+  report +=
+    "6. **Web 探索**: DuckDuckGo で未検出サブスクリプションの料金情報を補完\n\n";
 
   report += "### 2.2 分析パイプライン\n\n";
   report += "```\n";
-  report += "ローカルアプリ走査 → AI ツールフィルタ → 課金ページ収集 → LLM 抽出\n";
+  report +=
+    "ローカルアプリ走査 → AI ツールフィルタ → 課金ページ収集 → LLM 抽出\n";
   report += "  → 正規化・重複除去 → AI ツールフィルタ(サブスク) → Web 探索\n";
   report += "  → アプリ-サブスク結合 → 最適化分析 → レポート生成\n";
   report += "```\n\n";
@@ -3382,9 +3480,16 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "|------|------|\n";
   report += "| ローカルアプリ検出数 | " + localApps.length + " |\n";
   report += "| サブスクリプション検出数 | " + subs.length + " |\n";
-  report += "| 月額合計 (推定) | " + formatJpy(analysis.totalMonthlyJpy) + " |\n";
-  report += "| 重複カテゴリ | " + (analysis.overlaps ? analysis.overlaps.length : 0) + " |\n";
-  report += "| 未使用の可能性 | " + (analysis.unused ? analysis.unused.length : 0) + " |\n\n";
+  report +=
+    "| 月額合計 (推定) | " + formatJpy(analysis.totalMonthlyJpy) + " |\n";
+  report +=
+    "| 重複カテゴリ | " +
+    (analysis.overlaps ? analysis.overlaps.length : 0) +
+    " |\n";
+  report +=
+    "| 未使用の可能性 | " +
+    (analysis.unused ? analysis.unused.length : 0) +
+    " |\n\n";
   report += "---\n\n";
 
   // ─── 3. Per-Subscription Analysis (LLM) ───
@@ -3397,11 +3502,12 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     // Generate a combined deep-dive analysis for all subscriptions
     var subsAnalysis = generateReportSection(
       "Subscription Analysis",
-      sysBase + " 各サブスクリプションについて、サービスの概要・プラン詳細・コスト評価・使用状況の推定を含めてください。",
+      sysBase +
+        " 各サブスクリプションについて、サービスの概要・プラン詳細・コスト評価・使用状況の推定を含めてください。",
       "以下の各AIコーディングツールサブスクリプションについて、それぞれ100〜200語で詳細分析を行ってください。" +
         "各サービスについて: (1)サービス概要 (2)検出プラン・価格 (3)主要機能 (4)コスト対価値評価 を含めてください。" +
         "各サービスの前に「**サービス名**」を太字で付けてください。\n\n" +
-        subsSummary
+        subsSummary,
     );
     report += subsAnalysis + "\n\n";
   }
@@ -3413,12 +3519,16 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
 
   var correlationText = generateReportSection(
     "App Correlation",
-    sysBase + " ローカルにインストールされたAIコーディングツールと有料サブスクリプションの関連性を分析してください。",
+    sysBase +
+      " ローカルにインストールされたAIコーディングツールと有料サブスクリプションの関連性を分析してください。",
     "以下のローカルAIコーディングツールと検出サブスクリプションの相関を300〜500語で分析してください。" +
       "どのアプリがどのサブスクリプションに対応するか、サブスクなしで使えるアプリ、" +
       "サブスクがあるのにローカルにアプリがないケースを特定してください。\n\n" +
-      "■ ローカルアプリ:\n" + appsSummary + "\n\n" +
-      "■ サブスクリプション:\n" + subsSummary
+      "■ ローカルアプリ:\n" +
+      appsSummary +
+      "\n\n" +
+      "■ サブスクリプション:\n" +
+      subsSummary,
   );
   report += correlationText + "\n\n";
 
@@ -3428,9 +3538,14 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "|---|---|---|\n";
   for (var ci = 0; ci < subs.length; ci++) {
     var cs = subs[ci];
-    report += "| " + safeMd(cs.service) +
-      " | " + safeMd(cs.matched_app || "(なし)") +
-      " | " + safeMd(cs.app_usage || "N/A") + " |\n";
+    report +=
+      "| " +
+      safeMd(cs.service) +
+      " | " +
+      safeMd(cs.matched_app || "(なし)") +
+      " | " +
+      safeMd(cs.app_usage || "N/A") +
+      " |\n";
   }
   report += "\n";
   report += "---\n\n";
@@ -3439,13 +3554,21 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   console.log("  → コスト最適化戦略...");
   var costStrategy = generateReportSection(
     "Cost Strategy",
-    sysBase + " 具体的な数値を使い、コスト削減の戦略を提案してください。リスクと注意点も含めてください。",
+    sysBase +
+      " 具体的な数値を使い、コスト削減の戦略を提案してください。リスクと注意点も含めてください。",
     "以下のデータに基づき、AIコーディングツールのコスト最適化戦略を400〜600語で作成してください。" +
       "現状の支出分析、削減優先順位、具体的な節約額の計算、実行リスクを含めてください。\n\n" +
-      "■ 月額合計: " + formatJpy(analysis.totalMonthlyJpy) + "\n" +
-      "■ 推定節約可能額: " + formatJpy(recs.total_potential_monthly_savings_jpy || 0) + "/月\n\n" +
-      "■ サブスクリプション:\n" + subsSummary + "\n\n" +
-      "■ 推奨事項:\n" + recsSummary
+      "■ 月額合計: " +
+      formatJpy(analysis.totalMonthlyJpy) +
+      "\n" +
+      "■ 推定節約可能額: " +
+      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+      "/月\n\n" +
+      "■ サブスクリプション:\n" +
+      subsSummary +
+      "\n\n" +
+      "■ 推奨事項:\n" +
+      recsSummary,
   );
   report += "## 5. コスト最適化戦略\n\n";
   report += costStrategy + "\n\n";
@@ -3455,11 +3578,15 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   console.log("  → ツール比較・競合分析...");
   var compAnalysis = generateReportSection(
     "Competitive Analysis",
-    sysBase + " AIコーディングツール市場の知識を活用し、検出されたツールの比較分析を行ってください。",
+    sysBase +
+      " AIコーディングツール市場の知識を活用し、検出されたツールの比較分析を行ってください。",
     "以下のAIコーディングツールについて、機能比較・市場ポジション・価格対価値を300〜500語で分析してください。" +
       "重複する機能、各ツールの独自の強み、統合の可能性を評価してください。\n\n" +
-      "■ 検出ツール (サブスクリプション):\n" + subsSummary + "\n\n" +
-      "■ ローカルインストール済み:\n" + appsSummary
+      "■ 検出ツール (サブスクリプション):\n" +
+      subsSummary +
+      "\n\n" +
+      "■ ローカルインストール済み:\n" +
+      appsSummary,
   );
   report += "## 6. ツール比較・競合分析\n\n";
   report += compAnalysis + "\n\n";
@@ -3469,12 +3596,19 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   console.log("  → 推奨アクションプラン...");
   var actionPlan = generateReportSection(
     "Action Plan",
-    sysBase + " 優先度順に具体的なアクションアイテムを提案してください。各アクションのリスクレベルも示してください。",
+    sysBase +
+      " 優先度順に具体的なアクションアイテムを提案してください。各アクションのリスクレベルも示してください。",
     "以下の最適化推奨事項に基づき、優先度付きの具体的アクションプランを300〜500語で作成してください。" +
       "各アクションに (1)概要 (2)期待効果 (3)リスク (4)優先度(高/中/低) を含めてください。\n\n" +
-      "■ 推奨事項:\n" + recsSummary + "\n\n" +
-      "■ 現在の月額合計: " + formatJpy(analysis.totalMonthlyJpy) + "\n" +
-      "■ 推定節約額: " + formatJpy(recs.total_potential_monthly_savings_jpy || 0) + "/月"
+      "■ 推奨事項:\n" +
+      recsSummary +
+      "\n\n" +
+      "■ 現在の月額合計: " +
+      formatJpy(analysis.totalMonthlyJpy) +
+      "\n" +
+      "■ 推定節約額: " +
+      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+      "/月",
   );
   report += "## 7. 推奨アクションプラン\n\n";
   report += actionPlan + "\n\n";
@@ -3487,13 +3621,24 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     sysBase,
     "以下のデータに基づき、AIコーディングツールのサブスクリプション最適化調査の結論を200〜300語でまとめてください。" +
       "主要な発見、推奨アクションの要約、今後のレビュー計画を含めてください。\n\n" +
-      "■ サブスクリプション数: " + subs.length + "\n" +
-      "■ ローカルAIツール数: " + localApps.length + "\n" +
-      "■ 月額合計: " + formatJpy(analysis.totalMonthlyJpy) + "\n" +
-      "■ 推定節約可能額: " + formatJpy(recs.total_potential_monthly_savings_jpy || 0) + "/月\n" +
-      "■ 推奨事項数: ダウングレード " + (recs.downgrades ? recs.downgrades.length : 0) +
-        ", 重複 " + (recs.duplicates ? recs.duplicates.length : 0) +
-        ", 未使用 " + (recs.unused ? recs.unused.length : 0)
+      "■ サブスクリプション数: " +
+      subs.length +
+      "\n" +
+      "■ ローカルAIツール数: " +
+      localApps.length +
+      "\n" +
+      "■ 月額合計: " +
+      formatJpy(analysis.totalMonthlyJpy) +
+      "\n" +
+      "■ 推定節約可能額: " +
+      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+      "/月\n" +
+      "■ 推奨事項数: ダウングレード " +
+      (recs.downgrades ? recs.downgrades.length : 0) +
+      ", 重複 " +
+      (recs.duplicates ? recs.duplicates.length : 0) +
+      ", 未使用 " +
+      (recs.unused ? recs.unused.length : 0),
   );
   report += "## 8. 結論\n\n";
   report += conclusions + "\n\n";
@@ -3502,18 +3647,29 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   // ─── 9. Data Appendix (static) ───
   report += "## 9. データ付録\n\n";
   report += "### 9.1 サブスクリプション一覧\n\n";
-  report += "| # | サービス | プラン | 価格 | 月額(¥) | 請求周期 | ステータス | ソース |\n";
+  report +=
+    "| # | サービス | プラン | 価格 | 月額(¥) | 請求周期 | ステータス | ソース |\n";
   report += "|---|---|---|---|---:|---|---|---|\n";
   for (var di = 0; di < subs.length; di++) {
     var ds = subs[di];
-    report += "| " + (di + 1) +
-      " | " + safeMd(ds.service) +
-      " | " + safeMd(ds.plan) +
-      " | " + safeMd(ds.raw_price || "") +
-      " | " + safeMd(formatJpy(ds.monthly_jpy)) +
-      " | " + safeMd(ds.billing_period) +
-      " | " + safeMd(ds.status) +
-      " | " + safeMd(ds.source_type || "") + " |\n";
+    report +=
+      "| " +
+      (di + 1) +
+      " | " +
+      safeMd(ds.service) +
+      " | " +
+      safeMd(ds.plan) +
+      " | " +
+      safeMd(ds.raw_price || "") +
+      " | " +
+      safeMd(formatJpy(ds.monthly_jpy)) +
+      " | " +
+      safeMd(ds.billing_period) +
+      " | " +
+      safeMd(ds.status) +
+      " | " +
+      safeMd(ds.source_type || "") +
+      " |\n";
   }
   report += "\n";
 
@@ -3522,17 +3678,25 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "|---|---|---|---|\n";
   for (var ai = 0; ai < localApps.length; ai++) {
     var la = localApps[ai];
-    report += "| " + (ai + 1) +
-      " | " + safeMd(la.name) +
-      " | " + safeMd(la.lastUsed || "不明") +
-      " | " + safeMd(la.source || "") + " |\n";
+    report +=
+      "| " +
+      (ai + 1) +
+      " | " +
+      safeMd(la.name) +
+      " | " +
+      safeMd(la.lastUsed || "不明") +
+      " | " +
+      safeMd(la.source || "") +
+      " |\n";
   }
   report += "\n";
 
   report += "---\n\n";
-  report += "*本レポートは Subscription Optimization Deep Research ワークフローにより自動生成されました。*\n";
+  report +=
+    "*本レポートは Subscription Optimization Deep Research ワークフローにより自動生成されました。*\n";
   report += "*AI 分析によるコンテンツ抽出・合成を使用しています。*\n";
-  report += "*サブスクリプションの変更は一切行っていません。すべての推奨事項は手動での確認・実行が必要です。*\n";
+  report +=
+    "*サブスクリプションの変更は一切行っていません。すべての推奨事項は手動での確認・実行が必要です。*\n";
   report += "*Generated: " + new Date().toISOString() + "*\n";
 
   return report;
@@ -3542,7 +3706,14 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
 // 7. Write Artifacts
 // ============================================================================
 
-function writeArtifacts(outputDir, analysis, recs, actionsQueue, auditObj, comprehensiveReport) {
+function writeArtifacts(
+  outputDir,
+  analysis,
+  recs,
+  actionsQueue,
+  auditObj,
+  comprehensiveReport,
+) {
   ensureDirExists(outputDir);
   auditLog("create_output_dir", outputDir);
 
@@ -3576,7 +3747,11 @@ function writeArtifacts(outputDir, analysis, recs, actionsQueue, auditObj, compr
   // 7e. analysis_report.md (LLM-generated comprehensive report)
   if (comprehensiveReport) {
     writeFile(outputDir + "/analysis_report.md", comprehensiveReport);
-    console.log("  Report size: " + (comprehensiveReport.length / 1000).toFixed(1) + " KB");
+    console.log(
+      "  Report size: " +
+        (comprehensiveReport.length / 1000).toFixed(1) +
+        " KB",
+    );
   }
 
   console.log("[Step 7] Artifacts written to " + outputDir);
@@ -3938,13 +4113,29 @@ function workflow() {
 
   // --- Step 6.5: Comprehensive Report Generation (LLM) ---
   console.log("\n[Step 6.5] Generating comprehensive analysis report...");
-  var comprehensiveReport = buildComprehensiveReport(analysis, recs, localApps, auditObj);
-  console.log("[Step 6.5] Report generated: " + (comprehensiveReport.length / 1000).toFixed(1) + " KB");
+  var comprehensiveReport = buildComprehensiveReport(
+    analysis,
+    recs,
+    localApps,
+    auditObj,
+  );
+  console.log(
+    "[Step 6.5] Report generated: " +
+      (comprehensiveReport.length / 1000).toFixed(1) +
+      " KB",
+  );
   auditLog("generate_report", comprehensiveReport.length + " chars");
 
   // --- Step 7: Write Artifacts ---
   console.log("\n[Step 7] Writing artifacts...");
-  writeArtifacts(CONFIG.outputBaseDir, analysis, recs, actionsQueue, auditObj, comprehensiveReport);
+  writeArtifacts(
+    CONFIG.outputBaseDir,
+    analysis,
+    recs,
+    actionsQueue,
+    auditObj,
+    comprehensiveReport,
+  );
 
   // --- Done ---
   console.log("\n========================================");
