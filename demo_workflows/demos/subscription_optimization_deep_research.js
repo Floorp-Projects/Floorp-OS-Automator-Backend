@@ -2928,11 +2928,13 @@ function detectCategoryOverlaps(subscriptions) {
   }
 
   var overlaps = [];
+  var seenPairs = {}; // track service pairs to avoid double-counting
   var keys = Object.keys(categoryMap);
   for (var k = 0; k < keys.length; k++) {
     var indices = categoryMap[keys[k]];
     if (indices.length >= 2) {
       var services = [];
+      var serviceNamesOnly = [];
       var totalMonthly = 0;
       for (var m = 0; m < indices.length; m++) {
         var sub = subscriptions[indices[m]];
@@ -2940,10 +2942,18 @@ function detectCategoryOverlaps(subscriptions) {
           services.push(
             sub.service + " (" + formatJpy(sub.monthly_jpy) + "/月)",
           );
+          serviceNamesOnly.push(sub.service);
           totalMonthly += sub.monthly_jpy || 0;
         }
       }
       if (services.length >= 2) {
+        // Deduplicate: skip if same service pair already counted
+        var pairKey = serviceNamesOnly.slice().sort().join("|");
+        if (seenPairs[pairKey]) {
+          debugLog("Skipping duplicate overlap pair: " + pairKey + " (category: " + keys[k] + ")");
+          continue;
+        }
+        seenPairs[pairKey] = true;
         overlaps.push({
           category: keys[k],
           services: services,
@@ -3106,8 +3116,12 @@ function generateRecommendations(analysis) {
       recs.downgrades[a].estimated_monthly_savings_jpy || 0;
   for (var b = 0; b < recs.duplicates.length; b++)
     totalPotentialSavings += recs.duplicates[b].potential_savings_jpy || 0;
-  for (var c = 0; c < recs.unused.length; c++)
-    totalPotentialSavings += recs.unused[c].monthly_jpy || 0;
+  for (var c = 0; c < recs.unused.length; c++) {
+    // Only count unused subscriptions that actually cost money
+    if (recs.unused[c].monthly_jpy > 0) {
+      totalPotentialSavings += recs.unused[c].monthly_jpy || 0;
+    }
+  }
 
   recs.total_potential_monthly_savings_jpy = totalPotentialSavings;
 
@@ -3256,6 +3270,22 @@ function generateReportSection(sectionTitle, systemPrompt, userPrompt) {
     debugLog("Report section too short or empty: " + sectionTitle);
     return "(この節の生成に失敗しました。データは他の artifact ファイルを参照してください。)";
   }
+  // Validate: check for known hallucinated service names
+  var hallucinatedNames = ["Tabnine", "Replit", "CodeWhisperer", "Codeium", "Ghostwriter", "Amazon Q"];
+  var lower = text.toLowerCase();
+  for (var hi = 0; hi < hallucinatedNames.length; hi++) {
+    if (lower.indexOf(hallucinatedNames[hi].toLowerCase()) !== -1) {
+      debugLog("WARNING: Report section '" + sectionTitle + "' contains hallucinated service '" + hallucinatedNames[hi] + "' — retrying with stronger constraint");
+      var retryText = llmChat(
+        systemPrompt + " 【警告】前回の出力に存在しないサービス名('" + hallucinatedNames[hi] + "')が含まれていました。提供されたデータにあるサービスのみ言及してください。",
+        userPrompt
+      );
+      if (retryText && retryText.length >= 30) {
+        return retryText;
+      }
+      break;
+    }
+  }
   return text;
 }
 
@@ -3371,10 +3401,19 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   var appsSummary = buildAppsSummaryForLlm(localApps);
   var recsSummary = buildRecsSummaryForLlm(recs);
 
+  // Build explicit service name list for validation
+  var serviceNames = [];
+  for (var sni = 0; sni < subs.length; sni++) serviceNames.push(subs[sni].service);
+  var serviceNameListStr = serviceNames.join(", ");
+
   var sysBase =
     "あなたはサブスクリプション最適化の専門アナリストです。日本語でレポートを書いてください。" +
     "マークダウン形式で出力してください。見出し(##, ###)は使わないでください（親セクションが管理します）。" +
-    "具体的な数値・サービス名を必ず含めてください。";
+    "【最重要ルール】以下のデータに記載されたサービス名・プラン名・価格のみを使用してください。" +
+    "データに無いサービス名（例: Tabnine, Replit, Amazon CodeWhisperer, Codeium 等）は絶対に言及しないでください。" +
+    "検出されたサービスは: " + serviceNameListStr + " のみです。" +
+    "為替レートは $1 = ¥150 とし、ドル建て価格には括弧で円換算を付けてください。" +
+    "データにない情報を推測・補完・捏造しないでください。";
 
   var report = "";
 
@@ -3499,15 +3538,32 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   if (subs.length === 0) {
     report += "検出されたサブスクリプションはありません。\n\n";
   } else {
+    // Build per-service factsheet so LLM has precise data
+    var subsFactsheet = "";
+    for (var sfi = 0; sfi < subs.length; sfi++) {
+      var sf = subs[sfi];
+      var jpyStr = formatJpy(sf.monthly_jpy);
+      subsFactsheet += "### **" + sf.service + "**\n";
+      subsFactsheet += "- プラン: " + (sf.plan || "不明") + "\n";
+      subsFactsheet += "- 価格: " + (sf.raw_price || jpyStr + "/月") + " (月額換算: " + jpyStr + ")\n";
+      subsFactsheet += "- 請求周期: " + (sf.billing_period || "不明") + "\n";
+      subsFactsheet += "- ステータス: " + (sf.status || "不明") + "\n";
+      subsFactsheet += "- ソース: " + (sf.source_type || "不明") + "\n";
+      subsFactsheet += "- ノート: " + (sf.notes || "なし") + "\n\n";
+    }
+
     // Generate a combined deep-dive analysis for all subscriptions
     var subsAnalysis = generateReportSection(
       "Subscription Analysis",
       sysBase +
-        " 各サブスクリプションについて、サービスの概要・プラン詳細・コスト評価・使用状況の推定を含めてください。",
+        " 各サブスクリプションについて、サービスの概要・プラン詳細・コスト評価・使用状況の推定を含めてください。" +
+        " 以下のファクトシートの情報のみを使ってください。ファクトシートにないサービスは言及しないでください。",
       "以下の各AIコーディングツールサブスクリプションについて、それぞれ100〜200語で詳細分析を行ってください。" +
-        "各サービスについて: (1)サービス概要 (2)検出プラン・価格 (3)主要機能 (4)コスト対価値評価 を含めてください。" +
-        "各サービスの前に「**サービス名**」を太字で付けてください。\n\n" +
-        subsSummary,
+        "各サービスについて: (1)サービス概要（そのツールが何であるかを正確に） (2)検出プラン・価格 (3)主要機能 (4)コスト対価値評価 を含めてください。" +
+        "各サービスの前に「### **サービス名**」を付けてください。\n" +
+        "重要: Cursor はAIコードエディタ、GitHub Copilot はAIペアプログラマー、GLM Coding はZhipu AI のコーディングツール、" +
+        "ChatGPT は OpenAI の汎用AI、Claude は Anthropic の汎用AIです。\n\n" +
+        subsFactsheet,
     );
     report += subsAnalysis + "\n\n";
   }
@@ -3552,10 +3608,17 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
 
   // ─── 5. Cost Optimization Strategy (LLM) ───
   console.log("  → コスト最適化戦略...");
+  // Build explicit cost breakdown so LLM doesn't make up numbers
+  var costBreakdown = "";
+  for (var cbi = 0; cbi < subs.length; cbi++) {
+    var cbs = subs[cbi];
+    costBreakdown += "- " + cbs.service + " (" + (cbs.plan || "?") + "): " + formatJpy(cbs.monthly_jpy) + "/月\n";
+  }
   var costStrategy = generateReportSection(
     "Cost Strategy",
     sysBase +
-      " 具体的な数値を使い、コスト削減の戦略を提案してください。リスクと注意点も含めてください。",
+      " 提供されたデータの数値のみ使い、コスト削減の戦略を提案してください。リスクと注意点も含めてください。" +
+      " 価格を自分で計算しないでください。以下に記載された月額(¥)をそのまま使ってください。",
     "以下のデータに基づき、AIコーディングツールのコスト最適化戦略を400〜600語で作成してください。" +
       "現状の支出分析、削減優先順位、具体的な節約額の計算、実行リスクを含めてください。\n\n" +
       "■ 月額合計: " +
@@ -3564,9 +3627,9 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       "■ 推定節約可能額: " +
       formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
       "/月\n\n" +
-      "■ サブスクリプション:\n" +
-      subsSummary +
-      "\n\n" +
+      "■ 各サービスの月額内訳 (確定値。この金額をそのまま使ってください):\n" +
+      costBreakdown +
+      "\n" +
       "■ 推奨事項:\n" +
       recsSummary,
   );
@@ -3618,9 +3681,10 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   console.log("  → 結論...");
   var conclusions = generateReportSection(
     "Conclusions",
-    sysBase,
+    sysBase + " 結論では提供されたサービス名のみ言及してください。存在しないサービス名を絶対に使わないでください。",
     "以下のデータに基づき、AIコーディングツールのサブスクリプション最適化調査の結論を200〜300語でまとめてください。" +
       "主要な発見、推奨アクションの要約、今後のレビュー計画を含めてください。\n\n" +
+      "■ 検出サービス一覧 (これ以外のサービス名は使用禁止): " + serviceNameListStr + "\n" +
       "■ サブスクリプション数: " +
       subs.length +
       "\n" +
@@ -3633,12 +3697,14 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       "■ 推定節約可能額: " +
       formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
       "/月\n" +
+      "■ 各サービスの月額:\n" + costBreakdown + "\n" +
       "■ 推奨事項数: ダウングレード " +
       (recs.downgrades ? recs.downgrades.length : 0) +
       ", 重複 " +
       (recs.duplicates ? recs.duplicates.length : 0) +
       ", 未使用 " +
-      (recs.unused ? recs.unused.length : 0),
+      (recs.unused ? recs.unused.length : 0) +
+      "\n■ 推奨事項概要:\n" + recsSummary,
   );
   report += "## 8. 結論\n\n";
   report += conclusions + "\n\n";
