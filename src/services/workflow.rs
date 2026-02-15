@@ -563,8 +563,7 @@ impl WorkflowService for MyWorkflowService {
         );
 
         // Add 10 second delay for testing frontend progress UI
-        // DISABLED: Return immediately instead of delaying
-        // tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
         if let Err(err) = generate_workflow_async(&req.prompt).await {
             warn!("failed to generate workflow via generator (ignoring for demo): {err}");

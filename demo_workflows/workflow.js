@@ -44,7 +44,7 @@
 // Configuration
 // ============================================================================
 
-var DEBUG = true;
+var DEBUG = false;
 var AUDIT_ONLY = false; // true = generate audit plan & stop
 
 var CONFIG = {
@@ -103,6 +103,53 @@ var CONFIG = {
     "continue.dev",
     "replit.com",
     "aws.amazon.com",
+  ],
+  // Official domains per service for web verification safety.
+  // Web exploration should prefer/require these to avoid third-party noise.
+  officialServiceDomains: {
+    copilot: ["github.com", "copilot.github.com"],
+    "github copilot": ["github.com", "copilot.github.com"],
+    cursor: ["cursor.com"],
+    chatgpt: ["openai.com", "chatgpt.com"],
+    openai: ["openai.com", "chatgpt.com"],
+    claude: ["anthropic.com", "claude.ai"],
+    anthropic: ["anthropic.com", "claude.ai"],
+    gemini: ["google.com", "myaccount.google.com"],
+    "google ai": ["google.com", "myaccount.google.com"],
+    "glm coding": ["z.ai"],
+    "z.ai": ["z.ai"],
+    zai: ["z.ai"],
+    codeium: ["codeium.com", "windsurf.com"],
+    windsurf: ["windsurf.com", "codeium.com"],
+    tabnine: ["tabnine.com"],
+    supermaven: ["supermaven.com"],
+    continue: ["continue.dev"],
+    sourcegraph: ["sourcegraph.com"],
+    cody: ["sourcegraph.com"],
+    jetbrains: ["jetbrains.com"],
+    replit: ["replit.com"],
+    augment: ["augmentcode.com"],
+    devin: ["cognition.ai"],
+    "amazon q": ["aws.amazon.com"],
+    codewhisperer: ["aws.amazon.com"],
+  },
+  // Services that are often used via web/IDE integrations, so "no local app"
+  // should not be treated as strong unused evidence.
+  webOnlyServiceKeywords: [
+    "copilot",
+    "github",
+    "openai",
+    "chatgpt",
+    "anthropic",
+    "claude",
+    "z.ai",
+    "glm",
+    "gemini",
+    "cursor",
+    "codeium",
+    "windsurf",
+    "sourcegraph",
+    "cody",
   ],
   // Auto-open sources — AI coding tool billing pages only
   autoOpenSources: [
@@ -171,6 +218,11 @@ var CONFIG = {
     visitDelay: 1500, // ms between page visits
     pageLoadTimeout: 12000, // ms to wait for page load
     maxPageChars: 6000, // max chars to extract per visited page
+    // Safety defaults for accuracy:
+    // - Don't auto-add subscription candidates inferred from generic pricing pages.
+    // - Prefer official domains for any inference.
+    allowAppInferredSubscriptions: false,
+    requireOfficialDomainForInferredSubs: true,
   },
 
   // Keywords that definitively EXCLUDE an app from being an AI coding tool.
@@ -298,6 +350,10 @@ var CONFIG = {
     "youtube",
     "google one",
     "google play",
+    "line（",
+    "ライン",
+    "lyp",
+    "lypプレミアム",
     "pokemon",
     "pokémon",
     "pocket",
@@ -312,10 +368,25 @@ var CONFIG = {
     "wine",
     "wireshark",
     "zipang",
+    "kinoppy",
+    "紀伊國屋",
+    "kinokuniya",
+    "bookstore",
+    "電子書籍",
+    "screen studio",
+    "screen recording",
+    "screenflow",
+    "chatgpt atlas",
+    "twitter",
+    "x premium",
+    "x.com",
+    "social media",
   ],
 
   // Short exact names that should be excluded (substring match would be too broad).
   // E.g. "line" would match "cline" with indexOf, so use exact match.
+  // "chatgpt" and "claude" are LLM chat apps as local apps, but their SUBSCRIPTIONS
+  // (ChatGPT Plus/Pro, Claude Pro) include coding tools (Codex, Claude Code) and should be tracked.
   notAiToolExactNames: [
     "line",
     "dia",
@@ -325,6 +396,10 @@ var CONFIG = {
     "hex",
     "ftp",
     "collect",
+    "chatgpt",
+    "claude",
+    "x",
+    "twitter",
   ],
 
   // Keywords that definitively identify an app as an AI coding tool.
@@ -346,6 +421,7 @@ var CONFIG = {
     "codewhisperer",
     "openai",
     "chatgpt",
+    "claude code",
     "claude",
     "anthropic",
     "github",
@@ -414,6 +490,269 @@ var CONFIG = {
       "codegeex",
       "qwen coder",
     ],
+  },
+
+  // Student / Academic discount database ------------------------------------
+  // Maps service name (lowercase) → discount info for students
+  studentDiscounts: {
+    "github copilot": {
+      student_plan: "GitHub Copilot Free (Student)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 5850,
+      how_to_apply:
+        "GitHub Education (https://education.github.com) に学生認証を申請。.edu/.ac.jp メールまたは学生証で認証可能。",
+      note: "GitHub Student Developer Pack に含まれる。Copilot Pro 相当が無料。",
+    },
+    copilot: {
+      student_plan: "GitHub Copilot Free (Student)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 5850,
+      how_to_apply:
+        "GitHub Education (https://education.github.com) に学生認証を申請。",
+      note: "GitHub Student Developer Pack に含まれる。",
+    },
+    cursor: {
+      student_plan: "Cursor Pro (学生1年間無料)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 3000,
+      how_to_apply:
+        "cursor.com/students から .edu メールで申請。対象大学の学生は1年間 Cursor Pro が無料。",
+      note: "2025年5月開始の学生プログラム。1年間 Pro が無料。対象国・大学に制限あり。",
+    },
+    jetbrains: {
+      student_plan: "JetBrains All Products (学生無料)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 3700,
+      how_to_apply:
+        "JetBrains (https://www.jetbrains.com/community/education/) で学生ライセンスを申請。.edu/.ac.jp メールまたは ISIC カードで認証。",
+      note: "全 JetBrains IDE + AI Assistant が無料。年次更新。",
+    },
+    "jetbrains ai": {
+      student_plan: "JetBrains AI Assistant (学生無料)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 1500,
+      how_to_apply: "JetBrains 学生ライセンスに AI Assistant が含まれる。",
+      note: "JetBrains 学生ライセンスの一部。",
+    },
+    chatgpt: {
+      student_plan: null,
+      student_price: null,
+      student_price_jpy: null,
+      normal_price_jpy: 3000,
+      how_to_apply: null,
+      note: "2026年2月時点で公式の学割プランなし。ChatGPT Edu は教育機関単位の提供。",
+    },
+    claude: {
+      student_plan: null,
+      student_price: null,
+      student_price_jpy: null,
+      normal_price_jpy: 2700,
+      how_to_apply: null,
+      note: "2026年2月時点で公式の学割プランなし。",
+    },
+    "glm coding": {
+      student_plan: null,
+      student_price: null,
+      student_price_jpy: null,
+      normal_price_jpy: 6750,
+      how_to_apply: null,
+      note: "Zhipu AI — 学割情報なし。中国国内の教育機関向けプログラムの可能性あり。",
+    },
+    notion: {
+      student_plan: "Notion Plus (学生無料)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 1200,
+      how_to_apply: ".edu/.ac.jp メールでサインアップすると自動適用。",
+      note: "AI機能も含まれる。",
+    },
+    figma: {
+      student_plan: "Figma Professional (学生無料)",
+      student_price: "$0/月",
+      student_price_jpy: 0,
+      normal_price_jpy: 1800,
+      how_to_apply:
+        "Figma Education (https://www.figma.com/education/) から申請。",
+      note: "デザインツール。AI coding には直接関係しないが開発ワークフローに含まれる場合。",
+    },
+  },
+
+  // OSS contributor license eligibility database ----------------------------
+  ossLicenses: {
+    jetbrains: {
+      oss_plan: "JetBrains All Products (OSS License, 無料)",
+      oss_price_jpy: 0,
+      requirement: "公開OSSプロジェクトを3ヶ月以上アクティブに開発していること",
+      how_to_apply:
+        "https://www.jetbrains.com/community/opensource/ — プロジェクトURL を提出して審査。FOSS かつ商用利用なしが条件。",
+      note: "年次更新。承認まで通常 1-2 週間。",
+    },
+    "github copilot": {
+      oss_plan: "GitHub Copilot Free (OSS Maintainer)",
+      oss_price_jpy: 0,
+      requirement: "人気のある公開OSSリポジトリのメンテナーであること",
+      how_to_apply:
+        "GitHub Settings → Copilot で OSS maintainer として申請。リポジトリの star 数やアクティビティが審査対象。",
+      note: "個人 OSS 貢献者向け。基準は公開されていないが、100+ stars が目安と言われている。",
+    },
+    copilot: {
+      oss_plan: "GitHub Copilot Free (OSS Maintainer)",
+      oss_price_jpy: 0,
+      requirement: "人気のある公開OSSリポジトリのメンテナーであること",
+      how_to_apply: "GitHub Settings → Copilot で OSS maintainer として申請。",
+      note: "GitHub Copilot と同じ。",
+    },
+  },
+
+  // Tech stack alignment recommendations ------------------------------------
+  techStackRecommendations: {
+    typescript: {
+      bestTools: ["cursor", "github copilot", "windsurf"],
+      reason:
+        "Cursor は TypeScript/React の補完精度が特に高い。Copilot も TS サポートが充実。",
+    },
+    rust: {
+      bestTools: ["cursor", "github copilot", "jetbrains ai"],
+      reason:
+        "Cursor + rust-analyzer の組み合わせが強力。JetBrains RustRover + AI Assistant も有力。",
+    },
+    python: {
+      bestTools: ["cursor", "github copilot", "jetbrains ai"],
+      reason:
+        "全ツールが Python を強力にサポート。JetBrains PyCharm + AI は Data Science に特に強い。",
+    },
+    java: {
+      bestTools: ["jetbrains ai", "github copilot"],
+      reason:
+        "IntelliJ IDEA + JetBrains AI Assistant が Java 界で最強。Copilot も良好。",
+    },
+    go: {
+      bestTools: ["github copilot", "cursor"],
+      reason: "Copilot の Go サポートは成熟。Cursor も Go を良くサポート。",
+    },
+    swift: {
+      bestTools: ["github copilot", "cursor"],
+      reason: "Xcode 統合なら Copilot。VSCode ベースなら Cursor。",
+    },
+    "c++": {
+      bestTools: ["github copilot", "jetbrains ai", "cursor"],
+      reason: "CLion + JetBrains AI が C++ に特化。Copilot も C++ に強い。",
+    },
+  },
+
+  // User profile detection signals ------------------------------------------
+  profileDetection: {
+    // Email domain patterns that indicate student status
+    studentEmailDomains: [
+      ".edu",
+      ".ac.jp",
+      ".ac.uk",
+      ".edu.au",
+      ".edu.cn",
+      ".edu.tw",
+      ".ac.kr",
+      ".edu.sg",
+      ".ac.in",
+      ".edu.hk",
+      ".edu.br",
+      ".ac.nz",
+      ".edu.mx",
+      ".student.",
+    ],
+    // App names that suggest student/academic usage
+    studentAppKeywords: [
+      "webclass",
+      "moodle",
+      "canvas",
+      "blackboard",
+      "google classroom",
+      "teams for education",
+      "lms",
+      "manaba",
+      "universal passport",
+      "campusplan",
+      "学務",
+      "履修",
+      "syllabus",
+      "splashtop classroom",
+    ],
+    // Directory patterns that suggest student status
+    studentDirPatterns: [
+      "university",
+      "college",
+      "school",
+      "大学",
+      "学校",
+      "授業",
+      "assignment",
+      "homework",
+      "lecture",
+      "thesis",
+      "論文",
+      "レポート",
+      "卒論",
+      "修論",
+    ],
+    // Language marker files → detected language mapping
+    languageMarkers: {
+      "package.json": "JavaScript/TypeScript",
+      "tsconfig.json": "TypeScript",
+      "Cargo.toml": "Rust",
+      "go.mod": "Go",
+      "requirements.txt": "Python",
+      "setup.py": "Python",
+      "pyproject.toml": "Python",
+      Gemfile: "Ruby",
+      "pom.xml": "Java",
+      "build.gradle": "Java/Kotlin",
+      "Package.swift": "Swift",
+      "CMakeLists.txt": "C/C++",
+      Makefile: "C/C++",
+      "composer.json": "PHP",
+      "mix.exs": "Elixir",
+      "deno.json": "TypeScript/Deno",
+      "pubspec.yaml": "Dart/Flutter",
+    },
+    // Directories to scan for local projects
+    projectScanDirs: [
+      "~/Documents",
+      "~/Developer",
+      "~/Projects",
+      "~/dev",
+      "~/dev-source",
+      "~/workspace",
+      "~/repos",
+      "~/src",
+      "~/code",
+      "~/Desktop",
+    ],
+    // Enterprise/company indicators in GitHub bio
+    enterpriseIndicators: [
+      "engineer at",
+      "developer at",
+      "works at",
+      "software engineer",
+      "senior engineer",
+      "staff engineer",
+      "employed",
+      "@",
+      "inc.",
+      "corp.",
+      "ltd.",
+      "株式会社",
+      "合同会社",
+    ],
+  },
+  // Profile confidence thresholds for high-impact personalized recommendations.
+  personalizedMinConfidence: {
+    student: 0.6,
+    oss: 0.6,
+    enterprise: 0.6,
   },
 
   // Safety ------------------------------------------------------------------
@@ -493,7 +832,8 @@ function shellEscape(path) {
 function safeMd(value) {
   return String(value || "")
     .replace(/\|/g, "\\|")
-    .replace(/\n/g, " ");
+    .replace(/[\r\n]+/g, " ")
+    .trim();
 }
 
 function execSafe(cmd) {
@@ -577,9 +917,7 @@ function llmChat(systemPrompt, userPrompt, retries) {
     } catch (e) {
       attempt++;
       if (attempt > retries) {
-        console.log(
-          "[WARN] LLM call failed after " + retries + " retries: " + e,
-        );
+        debugLog("[WARN] LLM call failed after " + retries + " retries: " + e);
         return "";
       }
       safeSleep(1000 * attempt);
@@ -845,7 +1183,14 @@ function buildLocalAppInventory() {
     auditLog("read_homebrew", "Homebrew (" + brewApps.length + " cask apps)");
   }
 
-  // 1d. Usage signals
+  // 1d. VS Code extensions (AI coding tools only)
+  var vscodeExts = listVscodeExtensions();
+  if (vscodeExts.length) {
+    apps = apps.concat(vscodeExts);
+    auditLog("read_vscode_extensions", "VS Code extensions (" + vscodeExts.length + " AI tools)");
+  }
+
+  // 1e. Usage signals
   if (CONFIG.useUsageSignals) {
     apps = enrichWithUsageSignals(apps);
     auditLog(
@@ -854,7 +1199,7 @@ function buildLocalAppInventory() {
     );
   }
 
-  console.log("[Step 1] Local app inventory: " + apps.length + " apps found");
+  debugLog("[Step 1] Local app inventory: " + apps.length + " apps found");
   return apps;
 }
 
@@ -914,6 +1259,70 @@ function listHomebrewApps() {
   return apps;
 }
 
+function listVscodeExtensions() {
+  var home = getHomeDir();
+  var extDir = home + "/.vscode/extensions";
+  var raw = execSafe("ls -1 " + shellEscape(extDir) + " 2>/dev/null");
+  if (!raw) return [];
+
+  var lines = raw.split("\n");
+  var extensions = [];
+
+  // AI coding tool extension keywords
+  var aiExtKeywords = [
+    "copilot",
+    "cursor",
+    "codeium",
+    "tabnine",
+    "supermaven",
+    "cody",
+    "continue",
+    "cline",
+    "aider",
+    "codegeex",
+    "glm",
+    "zhipu",
+  ];
+
+  for (var i = 0; i < lines.length; i++) {
+    var extName = lines[i].trim();
+    if (!extName) continue;
+
+    // Check if this extension is an AI coding tool
+    var extLower = extName.toLowerCase();
+    var isAiTool = false;
+    for (var k = 0; k < aiExtKeywords.length; k++) {
+      if (extLower.indexOf(aiExtKeywords[k]) !== -1) {
+        isAiTool = true;
+        break;
+      }
+    }
+    if (!isAiTool) continue;
+
+    // Extract publisher and extension name (e.g., "GitHub.copilot-1.0.0" -> "GitHub Copilot")
+    var parts = extName.split(".");
+    var publisher = parts[0] || "";
+    var extSimpleName = (parts[1] || "").split("-")[0] || extName;
+
+    // Clean up display name
+    var displayName = extSimpleName;
+    if (publisher) {
+      displayName = publisher + " " + extSimpleName;
+    }
+
+    extensions.push({
+      name: displayName,
+      bundleId: "",
+      path: extDir + "/" + extName,
+      source: "vscode_extension",
+      lastUsed: "",
+      usageBucket: "unknown",
+      extensionId: extName,
+    });
+  }
+  return extensions;
+}
+
 function enrichWithUsageSignals(apps) {
   for (var i = 0; i < apps.length; i++) {
     var a = apps[i];
@@ -968,13 +1377,13 @@ function buildSubscriptionInventory() {
 
   // 2a. Auto-open & explore pre-configured billing sources
   var allSources = CONFIG.autoOpenSources.concat(CONFIG.additionalSources);
-  console.log(
+  debugLog(
     "[Step 2a] Auto-opening " + allSources.length + " billing source(s)...",
   );
 
   for (var i = 0; i < allSources.length; i++) {
     var src = allSources[i];
-    console.log("\n  [Collect] " + src.label + " → " + src.url);
+    debugLog("\n  [Collect] " + src.label + " → " + src.url);
     var tabId = null;
     try {
       tabId = floorp.createTab(src.url, false);
@@ -982,7 +1391,7 @@ function buildSubscriptionInventory() {
         floorp.tabWaitForElement(tabId, src.waitSelector, 15000);
       }
       floorp.tabWaitForNetworkIdle(tabId);
-      safeSleep(1500);
+      safeSleep(2500);
 
       var pageText = collectSourceText(tabId, src, CONFIG.maxPageChars);
       auditLog(
@@ -1004,6 +1413,18 @@ function buildSubscriptionInventory() {
           if (extracted && extracted.length) {
             debugLog(
               "GitHub Copilot manual fallback: extracted " +
+                extracted.length +
+                " entries",
+            );
+          }
+        }
+        // Fallback: if LLM failed for Link.com/Stripe, parse with regex
+        if ((!extracted || extracted.length === 0) && src.id === "link") {
+          debugLog("Link.com LLM failed, trying manual extraction...");
+          extracted = manualLinkFallback(pageText);
+          if (extracted && extracted.length) {
+            debugLog(
+              "Link.com manual fallback: extracted " +
                 extracted.length +
                 " entries",
             );
@@ -1039,14 +1460,14 @@ function buildSubscriptionInventory() {
     }
   }
   if (newTabs.length > 0) {
-    console.log(
+    debugLog(
       "\n[Step 2b] Found " + newTabs.length + " additional open billing tab(s)",
     );
   }
 
   for (var k = 0; k < newTabs.length; k++) {
     var tab = newTabs[k];
-    console.log("  [Tab] " + tab.title + " → " + tab.url);
+    debugLog("  [Tab] " + tab.title + " → " + tab.url);
     var instanceId = null;
     try {
       instanceId = floorp.attachToTab(String(tab.id));
@@ -1086,7 +1507,7 @@ function buildSubscriptionInventory() {
   var pdfSubs = processInvoicePDFs();
   subscriptions = subscriptions.concat(pdfSubs);
 
-  console.log(
+  debugLog(
     "\n[Step 2] Total raw subscription entries: " + subscriptions.length,
   );
   return subscriptions;
@@ -1198,6 +1619,27 @@ function collectSourceText(tabId, source, maxChars) {
         ? combined.slice(0, maxChars)
         : combined;
     }
+    // SPA may not be loaded yet — retry after extra wait
+    debugLog(
+      "Link.com selectors returned short text (" +
+        combined.length +
+        " chars), retrying after 4s...",
+    );
+    safeSleep(4000);
+    listText = readSelectorText(tabId, selectors.list, "link.list.retry");
+    detailText = readSelectorText(tabId, selectors.detail, "link.detail.retry");
+    combined = listText + "\n---\n" + detailText;
+    if (combined.length > 100) {
+      debugLog("Link.com retry succeeded: " + combined.length + " chars");
+      return combined.length > maxChars
+        ? combined.slice(0, maxChars)
+        : combined;
+    }
+    debugLog(
+      "Link.com retry still short (" +
+        combined.length +
+        " chars), falling through to generic",
+    );
     // fallback to generic
   }
 
@@ -1263,6 +1705,27 @@ function collectSourceText(tabId, source, maxChars) {
         ? zaiPrefixed.slice(0, maxChars)
         : zaiPrefixed;
     }
+    // SPA may not be hydrated — retry after wait
+    debugLog(
+      "Z.ai tabpanel short (" +
+        (zaiPanel ? zaiPanel.length : 0) +
+        " chars), retrying after 4s...",
+    );
+    safeSleep(4000);
+    zaiPanel = readSelectorText(
+      tabId,
+      "div[role='tabpanel']",
+      "zai.tabpanel.retry",
+    );
+    if (zaiPanel && zaiPanel.length > 50) {
+      debugLog("Z.ai retry succeeded: " + zaiPanel.length + " chars");
+      var zaiPrefixed2 =
+        "[Z.ai / GLM Coding subscription management page]\n" + zaiPanel;
+      return zaiPrefixed2.length > maxChars
+        ? zaiPrefixed2.slice(0, maxChars)
+        : zaiPrefixed2;
+    }
+    debugLog("Z.ai retry still short, falling through to generic");
   }
 
   // Cursor — SPA needs extra wait; try specific selectors, avoid JS source
@@ -1423,6 +1886,99 @@ function manualGitHubCopilotFallback(pageText) {
   ];
 }
 
+// Manual fallback for Link.com / Stripe subscription page.
+// Parses Japanese/English text patterns like:
+//   "サブスクリプション アクティブ BUILDJET OÜ お支払い期日: 2025年5月4日 $0.00"
+function manualLinkFallback(pageText) {
+  var text = String(pageText || "");
+  var results = [];
+  // Pattern: merchant name followed by price like $XX.XX or ¥X,XXX
+  // Link.com shows: <merchant name> + billing info + <price>
+  var priceRegex = /[\$\￥¥][\d,]+\.?\d*/g;
+  var prices = [];
+  var m;
+  while ((m = priceRegex.exec(text)) !== null) {
+    prices.push({ value: m[0], index: m.index });
+  }
+  if (prices.length === 0) return [];
+
+  // Try to extract subscription blocks by splitting on known separators
+  // Link.com lists subscriptions separated by status keywords
+  var statusKeywords = [
+    "アクティブ",
+    "active",
+    "非アクティブ",
+    "inactive",
+    "cancelled",
+    "キャンセル済み",
+  ];
+  var lower = text.toLowerCase();
+
+  for (var pi = 0; pi < prices.length; pi++) {
+    var price = prices[pi];
+    // Look backwards from price position for a merchant/service name
+    var before = text
+      .substring(Math.max(0, price.index - 200), price.index)
+      .trim();
+    // Remove status keywords and Japanese labels to isolate merchant name
+    var merchantText = before;
+    for (var si = 0; si < statusKeywords.length; si++) {
+      merchantText = merchantText.replace(
+        new RegExp(statusKeywords[si], "gi"),
+        "",
+      );
+    }
+    merchantText = merchantText
+      .replace(/サブスクリプション/g, "")
+      .replace(/お支払い期日[：:]\s*\d{4}年?\d{1,2}月?\d{1,2}日?/g, "")
+      .replace(/\d{4}\/\d{1,2}\/\d{1,2}/g, "")
+      .trim();
+    // Take last non-empty segment as merchant name
+    var segments = merchantText.split(/\s{2,}|\n/).filter(function (s) {
+      return s.trim().length > 1;
+    });
+    var merchant =
+      segments.length > 0 ? segments[segments.length - 1].trim() : "Unknown";
+    if (merchant.length > 80) merchant = merchant.substring(0, 80);
+
+    // Determine status
+    var status = "unknown";
+    if (lower.indexOf("アクティブ") !== -1 || lower.indexOf("active") !== -1)
+      status = "active";
+    if (
+      lower.indexOf("非アクティブ") !== -1 ||
+      lower.indexOf("inactive") !== -1
+    )
+      status = "inactive";
+
+    // Extract billing date
+    var dateMatch = before.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+    var billingDate = "";
+    if (dateMatch) {
+      billingDate =
+        dateMatch[1] +
+        "-" +
+        String("0" + dateMatch[2]).slice(-2) +
+        "-" +
+        String("0" + dateMatch[3]).slice(-2);
+    }
+
+    results.push({
+      service: merchant,
+      plan: "unknown",
+      price: price.value,
+      currency: price.value.indexOf("$") !== -1 ? "USD" : "JPY",
+      billing_period: "unknown",
+      next_billing_date: billingDate,
+      status: status,
+      notes: "(manual extraction from Link.com — LLM failed)",
+    });
+  }
+
+  debugLog("manualLinkFallback extracted: " + results.length + " entries");
+  return results;
+}
+
 function llmExtractSubscriptions(pageText, sourceUrl, sourceTitle) {
   var systemPrompt =
     "You extract the user's ACTUAL subscription/service entries from a billing or account page. " +
@@ -1511,7 +2067,7 @@ function llmExtractSubscriptions(pageText, sourceUrl, sourceTitle) {
     console.log("  [WARN] LLM returned no valid JSON for " + sourceUrl);
     return [];
   }
-  console.log("  Extracted " + parsed.length + " entries from " + sourceUrl);
+  debugLog("  Extracted " + parsed.length + " entries from " + sourceUrl);
   if (parsed.length === 0) {
     debugLog(
       "LLM returned empty array [] for " +
@@ -1579,7 +2135,7 @@ function processInvoicePDFs() {
   }
 
   if (pdfCount > 0) {
-    console.log(
+    debugLog(
       "[Step 2c] Processed " +
         pdfCount +
         " PDF invoice(s), found " +
@@ -1647,6 +2203,10 @@ function normaliseSubscriptions(entries) {
 
 function parsePrice(text) {
   var cleaned = text.trim();
+  // Guard: reject date-like strings (e.g. "2024/05/15", "2025-02-13")
+  if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(cleaned)) {
+    return { amount: 0, currency: "", period: "" };
+  }
   var match = cleaned.match(/([\$€¥£￥])?\s*([0-9,]+(?:\.[0-9]+)?)/);
   if (!match) return { amount: 0, currency: "", period: "" };
 
@@ -1684,8 +2244,11 @@ function normaliseCurrencyCode(code) {
 
 function normalisePeriod(period) {
   var p = String(period || "").toLowerCase();
+  if (/四半期|quarter|3\s*month|3か月/.test(p)) return "quarterly";
   if (/年|year|annual/.test(p)) return "yearly";
   if (/月|month|mo/.test(p)) return "monthly";
+  if (/週|week|weekly/.test(p)) return "weekly";
+  if (/daily|日次/.test(p)) return "daily";
   if (/一回|one.?time|lifetime/.test(p)) return "one-time";
   if (/日/.test(p)) return ""; // likely parse error
   return p || "unknown";
@@ -1773,7 +2336,11 @@ function convertToJpy(amount, currency) {
 function estimateMonthlyJpy(jpyAmount, period) {
   if (!jpyAmount || jpyAmount === 0) return 0;
   if (period === "yearly") return Math.round(jpyAmount / 12);
+  if (period === "quarterly") return Math.round(jpyAmount / 3);
   if (period === "monthly") return jpyAmount;
+  if (period === "weekly") return Math.round((jpyAmount * 52) / 12);
+  if (period === "daily") return Math.round(jpyAmount * 30);
+  if (period === "one-time") return 0;
   return jpyAmount; // unknown or one-time → treat as-is
 }
 
@@ -1781,12 +2348,15 @@ function calculateConfidence(entry) {
   var score = 0.3; // base
   if (entry.service && entry.service.length > 1) score += 0.15;
   if (entry.price && String(entry.price).match(/[0-9]/)) score += 0.2;
+  else score -= 0.1; // unknown price is low-confidence
   if (entry.billing_period && entry.billing_period !== "unknown") score += 0.1;
   if (entry.next_billing_date) score += 0.1;
   if (entry.source_type === "browser_billing_page") score += 0.1;
   if (entry.source_type === "pdf_invoice") score -= 0.05;
+  if (entry.source_type === "web_exploration") score -= 0.2;
   if (entry.status === "active") score += 0.05;
-  return Math.min(1.0, Math.round(score * 100) / 100);
+  if (!entry.status || entry.status === "unknown") score -= 0.05;
+  return Math.max(0, Math.min(1.0, Math.round(score * 100) / 100));
 }
 
 function deduplicateSubscriptions(subs) {
@@ -1951,6 +2521,80 @@ function extractUrlDomain(url) {
   }
 }
 
+function normalizeDomain(domainOrUrl) {
+  var d = String(domainOrUrl || "").toLowerCase().trim();
+  if (!d) return "";
+  d = d.replace(/^https?:\/\//, "");
+  d = d.split("/")[0];
+  d = d.replace(/^www\./, "");
+  return d;
+}
+
+function isSameOrSubdomain(domain, baseDomain) {
+  var d = normalizeDomain(domain);
+  var b = normalizeDomain(baseDomain);
+  if (!d || !b) return false;
+  return d === b || d.indexOf("." + b) !== -1;
+}
+
+function getOfficialDomainsForService(serviceName, sourceUrl) {
+  var domains = [];
+  var seen = {};
+
+  function addDomain(d) {
+    var n = normalizeDomain(d);
+    if (!n || seen[n]) return;
+    seen[n] = true;
+    domains.push(n);
+  }
+
+  // Source URL domain is the strongest ownership signal.
+  addDomain(extractUrlDomain(sourceUrl || ""));
+
+  // Service mapping in config.
+  var map = CONFIG.officialServiceDomains || {};
+  var serviceNorm = normalizeLooseText(serviceName || "");
+  var mapKeys = Object.keys(map);
+  for (var i = 0; i < mapKeys.length; i++) {
+    var keyNorm = normalizeLooseText(mapKeys[i]);
+    if (!keyNorm || !serviceNorm) continue;
+    if (
+      serviceNorm.indexOf(keyNorm) !== -1 ||
+      keyNorm.indexOf(serviceNorm) !== -1
+    ) {
+      var list = map[mapKeys[i]];
+      if (Array.isArray(list)) {
+        for (var j = 0; j < list.length; j++) addDomain(list[j]);
+      } else if (list) {
+        addDomain(list);
+      }
+    }
+  }
+
+  // Fallback to known billing domains for matching service-like hosts.
+  var known = CONFIG.knownBillingDomains || [];
+  for (var k = 0; k < known.length; k++) {
+    var kd = normalizeDomain(known[k]);
+    if (!kd) continue;
+    if (serviceNorm && normalizeLooseText(kd).indexOf(serviceNorm) !== -1) {
+      addDomain(kd);
+    }
+  }
+
+  return domains;
+}
+
+function isOfficialOrTrustedDomain(resultDomain, serviceName, sourceUrl) {
+  var domain = normalizeDomain(resultDomain);
+  if (!domain) return false;
+  var official = getOfficialDomainsForService(serviceName, sourceUrl);
+  if (!official.length) return false;
+  for (var i = 0; i < official.length; i++) {
+    if (isSameOrSubdomain(domain, official[i])) return true;
+  }
+  return false;
+}
+
 /**
  * Visit a URL in a new tab, extract text, close tab.
  * Returns extracted text or empty string.
@@ -2011,6 +2655,10 @@ function identifyWebResearchCandidates(subscriptions, apps) {
   // --- Subscriptions needing price/plan verification ---
   for (var i = 0; i < subscriptions.length; i++) {
     var sub = subscriptions[i];
+    if (String(sub.source_type || "") === "web_exploration") {
+      // Prevent self-reinforcing loops from previously inferred candidates.
+      continue;
+    }
     var svcKey = String(sub.service || "")
       .toLowerCase()
       .replace(/\s+/g, "");
@@ -2271,6 +2919,69 @@ function isObviouslyAiTool(name) {
   return false;
 }
 
+function isSuspiciousGenericServiceName(name) {
+  var lower = String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  if (!lower) return true;
+  return lower.length <= 2;
+}
+
+function hasAiCodingEvidenceInSubscription(sub) {
+  var text = (
+    String((sub && sub.service) || "") +
+    " " +
+    String((sub && sub.plan) || "") +
+    " " +
+    String((sub && sub.notes) || "") +
+    " " +
+    String((sub && sub.source_url) || "")
+  ).toLowerCase();
+
+  if (
+    text.indexOf("x.com") !== -1 ||
+    text.indexOf("twitter") !== -1 ||
+    text.indexOf("help.x.com") !== -1
+  ) {
+    return false;
+  }
+
+  var keywords = CONFIG.knownAiToolKeywords || [];
+  for (var i = 0; i < keywords.length; i++) {
+    if (text.indexOf(String(keywords[i] || "").toLowerCase()) !== -1) {
+      return true;
+    }
+  }
+
+  var aiHints = [
+    "ai code",
+    "coding assistant",
+    "code completion",
+    "code generation",
+    "developer tool",
+    "programming",
+  ];
+  for (var j = 0; j < aiHints.length; j++) {
+    if (text.indexOf(aiHints[j]) !== -1) return true;
+  }
+  return false;
+}
+
+function shouldKeepVerifiedSubscription(sub, verifyResult) {
+  if (!sub) return false;
+  if (isObviouslyAiTool(sub.service)) return true;
+  if (hasAiCodingEvidenceInSubscription(sub)) return true;
+
+  var confidence = Number((verifyResult && verifyResult.confidence) || 0);
+  var reason = String((verifyResult && verifyResult.reason) || "").toLowerCase();
+  var reasonLooksCoding =
+    reason.indexOf("code") !== -1 ||
+    reason.indexOf("coding") !== -1 ||
+    reason.indexOf("developer") !== -1;
+
+  return confidence >= 0.85 && reasonLooksCoding;
+}
+
 /**
  * DDG search + LLM to determine if an app/service is an AI coding tool.
  * Returns { is_ai_coding_tool: boolean, confidence: number, reason: string }
@@ -2327,7 +3038,7 @@ function ddgVerifyIsAiCodingTool(appName) {
     "3. Web browsers (Edge, Chrome, Brave, Arc) are NOT AI coding tools even if they have AI sidebars.\n" +
     "4. Note-taking apps, email clients, spreadsheets, presentations, music/video software are NEVER AI coding tools.\n" +
     "5. General-purpose AI assistants (ChatGPT, Claude) count as AI coding tools ONLY if accessed via a " +
-    "   dedicated coding interface (e.g. Claude Code CLI). ChatGPT.app and Claude.app are AI chat apps, not coding tools.\n" +
+    "   dedicated coding interface (e.g. Claude Code CLI). ChatGPT.app, ChatGPT Atlas, Claude.app are LLM browsers / AI chat apps, not coding tools.\n" +
     "6. Developer utilities (Git clients, database tools, API testers, terminal emulators) are NOT AI coding tools " +
     "   even though developers use them.\n" +
     "7. IDEs/code editors WITHOUT built-in AI code generation (e.g. vanilla VS Code, Sublime Text, Vim) are NOT AI coding tools.\n" +
@@ -2335,7 +3046,8 @@ function ddgVerifyIsAiCodingTool(appName) {
     "Examples of NOT AI coding tools: Microsoft Edge, OneNote, Docker, Postman, Xcode, VS Code (without Copilot), Notion, Thunderbird, Ollama.\n" +
     "8. Email clients (Thunderbird, Outlook, Mail) that integrate with AI chatbots are NOT AI coding tools.\n" +
     "9. Local LLM runners (Ollama, LM Studio, GPT4All) are infrastructure tools, NOT AI coding tools " +
-    "   unless they specifically provide code completion or editor integration as their primary feature.";
+    "   unless they specifically provide code completion or editor integration as their primary feature.\n" +
+    "10. LLM browsers / AI chat clients (ChatGPT Atlas, ChatGPT.app, Claude.app, Kimi) are general-purpose AI access apps, NOT AI coding tools.";
 
   var userPrompt = "App name: " + appName + "\n" + context;
 
@@ -2395,7 +3107,7 @@ function filterLocalAppsToAiTools(apps) {
     }
   }
 
-  console.log(
+  debugLog(
     "  [AI Filter] " +
       passed.length +
       " obvious AI tools, " +
@@ -2408,16 +3120,16 @@ function filterLocalAppsToAiTools(apps) {
   var verified = 0;
   for (var j = 0; j < needVerification.length && verified < maxSearches; j++) {
     var app = needVerification[j];
-    console.log("    [Verify] " + app.name + "...");
+    debugLog("    [Verify] " + app.name + "...");
 
     var result = ddgVerifyIsAiCodingTool(app.name);
     verified++;
 
     if (result.is_ai_coding_tool) {
-      console.log("      → YES: " + (result.reason || ""));
+      debugLog("      → YES: " + (result.reason || ""));
       passed.push(app);
     } else {
-      console.log("      → NO (excluded): " + (result.reason || ""));
+      debugLog("      → NO (excluded): " + (result.reason || ""));
       auditLog(
         "ai_filter_excluded_app",
         app.name + " — " + (result.reason || "not AI coding tool"),
@@ -2430,7 +3142,7 @@ function filterLocalAppsToAiTools(apps) {
   // Apps beyond the max search limit are excluded by default
   if (needVerification.length > maxSearches) {
     var skipped = needVerification.length - maxSearches;
-    console.log(
+    debugLog(
       "    [AI Filter] " + skipped + " apps skipped (search limit), excluded",
     );
     auditLog("ai_filter_skipped", skipped + " apps beyond search limit");
@@ -2452,8 +3164,22 @@ function filterSubscriptionsToAiTools(subscriptions) {
 
   for (var i = 0; i < subscriptions.length; i++) {
     var svc = subscriptions[i].service || "";
+    if (isSuspiciousGenericServiceName(svc) && !isObviouslyAiTool(svc)) {
+      auditLog(
+        "ai_filter_excluded_sub",
+        svc + " — excluded as generic short service name",
+      );
+      continue;
+    }
     if (isDefinitelyNotAiTool(svc)) {
       auditLog("ai_filter_excluded_sub", svc + " — excluded by notAiTool list");
+      continue;
+    }
+    if (!isObviouslyAiTool(svc) && !hasAiCodingEvidenceInSubscription(subscriptions[i])) {
+      auditLog(
+        "ai_filter_excluded_sub",
+        svc + " — excluded due to missing AI-coding evidence",
+      );
       continue;
     }
     if (isObviouslyAiTool(svc)) {
@@ -2463,7 +3189,7 @@ function filterSubscriptionsToAiTools(subscriptions) {
     }
   }
 
-  console.log(
+  debugLog(
     "  [AI Filter] " +
       passed.length +
       " obvious AI subscriptions, " +
@@ -2475,16 +3201,16 @@ function filterSubscriptionsToAiTools(subscriptions) {
   var verified = 0;
   for (var j = 0; j < needVerification.length && verified < maxSearches; j++) {
     var sub = needVerification[j];
-    console.log("    [Verify] " + sub.service + "...");
+    debugLog("    [Verify] " + sub.service + "...");
 
     var result = ddgVerifyIsAiCodingTool(sub.service);
     verified++;
 
-    if (result.is_ai_coding_tool) {
-      console.log("      → YES: " + (result.reason || ""));
+    if (result.is_ai_coding_tool && shouldKeepVerifiedSubscription(sub, result)) {
+      debugLog("      → YES: " + (result.reason || ""));
       passed.push(sub);
     } else {
-      console.log("      → NO (excluded): " + (result.reason || ""));
+      debugLog("      → NO (excluded): " + (result.reason || ""));
       auditLog(
         "ai_filter_excluded_sub",
         sub.service + " — " + (result.reason || "not AI coding tool"),
@@ -2496,7 +3222,7 @@ function filterSubscriptionsToAiTools(subscriptions) {
 
   if (needVerification.length > maxSearches) {
     var skipped = needVerification.length - maxSearches;
-    console.log(
+    debugLog(
       "    [AI Filter] " +
         skipped +
         " subscriptions skipped (search limit), excluded",
@@ -2537,11 +3263,11 @@ function webExploreAndVerify(subscriptions, apps) {
   }
 
   if (allQueries.length === 0) {
-    console.log("[Step 3.5] No candidates need web research — skipping.");
+    debugLog("[Step 3.5] No candidates need web research — skipping.");
     return { subscriptions: subscriptions, newCandidates: [], findings: [] };
   }
 
-  console.log(
+  debugLog(
     "[Step 3.5] Web-exploring " +
       allQueries.length +
       " queries (" +
@@ -2559,7 +3285,7 @@ function webExploreAndVerify(subscriptions, apps) {
 
   for (var q = 0; q < allQueries.length; q++) {
     if (totalVisits >= maxTotalVisits) {
-      console.log(
+      debugLog(
         "  [LIMIT] Reached max total visits (" +
           maxTotalVisits +
           "), stopping.",
@@ -2568,7 +3294,7 @@ function webExploreAndVerify(subscriptions, apps) {
     }
 
     var query = allQueries[q];
-    console.log(
+    debugLog(
       "\n  [Search " +
         (q + 1) +
         "/" +
@@ -2584,23 +3310,37 @@ function webExploreAndVerify(subscriptions, apps) {
       query.query,
       CONFIG.webExplore.resultsPerSearch,
     );
-    console.log("    → " + searchResults.length + " results");
+    debugLog("    → " + searchResults.length + " results");
 
     if (!searchResults.length) {
       safeSleep(CONFIG.webExplore.searchDelay || 2000);
       continue;
     }
 
-    // Prioritise official domains: look for the service's own domain first
-    var serviceLower = String(query.service || query.appName || "")
-      .toLowerCase()
-      .replace(/\s+/g, "");
+    // Prioritise official domains first, then service-like domains.
+    var serviceNameForQuery = String(query.service || query.appName || "");
+    var serviceLower = serviceNameForQuery.toLowerCase().replace(/\s+/g, "");
     searchResults.sort(function (a, b) {
       var aDomain = String(a.domain || "").toLowerCase();
       var bDomain = String(b.domain || "").toLowerCase();
-      var aOfficial = aDomain.indexOf(serviceLower) !== -1 ? 0 : 1;
-      var bOfficial = bDomain.indexOf(serviceLower) !== -1 ? 0 : 1;
-      return aOfficial - bOfficial;
+      var aOfficial = isOfficialOrTrustedDomain(
+        aDomain,
+        serviceNameForQuery,
+        query.source_url,
+      )
+        ? 0
+        : 1;
+      var bOfficial = isOfficialOrTrustedDomain(
+        bDomain,
+        serviceNameForQuery,
+        query.source_url,
+      )
+        ? 0
+        : 1;
+      if (aOfficial !== bOfficial) return aOfficial - bOfficial;
+      var aServiceLike = aDomain.indexOf(serviceLower) !== -1 ? 0 : 1;
+      var bServiceLike = bDomain.indexOf(serviceLower) !== -1 ? 0 : 1;
+      return aServiceLike - bServiceLike;
     });
 
     var visitCount = 0;
@@ -2612,7 +3352,28 @@ function webExploreAndVerify(subscriptions, apps) {
       r++
     ) {
       var result = searchResults[r];
-      console.log(
+      var isOfficialDomain = isOfficialOrTrustedDomain(
+        result.domain,
+        serviceNameForQuery,
+        query.source_url,
+      );
+      var requireOfficialDomain =
+        query.type === "app_subscription_check"
+          ? CONFIG.webExplore.requireOfficialDomainForInferredSubs !== false
+          : true;
+
+      // Accuracy guard: skip non-official sources for pricing/app inference.
+      if (requireOfficialDomain && !isOfficialDomain) {
+        debugLog(
+          "      → skip non-official domain for " +
+            serviceNameForQuery +
+            ": " +
+            (result.domain || result.url),
+        );
+        continue;
+      }
+
+      debugLog(
         "    [Visit] " + result.domain + " — " + result.title.substring(0, 50),
       );
 
@@ -2624,7 +3385,7 @@ function webExploreAndVerify(subscriptions, apps) {
       visitCount++;
 
       if (pageText.length < 80) {
-        console.log("      → too short (" + pageText.length + " chars), skip");
+        debugLog("      → too short (" + pageText.length + " chars), skip");
         continue;
       }
 
@@ -2648,7 +3409,7 @@ function webExploreAndVerify(subscriptions, apps) {
           finding._service = query.service;
           finding._sourceUrl = result.url;
           findings.push(finding);
-          console.log("      → found " + finding.plans.length + " plan(s)");
+          debugLog("      → found " + finding.plans.length + " plan(s)");
           break; // got what we need for this service
         }
       } else if (query.type === "app_subscription_check") {
@@ -2660,7 +3421,7 @@ function webExploreAndVerify(subscriptions, apps) {
           findings.push(finding);
 
           if (finding.is_subscription && !finding.is_free) {
-            console.log(
+            debugLog(
               "      → " +
                 query.appName +
                 " is subscription-based: " +
@@ -2669,23 +3430,34 @@ function webExploreAndVerify(subscriptions, apps) {
             // Validate that price_monthly looks like a real price (has digit), not "Unknown" / "unknown"
             var rawPrice = finding.price_monthly || "";
             var hasRealPrice = /\d/.test(rawPrice);
-            newCandidates.push({
-              service: query.appName,
-              plan: finding.plan_name || "unknown",
-              price: hasRealPrice ? rawPrice : "",
-              currency: "USD",
-              billing_period: "monthly",
-              next_billing_date: "",
-              status: "active",
-              notes:
-                "Detected via web exploration — verify manually" +
-                (hasRealPrice ? "" : " (price unknown)"),
-              source_url: result.url,
-              source_type: "web_exploration",
-              source_title: "DuckDuckGo → " + result.domain,
-            });
+            var allowInferred =
+              CONFIG.webExplore.allowAppInferredSubscriptions === true;
+            if (allowInferred && hasRealPrice) {
+              newCandidates.push({
+                service: query.appName,
+                plan: finding.plan_name || "unknown",
+                price: rawPrice,
+                currency: "USD",
+                billing_period: "monthly",
+                next_billing_date: "",
+                status: "unknown",
+                notes:
+                  "Inferred from official pricing page only; ownership unverified",
+                source_url: result.url,
+                source_type: "web_exploration",
+                source_title: "DuckDuckGo → " + result.domain,
+              });
+            } else {
+              auditLog(
+                "web_explore_inferred_not_added",
+                query.appName +
+                  " via " +
+                  result.url +
+                  " (ownership not verifiable from pricing page)",
+              );
+            }
           } else {
-            console.log(
+            debugLog(
               "      → " +
                 query.appName +
                 ": " +
@@ -2764,7 +3536,7 @@ function webExploreAndVerify(subscriptions, apps) {
     }
   }
 
-  console.log(
+  debugLog(
     "\n[Step 3.5] Web exploration complete: " +
       totalVisits +
       " pages visited, " +
@@ -2868,6 +3640,7 @@ function mapSubscriptionsToApps(subscriptions, apps) {
   for (var j = 0; j < subscriptions.length; j++) {
     var sub = subscriptions[j];
     var svcLower = String(sub.service || "").toLowerCase();
+    var svcNorm = svcLower.replace(/[^a-z0-9]/g, "");
     sub.matched_app = "";
     sub.app_usage = "no_match";
 
@@ -2876,17 +3649,21 @@ function mapSubscriptionsToApps(subscriptions, apps) {
       if (!appLower) continue;
 
       // Direct name match or substring match
-      if (
-        svcLower.indexOf(appLower) !== -1 ||
-        appLower.indexOf(svcLower) !== -1
-      ) {
+      var appNorm = String(appLower || "").replace(/[^a-z0-9]/g, "");
+      var canUseSubstring = svcNorm.length >= 3 && appNorm.length >= 3;
+      var directMatch = svcNorm && appNorm && svcNorm === appNorm;
+      var containsMatch =
+        canUseSubstring &&
+        (svcNorm.indexOf(appNorm) !== -1 || appNorm.indexOf(svcNorm) !== -1);
+
+      if (directMatch || containsMatch) {
         sub.matched_app = apps[k].name;
         sub.app_usage = apps[k].usageBucket || "unknown";
         break;
       }
       // Bundle ID match
       var bid = String(apps[k].bundleId || "").toLowerCase();
-      if (bid && svcLower && bid.indexOf(svcLower) !== -1) {
+      if (bid && svcNorm.length >= 3 && bid.indexOf(svcNorm) !== -1) {
         sub.matched_app = apps[k].name;
         sub.app_usage = apps[k].usageBucket || "unknown";
         break;
@@ -2938,7 +3715,8 @@ function detectCategoryOverlaps(subscriptions) {
       var totalMonthly = 0;
       for (var m = 0; m < indices.length; m++) {
         var sub = subscriptions[indices[m]];
-        if (sub.status !== "inactive") {
+        // Overlap savings should consider paid active subscriptions only.
+        if (sub.status !== "inactive" && (sub.monthly_jpy || 0) > 0) {
           services.push(
             sub.service + " (" + formatJpy(sub.monthly_jpy) + "/月)",
           );
@@ -2950,7 +3728,13 @@ function detectCategoryOverlaps(subscriptions) {
         // Deduplicate: skip if same service pair already counted
         var pairKey = serviceNamesOnly.slice().sort().join("|");
         if (seenPairs[pairKey]) {
-          debugLog("Skipping duplicate overlap pair: " + pairKey + " (category: " + keys[k] + ")");
+          debugLog(
+            "Skipping duplicate overlap pair: " +
+              pairKey +
+              " (category: " +
+              keys[k] +
+              ")",
+          );
           continue;
         }
         seenPairs[pairKey] = true;
@@ -2966,6 +3750,15 @@ function detectCategoryOverlaps(subscriptions) {
   return overlaps;
 }
 
+function isLikelyWebOnlyService(serviceName) {
+  var text = String(serviceName || "").toLowerCase();
+  var keys = CONFIG.webOnlyServiceKeywords || [];
+  for (var i = 0; i < keys.length; i++) {
+    if (text.indexOf(String(keys[i]).toLowerCase()) !== -1) return true;
+  }
+  return false;
+}
+
 function identifyUnused(subscriptions, apps) {
   var unused = [];
   for (var i = 0; i < subscriptions.length; i++) {
@@ -2976,6 +3769,10 @@ function identifyUnused(subscriptions, apps) {
     var reason = "";
 
     if (!sub.matched_app && sub.monthly_jpy > 0) {
+      if (isLikelyWebOnlyService(sub.service)) {
+        // Web/IDE-integrated services are often used without a standalone app.
+        continue;
+      }
       isUnused = true;
       reason = "No matching installed application found";
     } else if (sub.app_usage === "dormant" || sub.app_usage === "rare") {
@@ -3006,6 +3803,11 @@ function identifyDowngradeOpportunities(subscriptions) {
   var candidates = [];
   for (var i = 0; i < subscriptions.length; i++) {
     var s = subscriptions[i];
+    var notesLower = String(s.notes || "").toLowerCase();
+    if (notesLower.indexOf("downgrade pending") !== -1) {
+      // Already pending in provider UI; avoid duplicate/conflicting guidance.
+      continue;
+    }
     if (s.status !== "inactive" && s.monthly_jpy > 0) {
       candidates.push(s);
     }
@@ -3018,7 +3820,8 @@ function identifyDowngradeOpportunities(subscriptions) {
     "Consider: annual vs monthly savings, lower tiers, free alternatives. " +
     "Return ONLY a JSON array. Each item: " +
     "{service, current_plan, suggested_action, suggested_plan, estimated_monthly_savings_jpy, rationale, risk}. " +
-    "Only include items where a real saving is plausible. Be conservative.";
+    "Only include items where a real saving is plausible. Be conservative. " +
+    "Rules: do not invent plans, do not suggest a plan equivalent to current price, and estimated_monthly_savings_jpy must be <= current monthly_jpy for that service.";
 
   var userPrompt =
     "Active subscriptions:\n" + JSON.stringify(candidates, null, 2);
@@ -3026,7 +3829,101 @@ function identifyDowngradeOpportunities(subscriptions) {
   var raw = llmChat(systemPrompt, userPrompt);
   var json = extractJsonArray(raw);
   var parsed = safeJsonParse(json);
-  return Array.isArray(parsed) ? parsed : [];
+  if (!Array.isArray(parsed)) return [];
+  return sanitizeDowngradeRecommendations(candidates, parsed);
+}
+
+function normalizeLooseText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[\(\)\[\]{}:：\-_/]/g, "");
+}
+
+function findCandidateByService(candidates, serviceName) {
+  var needle = normalizeLooseText(serviceName);
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    var svc = normalizeLooseText(c.service);
+    if (!svc || !needle) continue;
+    if (
+      svc === needle ||
+      svc.indexOf(needle) !== -1 ||
+      needle.indexOf(svc) !== -1
+    ) {
+      return c;
+    }
+  }
+  return null;
+}
+
+function sanitizeDowngradeRecommendations(candidates, rawItems) {
+  var bestByService = {};
+  for (var i = 0; i < rawItems.length; i++) {
+    var item = rawItems[i] || {};
+    var service = String(item.service || "").trim();
+    if (!service) continue;
+
+    var candidate = findCandidateByService(candidates, service);
+    if (!candidate) continue;
+
+    var currentMonthly = candidate.monthly_jpy || 0;
+    if (currentMonthly <= 0) continue;
+
+    var suggestedPlan = String(item.suggested_plan || "").trim();
+    var currentPlan = String(candidate.plan || item.current_plan || "").trim();
+    var candidateServiceLower = String(candidate.service || "").toLowerCase();
+    var suggestedPlanLower = suggestedPlan.toLowerCase();
+
+    // Service-specific safety rules to reject implausible plan names.
+    if (candidateServiceLower.indexOf("copilot") !== -1) {
+      if (suggestedPlanLower.indexOf("basic") !== -1) continue;
+      if (
+        suggestedPlan &&
+        suggestedPlanLower.indexOf("free") === -1 &&
+        suggestedPlanLower.indexOf("pro") === -1 &&
+        suggestedPlanLower.indexOf("business") === -1 &&
+        suggestedPlanLower.indexOf("enterprise") === -1 &&
+        suggestedPlanLower.indexOf("student") === -1
+      ) {
+        continue;
+      }
+    }
+
+    if (
+      suggestedPlan &&
+      normalizeLooseText(suggestedPlan) === normalizeLooseText(currentPlan)
+    ) {
+      continue;
+    }
+
+    var savings = Number(item.estimated_monthly_savings_jpy || 0);
+    if (!isFinite(savings) || savings <= 0) continue;
+    if (savings > currentMonthly) savings = currentMonthly;
+
+    var key = normalizeLooseText(candidate.service || service);
+    var sanitized = {
+      service: candidate.service || service,
+      current_plan: currentPlan,
+      suggested_action: String(item.suggested_action || "Review plan").trim(),
+      suggested_plan: suggestedPlan,
+      estimated_monthly_savings_jpy: Math.round(savings),
+      rationale: String(item.rationale || "").trim(),
+      risk: String(item.risk || "low").trim(),
+    };
+
+    if (
+      !bestByService[key] ||
+      sanitized.estimated_monthly_savings_jpy >
+        bestByService[key].estimated_monthly_savings_jpy
+    ) {
+      bestByService[key] = sanitized;
+    }
+  }
+
+  return Object.keys(bestByService).map(function (k) {
+    return bestByService[k];
+  });
 }
 
 function sumMonthly(subscriptions) {
@@ -3042,6 +3939,1322 @@ function sumMonthly(subscriptions) {
 function formatJpy(amount) {
   if (!amount) return "¥0";
   return "¥" + String(Math.round(amount)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// ============================================================================
+// 4.5. User Profile Detection & Analysis
+// ============================================================================
+
+/**
+ * Detect comprehensive user profile by combining:
+ *   - Local git config (name, email)
+ *   - GitHub CLI data (if installed)
+ *   - GitHub web profile (scraped via Floorp)
+ *   - Local project analysis (tech stack)
+ *   - Local app/directory signals (student, enterprise)
+ *
+ * Returns rich profile object for personalized recommendations.
+ */
+function detectUserProfile() {
+  debugLog("[Step 0.5] Detecting user profile (comprehensive)...");
+  var profile = {
+    // Classification
+    type: "unknown", // "student" | "likely_student" | "professional" | "oss_contributor" | "hobbyist"
+    confidence: 0,
+    signals: [],
+
+    // Identity from local git
+    name: "",
+    email: "",
+    githubUsername: "",
+
+    // GitHub profile (web + CLI)
+    github: {
+      bio: "",
+      company: "",
+      location: "",
+      plan: "free", // "free" | "pro" | "enterprise"
+      publicRepos: 0,
+      followers: 0,
+      following: 0,
+      isEducation: false,
+      isProBadge: false,
+      orgs: [], // [{name, isEnterprise}]
+      pinnedRepos: [], // [{name, language, stars, description}]
+      recentActivity: "",
+      profileUrl: "",
+    },
+
+    // Tech stack from local projects
+    techStack: {
+      primaryLanguages: [], // ["TypeScript", "Rust", "Python"]
+      frameworks: [], // ["React", "Vite", "Tokio"]
+      devRole: "", // "fullstack" | "frontend" | "backend" | "data_science" | "mobile"
+      totalProjects: 0,
+    },
+
+    // Eligibility flags
+    studentDiscountEligible: false,
+    ossLicenseEligible: false,
+    enterpriseLicenseLikely: false,
+
+    // Org
+    detectedOrganization: "",
+    teamIndicators: [],
+  };
+
+  var studentScore = 0;
+  var ossScore = 0;
+  var enterpriseScore = 0;
+
+  // ─── Signal 1: Git global config (name + email) ───
+  try {
+    var gitName = execSafe(
+      "git config --global user.name 2>/dev/null || echo ''",
+    );
+    gitName = (gitName || "").trim();
+    if (gitName) {
+      profile.name = gitName;
+      profile.signals.push("git user.name: " + gitName);
+    }
+
+    var gitEmail = execSafe(
+      "git config --global user.email 2>/dev/null || echo ''",
+    );
+    gitEmail = (gitEmail || "").trim();
+    if (gitEmail) {
+      profile.email = gitEmail;
+      var emailLower = gitEmail.toLowerCase();
+      var studentDomains = CONFIG.profileDetection.studentEmailDomains;
+      for (var i = 0; i < studentDomains.length; i++) {
+        if (emailLower.indexOf(studentDomains[i]) !== -1) {
+          studentScore += 3;
+          profile.signals.push(
+            "email has student domain: " +
+              studentDomains[i] +
+              " (" +
+              gitEmail +
+              ")",
+          );
+          var atIdx = emailLower.indexOf("@");
+          if (atIdx !== -1) {
+            profile.detectedOrganization = emailLower.substring(atIdx + 1);
+          }
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    debugLog("Git config detection failed: " + e);
+  }
+
+  // ─── Signal 2: GitHub username detection (git config, gh CLI, .gitconfig) ───
+  try {
+    // Method A: github.user from git config
+    var ghUser = execSafe(
+      "git config --global github.user 2>/dev/null || echo ''",
+    );
+    ghUser = (ghUser || "").trim();
+
+    // Method B: try gh CLI
+    if (!ghUser) {
+      var ghAuthStatus = execSafe("gh auth status 2>&1 || echo ''");
+      if (ghAuthStatus) {
+        var accountMatch = ghAuthStatus.match(
+          /Logged in to github\.com account (\S+)/i,
+        );
+        if (!accountMatch)
+          accountMatch = ghAuthStatus.match(/account\s+(\S+)/i);
+        if (accountMatch) ghUser = accountMatch[1].replace(/\(.*\)/, "").trim();
+      }
+    }
+
+    // Method C: extract from remote URLs of repos in cwd or home
+    if (!ghUser) {
+      var remoteUrl = execSafe(
+        "git remote get-url origin 2>/dev/null || echo ''",
+      );
+      remoteUrl = (remoteUrl || "").trim();
+      if (remoteUrl) {
+        var ghMatch = remoteUrl.match(/github\.com[:/]([^/]+)\//);
+        if (ghMatch) ghUser = ghMatch[1];
+      }
+    }
+
+    if (ghUser) {
+      profile.githubUsername = ghUser;
+      profile.github.profileUrl = "https://github.com/" + ghUser;
+      profile.signals.push("GitHub username: " + ghUser);
+    }
+  } catch (e) {
+    debugLog("GitHub username detection failed: " + e);
+  }
+
+  // ─── Signal 3: GitHub CLI API data (rich profile if gh is installed) ───
+  try {
+    if (profile.githubUsername) {
+      var ghApiRaw = execSafe("gh api user 2>/dev/null || echo ''");
+      if (ghApiRaw && ghApiRaw.indexOf("{") !== -1) {
+        var ghApiData = safeJsonParse(ghApiRaw);
+        if (ghApiData && ghApiData.login) {
+          profile.github.bio = (ghApiData.bio || "")
+            .replace(/[\r\n]+/g, " ")
+            .trim();
+          profile.github.company = (ghApiData.company || "")
+            .replace(/[\r\n]+/g, " ")
+            .trim();
+          profile.github.location = (ghApiData.location || "")
+            .replace(/[\r\n]+/g, " ")
+            .trim();
+          profile.github.publicRepos = ghApiData.public_repos || 0;
+          profile.github.followers = ghApiData.followers || 0;
+          profile.github.following = ghApiData.following || 0;
+          profile.name = profile.name || ghApiData.name || "";
+
+          if (ghApiData.plan) {
+            profile.github.plan = ghApiData.plan.name || "free";
+            if (ghApiData.plan.name === "pro") {
+              profile.github.isProBadge = true;
+              profile.signals.push("GitHub Pro plan detected");
+            }
+          }
+
+          // Company → enterprise indicator
+          if (ghApiData.company) {
+            enterpriseScore += 2;
+            profile.signals.push("GitHub company: " + ghApiData.company);
+            if (!profile.detectedOrganization) {
+              profile.detectedOrganization = ghApiData.company;
+            }
+          }
+
+          // High public repos + followers → OSS contributor
+          if (ghApiData.public_repos > 20) {
+            ossScore += 1;
+            profile.signals.push(
+              "GitHub public repos: " + ghApiData.public_repos,
+            );
+          }
+          if (ghApiData.followers > 50) {
+            ossScore += 2;
+            profile.signals.push(
+              "GitHub followers: " + ghApiData.followers + " (notable)",
+            );
+          }
+          if (ghApiData.followers > 500) {
+            ossScore += 3;
+            profile.signals.push(
+              "GitHub followers: " +
+                ghApiData.followers +
+                " (significant OSS presence)",
+            );
+          }
+
+          // Student indicators in CLI API bio (runs even if web scraping fails)
+          if (profile.github.bio) {
+            var cliBioLower = profile.github.bio.toLowerCase();
+            if (
+              cliBioLower.indexOf("student") !== -1 ||
+              cliBioLower.indexOf("学生") !== -1 ||
+              cliBioLower.indexOf("university") !== -1 ||
+              cliBioLower.indexOf("大学") !== -1
+            ) {
+              studentScore += 3;
+              profile.signals.push(
+                "GitHub bio (API) mentions student/university",
+              );
+            }
+          }
+
+          // Student indicators in CLI API email domain
+          if (ghApiData.email) {
+            var apiEmailLower = ghApiData.email.toLowerCase();
+            var studentDomainsCli = CONFIG.profileDetection.studentEmailDomains;
+            for (var sdi = 0; sdi < studentDomainsCli.length; sdi++) {
+              if (apiEmailLower.indexOf(studentDomainsCli[sdi]) !== -1) {
+                studentScore += 3;
+                profile.signals.push(
+                  "GitHub API email has student domain: " +
+                    studentDomainsCli[sdi],
+                );
+                break;
+              }
+            }
+          }
+
+          debugLog(
+            "  [GitHub API] " +
+              ghApiData.login +
+              " — " +
+              ghApiData.public_repos +
+              " repos, " +
+              ghApiData.followers +
+              " followers" +
+              (ghApiData.company ? ", company: " + ghApiData.company : ""),
+          );
+        }
+      }
+
+      // Check orgs
+      var orgsRaw = execSafe(
+        "gh api user/orgs --jq '.[].login' 2>/dev/null || echo ''",
+      );
+      if (orgsRaw) {
+        var orgList = orgsRaw
+          .trim()
+          .split("\n")
+          .filter(function (o) {
+            return o.trim();
+          });
+        for (var oi = 0; oi < orgList.length; oi++) {
+          profile.github.orgs.push({
+            name: orgList[oi].trim(),
+            isEnterprise: false,
+          });
+        }
+        if (orgList.length > 0) {
+          profile.signals.push("GitHub orgs: " + orgList.join(", "));
+          profile.teamIndicators.push(
+            "GitHub org membership (" + orgList.length + " orgs)",
+          );
+          if (orgList.length >= 3) enterpriseScore += 1;
+        }
+      }
+
+      // Check starred repos count as activity indicator
+      var starredCount = execSafe(
+        "gh api user/starred --jq 'length' 2>/dev/null || echo '0'",
+      );
+      starredCount = parseInt(starredCount, 10) || 0;
+      if (starredCount > 100) {
+        profile.signals.push(
+          "GitHub starred repos: " + starredCount + " (active exploration)",
+        );
+      }
+    }
+  } catch (e) {
+    debugLog("GitHub CLI API failed: " + e);
+  }
+
+  // ─── Signal 4: GitHub web profile scraping (Floorp) ───
+  if (profile.githubUsername) {
+    try {
+      var ghProfile = scrapeGitHubProfile(profile.githubUsername);
+      if (ghProfile) {
+        // Merge GitHub web data into profile
+        if (ghProfile.isEducation) {
+          studentScore += 4;
+          profile.github.isEducation = true;
+          profile.signals.push(
+            "GitHub Education badge detected on web profile",
+          );
+        }
+        if (ghProfile.isProBadge && !profile.github.isProBadge) {
+          profile.github.isProBadge = true;
+          profile.signals.push("GitHub Pro badge on web profile");
+        }
+        if (ghProfile.pinnedRepos && ghProfile.pinnedRepos.length > 0) {
+          profile.github.pinnedRepos = ghProfile.pinnedRepos;
+          var pinnedLangs = [];
+          for (var pi = 0; pi < ghProfile.pinnedRepos.length; pi++) {
+            var pl = ghProfile.pinnedRepos[pi].language;
+            if (pl && pinnedLangs.indexOf(pl) === -1) pinnedLangs.push(pl);
+          }
+          if (pinnedLangs.length > 0) {
+            profile.signals.push(
+              "GitHub pinned repo languages: " + pinnedLangs.join(", "),
+            );
+          }
+        }
+        // Bio-based enterprise detection
+        if (ghProfile.bio) {
+          profile.github.bio = profile.github.bio || ghProfile.bio;
+          var bioLower = ghProfile.bio.toLowerCase();
+          var entIndicators = CONFIG.profileDetection.enterpriseIndicators;
+          for (var ei = 0; ei < entIndicators.length; ei++) {
+            if (bioLower.indexOf(entIndicators[ei]) !== -1) {
+              enterpriseScore += 2;
+              profile.signals.push(
+                "GitHub bio suggests employment: '" + entIndicators[ei] + "'",
+              );
+              break;
+            }
+          }
+          // Student indicators in bio
+          if (
+            bioLower.indexOf("student") !== -1 ||
+            bioLower.indexOf("学生") !== -1 ||
+            bioLower.indexOf("university") !== -1 ||
+            bioLower.indexOf("大学") !== -1
+          ) {
+            studentScore += 3;
+            profile.signals.push("GitHub bio mentions student/university");
+          }
+        }
+        if (ghProfile.contributionText) {
+          profile.github.recentActivity = ghProfile.contributionText;
+        }
+      }
+    } catch (e) {
+      debugLog("GitHub web profile scraping failed: " + e);
+    }
+  }
+
+  // ─── Signal 5: Local education apps ───
+  try {
+    var appListRaw = execSafe("ls /Applications/ 2>/dev/null || echo ''");
+    var userApps = execSafe("ls ~/Applications/ 2>/dev/null || echo ''");
+    var allAppsStr = (
+      (appListRaw || "") +
+      "\n" +
+      (userApps || "")
+    ).toLowerCase();
+    var eduAppKeywords = CONFIG.profileDetection.studentAppKeywords;
+    for (var j = 0; j < eduAppKeywords.length; j++) {
+      if (allAppsStr.indexOf(eduAppKeywords[j].toLowerCase()) !== -1) {
+        studentScore += 2;
+        profile.signals.push("education app found: " + eduAppKeywords[j]);
+      }
+    }
+  } catch (e) {
+    debugLog("App list scan failed: " + e);
+  }
+
+  // ─── Signal 6: Home directory patterns ───
+  try {
+    var homeContents = execSafe("ls ~ 2>/dev/null | head -50 || echo ''");
+    var homeLower = (homeContents || "").toLowerCase();
+    var dirPatterns = CONFIG.profileDetection.studentDirPatterns;
+    for (var k = 0; k < dirPatterns.length; k++) {
+      if (homeLower.indexOf(dirPatterns[k].toLowerCase()) !== -1) {
+        studentScore += 1;
+        profile.signals.push(
+          "student-related directory found: " + dirPatterns[k],
+        );
+      }
+    }
+  } catch (e) {
+    debugLog("Home dir scan failed: " + e);
+  }
+
+  // ─── Signal 7: Local tech stack analysis ───
+  try {
+    var techResult = analyzeLocalTechStack();
+    if (techResult) {
+      profile.techStack = techResult;
+      if (techResult.primaryLanguages.length > 0) {
+        profile.signals.push(
+          "primary languages: " + techResult.primaryLanguages.join(", "),
+        );
+      }
+      if (techResult.devRole) {
+        profile.signals.push("detected dev role: " + techResult.devRole);
+      }
+    }
+  } catch (e) {
+    debugLog("Local tech stack analysis failed: " + e);
+  }
+
+  // ─── Signal 8: macOS username ───
+  try {
+    var username = execSafe("whoami 2>/dev/null || echo ''");
+    username = (username || "").trim().toLowerCase();
+    var studentUserPatterns = ["student", "gakusei", "学生"];
+    for (var u = 0; u < studentUserPatterns.length; u++) {
+      if (username.indexOf(studentUserPatterns[u]) !== -1) {
+        studentScore += 1;
+        profile.signals.push("macOS username suggests student: " + username);
+      }
+    }
+  } catch (e) {
+    debugLog("Username check failed: " + e);
+  }
+
+  // ─── Determine profile type ───
+  // Priority: student > oss_contributor > enterprise/professional > hobbyist
+  if (studentScore >= 3) {
+    profile.type = "student";
+    profile.confidence = Math.min(studentScore / 10, 1.0);
+    profile.studentDiscountEligible = true;
+  } else if (studentScore >= 1) {
+    profile.type = "likely_student";
+    profile.confidence = studentScore / 10;
+    profile.studentDiscountEligible = true;
+  } else if (ossScore >= 4) {
+    profile.type = "oss_contributor";
+    profile.confidence = Math.min(ossScore / 8, 1.0);
+    profile.ossLicenseEligible = true;
+  } else if (enterpriseScore >= 3) {
+    profile.type = "professional";
+    profile.confidence = Math.min(enterpriseScore / 6, 1.0);
+    profile.enterpriseLicenseLikely = true;
+  } else if (
+    profile.github.publicRepos > 5 ||
+    profile.techStack.totalProjects > 3
+  ) {
+    profile.type = "hobbyist";
+    profile.confidence = 0.5;
+  } else {
+    profile.type = "professional";
+    profile.confidence = 0.3;
+  }
+
+  // OSS eligibility can co-exist with student
+  if (ossScore >= 3) {
+    profile.ossLicenseEligible = true;
+  }
+
+  // Enterprise can co-exist
+  if (enterpriseScore >= 2) {
+    profile.enterpriseLicenseLikely = true;
+  }
+
+  // ─── Log results ───
+  debugLog(
+    "[Step 0.5] User profile: " +
+      profile.type +
+      " (confidence: " +
+      (profile.confidence * 100).toFixed(0) +
+      "%" +
+      ", signals: " +
+      profile.signals.length +
+      ")",
+  );
+  if (profile.githubUsername) {
+    debugLog(
+      "  → GitHub: " +
+        profile.githubUsername +
+        " (" +
+        profile.github.publicRepos +
+        " repos, " +
+        profile.github.followers +
+        " followers)",
+    );
+  }
+  if (profile.techStack.primaryLanguages.length > 0) {
+    debugLog(
+      "  → Tech stack: " +
+        profile.techStack.primaryLanguages.join(", ") +
+        " (" +
+        profile.techStack.devRole +
+        ")",
+    );
+  }
+  for (var si = 0; si < Math.min(profile.signals.length, 8); si++) {
+    debugLog("  → " + profile.signals[si]);
+  }
+  if (profile.signals.length > 8) {
+    debugLog("  → ... and " + (profile.signals.length - 8) + " more signals");
+  }
+
+  auditLog(
+    "user_profile_detection",
+    JSON.stringify({
+      type: profile.type,
+      confidence: profile.confidence,
+      githubUsername: profile.githubUsername,
+      signals: profile.signals.length,
+      studentDiscountEligible: profile.studentDiscountEligible,
+      ossLicenseEligible: profile.ossLicenseEligible,
+      enterpriseLicenseLikely: profile.enterpriseLicenseLikely,
+      primaryLanguages: profile.techStack.primaryLanguages,
+      devRole: profile.techStack.devRole,
+    }),
+  );
+
+  return profile;
+}
+
+// ============================================================================
+// 4.5a. GitHub Web Profile Scraping (via Floorp)
+// ============================================================================
+
+/**
+ * Open a GitHub profile page in Floorp and extract structured data.
+ * Uses LLM to parse the page text into a structured object.
+ */
+function scrapeGitHubProfile(username) {
+  debugLog("  [GitHub Profile] Scraping https://github.com/" + username);
+
+  var tabId = null;
+  try {
+    tabId = floorp.createTab("https://github.com/" + username, false);
+    floorp.tabWaitForNetworkIdle(tabId);
+
+    var bodyText = floorp.tabElementText(tabId, "body");
+    if (!bodyText || bodyText.length < 100) {
+      debugLog("GitHub profile page empty or too short");
+      return null;
+    }
+
+    // Truncate to avoid LLM overload
+    if (bodyText.length > 4000) bodyText = bodyText.substring(0, 4000);
+
+    var sysPrompt =
+      "You are a data extractor. Given the text content of a GitHub profile page, " +
+      "extract the following information into a JSON object. " +
+      "Return ONLY valid JSON, no markdown, no explanation.\n" +
+      "Fields: {\n" +
+      '  "bio": string (user bio, empty string if none),\n' +
+      '  "company": string (company/org, empty if none),\n' +
+      '  "location": string (location, empty if none),\n' +
+      '  "isProBadge": boolean (true if PRO badge visible),\n' +
+      '  "isEducation": boolean (true if any education/student/campus badge),\n' +
+      '  "pinnedRepos": [{name: string, language: string, stars: number, description: string}],\n' +
+      '  "contributionText": string (e.g. "1,234 contributions in the last year"),\n' +
+      '  "orgNames": [string] (visible organization names)\n' +
+      "}\n" +
+      "IMPORTANT: Only include information that is CLEARLY visible in the text. " +
+      "Do not fabricate or assume. If information is not found, use empty string/0/false/[]. " +
+      "For pinnedRepos, ONLY include repos whose names are EXPLICITLY listed in the text. " +
+      "Do NOT invent repository names like 'my-awesome-project'. If no pinned repos are visible, return [].";
+
+    var userPrompt =
+      "GitHub profile page text for user '" + username + "':\n---\n" + bodyText;
+
+    var raw = llmChat(sysPrompt, userPrompt);
+    var jsonStr = extractJsonFromResponse(raw);
+    var result = safeJsonParse(jsonStr);
+
+    // Retry if result is mostly empty (common LLM failure case)
+    if (result && typeof result === "object") {
+      var isMostlyEmpty =
+        !result.bio &&
+        !result.company &&
+        !result.location &&
+        !result.isProBadge &&
+        !result.isEducation &&
+        (!result.pinnedRepos || result.pinnedRepos.length === 0) &&
+        !result.contributionText;
+
+      if (isMostlyEmpty && username) {
+        debugLog(
+          "GitHub profile scraping returned empty - retrying with expanded prompt",
+        );
+        // Retry with more specific instructions
+        var retryPrompt =
+          sysPrompt +
+          "\n\n【重要】This GitHub profile likely HAS visible information. " +
+          "Look more carefully for:\n" +
+          "- Any text in the bio section\n" +
+          "- Badge icons (PRO, Education, Campus)\n" +
+          "- Pinned repositories section with repo names\n" +
+          "- Organization memberships\n" +
+          "- Contribution activity\n" +
+          "If truly no information is visible, explicitly state that rather than returning empty values.";
+
+        var retryRaw = llmChat(retryPrompt, userPrompt);
+        var retryJsonStr = extractJsonFromResponse(retryRaw);
+        var retryResult = safeJsonParse(retryJsonStr);
+        if (retryResult && typeof retryResult === "object") {
+          // Only use retry if it has more data
+          var hasMoreData =
+            retryResult.bio ||
+            retryResult.company ||
+            retryResult.isProBadge ||
+            retryResult.isEducation ||
+            (retryResult.pinnedRepos && retryResult.pinnedRepos.length > 0);
+          if (hasMoreData) {
+            result = retryResult;
+          }
+        }
+      }
+    }
+
+    if (result && typeof result === "object") {
+      debugLog(
+        "  [GitHub Profile] Extracted: bio=" +
+          (result.bio ? "yes" : "no") +
+          ", education=" +
+          (result.isEducation ? "YES" : "no") +
+          ", pro=" +
+          (result.isProBadge ? "YES" : "no") +
+          ", pinned=" +
+          (result.pinnedRepos || []).length +
+          ", contributions=" +
+          (result.contributionText || "unknown"),
+      );
+      return result;
+    }
+
+    return null;
+  } catch (e) {
+    debugLog("scrapeGitHubProfile failed: " + e);
+    return null;
+  } finally {
+    if (tabId) {
+      try {
+        floorp.closeTab(tabId);
+      } catch (e2) {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/**
+ * Extract JSON from LLM response that might contain markdown fences.
+ */
+function extractJsonFromResponse(raw) {
+  if (!raw) return "{}";
+  // Strip markdown code fences
+  var stripped = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+  // Find first { and last }
+  var first = stripped.indexOf("{");
+  var last = stripped.lastIndexOf("}");
+  if (first !== -1 && last > first) {
+    return stripped.substring(first, last + 1);
+  }
+  return stripped;
+}
+
+// ============================================================================
+// 4.5b. Local Tech Stack Analysis
+// ============================================================================
+
+/**
+ * Scan local project directories to determine primary languages and dev role.
+ */
+function analyzeLocalTechStack() {
+  debugLog("  [Tech Stack] Scanning local projects...");
+
+  var langCounts = {}; // language → count
+  var frameworks = []; // detected frameworks
+  var totalProjects = 0;
+  var markers = CONFIG.profileDetection.languageMarkers;
+  var scanDirs = CONFIG.profileDetection.projectScanDirs;
+
+  // Find git repos in common project directories
+  var repoDirs = [];
+  for (var d = 0; d < scanDirs.length; d++) {
+    try {
+      var expandedDir = scanDirs[d].replace("~", "$HOME");
+      var findResult = execSafe(
+        "find " +
+          expandedDir +
+          " -name '.git' -maxdepth 3 -type d 2>/dev/null | head -30",
+      );
+      if (findResult) {
+        var lines = findResult.trim().split("\n");
+        for (var li = 0; li < lines.length; li++) {
+          var gitDir = lines[li].trim();
+          if (gitDir) {
+            // Parent of .git is the project root
+            var projRoot = gitDir.replace(/\/\.git$/, "");
+            if (repoDirs.indexOf(projRoot) === -1) repoDirs.push(projRoot);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore scan failures for individual dirs
+    }
+  }
+
+  totalProjects = repoDirs.length;
+  debugLog("  [Tech Stack] Found " + totalProjects + " local git projects");
+
+  // Check each project for language marker files
+  var markerFiles = Object.keys(markers);
+  for (var r = 0; r < Math.min(repoDirs.length, 30); r++) {
+    try {
+      var dirContents = execSafe(
+        "ls '" + repoDirs[r] + "' 2>/dev/null || echo ''",
+      );
+      if (!dirContents) continue;
+      var dirLower = dirContents.toLowerCase();
+
+      for (var m = 0; m < markerFiles.length; m++) {
+        if (dirLower.indexOf(markerFiles[m].toLowerCase()) !== -1) {
+          var lang = markers[markerFiles[m]];
+          langCounts[lang] = (langCounts[lang] || 0) + 1;
+        }
+      }
+
+      // Framework detection from package.json
+      if (dirLower.indexOf("package.json") !== -1) {
+        try {
+          var pkgRaw = execSafe(
+            "cat '" +
+              repoDirs[r] +
+              "/package.json' 2>/dev/null | head -80 || echo ''",
+          );
+          if (pkgRaw) {
+            var pkgLower = pkgRaw.toLowerCase();
+            if (
+              pkgLower.indexOf('"react"') !== -1 &&
+              frameworks.indexOf("React") === -1
+            )
+              frameworks.push("React");
+            if (
+              pkgLower.indexOf('"vue"') !== -1 &&
+              frameworks.indexOf("Vue") === -1
+            )
+              frameworks.push("Vue");
+            if (
+              pkgLower.indexOf('"next"') !== -1 &&
+              frameworks.indexOf("Next.js") === -1
+            )
+              frameworks.push("Next.js");
+            if (
+              pkgLower.indexOf('"vite"') !== -1 &&
+              frameworks.indexOf("Vite") === -1
+            )
+              frameworks.push("Vite");
+            if (
+              pkgLower.indexOf('"express"') !== -1 &&
+              frameworks.indexOf("Express") === -1
+            )
+              frameworks.push("Express");
+            if (
+              pkgLower.indexOf('"svelte"') !== -1 &&
+              frameworks.indexOf("Svelte") === -1
+            )
+              frameworks.push("Svelte");
+            if (
+              pkgLower.indexOf('"angular"') !== -1 &&
+              frameworks.indexOf("Angular") === -1
+            )
+              frameworks.push("Angular");
+            if (
+              pkgLower.indexOf('"electron"') !== -1 &&
+              frameworks.indexOf("Electron") === -1
+            )
+              frameworks.push("Electron");
+            if (
+              pkgLower.indexOf('"@chakra-ui') !== -1 &&
+              frameworks.indexOf("Chakra UI") === -1
+            )
+              frameworks.push("Chakra UI");
+          }
+        } catch (e2) {
+          // ignore
+        }
+      }
+
+      // Rust framework detection
+      if (dirLower.indexOf("cargo.toml") !== -1) {
+        try {
+          var cargoRaw = execSafe(
+            "cat '" +
+              repoDirs[r] +
+              "/Cargo.toml' 2>/dev/null | head -60 || echo ''",
+          );
+          if (cargoRaw) {
+            var cargoLower = cargoRaw.toLowerCase();
+            if (
+              cargoLower.indexOf("tokio") !== -1 &&
+              frameworks.indexOf("Tokio") === -1
+            )
+              frameworks.push("Tokio");
+            if (
+              cargoLower.indexOf("actix") !== -1 &&
+              frameworks.indexOf("Actix") === -1
+            )
+              frameworks.push("Actix");
+            if (
+              cargoLower.indexOf("tonic") !== -1 &&
+              frameworks.indexOf("Tonic/gRPC") === -1
+            )
+              frameworks.push("Tonic/gRPC");
+            if (
+              cargoLower.indexOf("deno_core") !== -1 &&
+              frameworks.indexOf("Deno Core") === -1
+            )
+              frameworks.push("Deno Core");
+          }
+        } catch (e3) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      // ignore project scan failure
+    }
+  }
+
+  // Sort languages by frequency
+  var langPairs = [];
+  var langKeys = Object.keys(langCounts);
+  for (var lk = 0; lk < langKeys.length; lk++) {
+    langPairs.push({ lang: langKeys[lk], count: langCounts[langKeys[lk]] });
+  }
+  langPairs.sort(function (a, b) {
+    return b.count - a.count;
+  });
+
+  var primaryLanguages = [];
+  for (var lp = 0; lp < Math.min(langPairs.length, 5); lp++) {
+    primaryLanguages.push(langPairs[lp].lang);
+  }
+
+  // Determine dev role
+  var devRole = "general";
+  var hasWeb =
+    langCounts["JavaScript/TypeScript"] || langCounts["TypeScript"] || 0;
+  var hasBackend =
+    (langCounts["Rust"] || 0) +
+    (langCounts["Go"] || 0) +
+    (langCounts["Java"] || 0) +
+    (langCounts["Python"] || 0);
+  var hasMobile =
+    (langCounts["Swift"] || 0) + (langCounts["Dart/Flutter"] || 0);
+  var hasData = langCounts["Python"] || 0;
+
+  if (hasWeb > 0 && hasBackend > 0) devRole = "fullstack";
+  else if (hasWeb > hasBackend) devRole = "frontend";
+  else if (hasBackend > hasWeb) devRole = "backend";
+  if (hasMobile > 2) devRole = "mobile";
+  // If lots of Python + frameworks suggest data, override
+  if (hasData > 3 && frameworks.indexOf("React") === -1)
+    devRole = "data_science";
+
+  debugLog(
+    "  [Tech Stack] Languages: " +
+      (primaryLanguages.join(", ") || "none detected") +
+      " | Frameworks: " +
+      (frameworks.join(", ") || "none") +
+      " | Role: " +
+      devRole,
+  );
+
+  return {
+    primaryLanguages: primaryLanguages,
+    frameworks: frameworks,
+    devRole: devRole,
+    totalProjects: totalProjects,
+  };
+}
+
+// ============================================================================
+// 4.5c. Personalized Recommendations Engine
+// ============================================================================
+
+/**
+ * Generate personalized recommendations based on full user profile.
+ * Returns structured recommendations across multiple categories:
+ *   - student_discounts: Academic pricing opportunities
+ *   - oss_licenses: Open-source contributor free licenses
+ *   - tech_stack_alignment: Tool recommendations based on tech stack
+ *   - plan_optimization: Plan changes based on actual usage patterns
+ *   - enterprise_coverage: Check if org/company provides licenses
+ */
+function generatePersonalizedRecommendations(subscriptions, userProfile) {
+  debugLog("[Step 5.5] Generating personalized recommendations...");
+  var result = {
+    studentDiscounts: [],
+    ossLicenses: [],
+    techStackAlignment: [],
+    planOptimization: [],
+    enterpriseCoverage: [],
+    totalPersonalizedSavingsJpy: 0,
+  };
+  var profileConfidence = Number((userProfile && userProfile.confidence) || 0);
+  var minConfidence = CONFIG.personalizedMinConfidence || {};
+  var allowStudentDiscounts =
+    userProfile &&
+    userProfile.studentDiscountEligible &&
+    profileConfidence >= Number(minConfidence.student || 0.6);
+  var allowOssLicenses =
+    userProfile &&
+    userProfile.ossLicenseEligible &&
+    profileConfidence >= Number(minConfidence.oss || 0.6);
+  var allowEnterpriseCoverage =
+    userProfile &&
+    userProfile.enterpriseLicenseLikely &&
+    profileConfidence >= Number(minConfidence.enterprise || 0.6);
+
+  if (userProfile && userProfile.studentDiscountEligible && !allowStudentDiscounts) {
+    debugLog(
+      "[Step 5.5] Student discount recommendations skipped due to low profile confidence (" +
+        profileConfidence +
+        ")",
+    );
+  }
+  if (userProfile && userProfile.ossLicenseEligible && !allowOssLicenses) {
+    debugLog(
+      "[Step 5.5] OSS license recommendations skipped due to low profile confidence (" +
+        profileConfidence +
+        ")",
+    );
+  }
+  if (
+    userProfile &&
+    userProfile.enterpriseLicenseLikely &&
+    !allowEnterpriseCoverage
+  ) {
+    debugLog(
+      "[Step 5.5] Enterprise coverage recommendations skipped due to low profile confidence (" +
+        profileConfidence +
+        ")",
+    );
+  }
+
+  var personalizedSavingsByService = {};
+  function addPersonalizedServiceSaving(serviceName, amount) {
+    var savings = Number(amount || 0);
+    if (!isFinite(savings) || savings <= 0) return;
+    var key = normalizeLooseText(serviceName || "");
+    if (!key) return;
+    personalizedSavingsByService[key] = Math.max(
+      personalizedSavingsByService[key] || 0,
+      Math.round(savings),
+    );
+  }
+
+  // ─── A. Student discounts ───
+  if (allowStudentDiscounts) {
+    result.studentDiscounts = generateStudentDiscountRecommendations(
+      subscriptions,
+      userProfile,
+    );
+    for (var sd = 0; sd < result.studentDiscounts.length; sd++) {
+      addPersonalizedServiceSaving(
+        result.studentDiscounts[sd].service,
+        result.studentDiscounts[sd].savings_jpy || 0,
+      );
+    }
+  }
+
+  // ─── B. OSS contributor licenses ───
+  if (allowOssLicenses) {
+    var ossDb = CONFIG.ossLicenses;
+    for (var i = 0; i < subscriptions.length; i++) {
+      var sub = subscriptions[i];
+      var svcLower = (sub.service || "").toLowerCase();
+
+      var ossDiscount = ossDb[svcLower];
+      if (!ossDiscount) {
+        var ossKeys = Object.keys(ossDb);
+        for (var ok = 0; ok < ossKeys.length; ok++) {
+          if (
+            svcLower.indexOf(ossKeys[ok]) !== -1 ||
+            ossKeys[ok].indexOf(svcLower) !== -1
+          ) {
+            ossDiscount = ossDb[ossKeys[ok]];
+            break;
+          }
+        }
+      }
+
+      if (ossDiscount) {
+        var currentJpy = sub.monthly_jpy || 0;
+        var ossSavings = currentJpy - (ossDiscount.oss_price_jpy || 0);
+        if (ossSavings > 0) {
+          result.ossLicenses.push({
+            service: sub.service,
+            current_plan: sub.plan || "unknown",
+            current_monthly_jpy: currentJpy,
+            oss_plan: ossDiscount.oss_plan,
+            oss_price_jpy: ossDiscount.oss_price_jpy,
+            savings_jpy: ossSavings,
+            requirement: ossDiscount.requirement,
+            how_to_apply: ossDiscount.how_to_apply,
+            note: ossDiscount.note || "",
+          });
+          addPersonalizedServiceSaving(sub.service, ossSavings);
+        }
+      }
+    }
+  }
+
+  // ─── C. Tech stack alignment ───
+  if (userProfile.techStack.primaryLanguages.length > 0) {
+    var usedToolNames = [];
+    for (var ti = 0; ti < subscriptions.length; ti++) {
+      usedToolNames.push((subscriptions[ti].service || "").toLowerCase());
+    }
+
+    var langs = userProfile.techStack.primaryLanguages;
+    var tsRecs = CONFIG.techStackRecommendations;
+    // Deduplicate: if "JavaScript/TypeScript" exists, skip "TypeScript" standalone
+    var hasJsTs = false;
+    for (var ldi = 0; ldi < langs.length; ldi++) {
+      if (langs[ldi].toLowerCase().indexOf("javascript/typescript") !== -1) {
+        hasJsTs = true;
+        break;
+      }
+    }
+    var seenRecKeys = {}; // track which CONFIG keys were already matched
+
+    for (var li = 0; li < langs.length; li++) {
+      var langLower = langs[li].toLowerCase();
+      // Skip standalone "TypeScript" if "JavaScript/TypeScript" already covered it
+      if (hasJsTs && langLower === "typescript") continue;
+      // Try exact key match, then partial
+      var rec = null;
+      var matchedKey = null;
+      var recKeys = Object.keys(tsRecs);
+      for (var rk = 0; rk < recKeys.length; rk++) {
+        if (
+          langLower.indexOf(recKeys[rk]) !== -1 ||
+          recKeys[rk].indexOf(langLower) !== -1
+        ) {
+          rec = tsRecs[recKeys[rk]];
+          matchedKey = recKeys[rk];
+          break;
+        }
+      }
+      // Skip if this CONFIG key was already used by a previous language
+      if (matchedKey && seenRecKeys[matchedKey]) continue;
+      if (matchedKey) seenRecKeys[matchedKey] = true;
+
+      if (rec) {
+        var alreadyUsing = [];
+        var notUsing = [];
+        for (var bt = 0; bt < rec.bestTools.length; bt++) {
+          var toolName = rec.bestTools[bt];
+          var found = false;
+          for (var ut = 0; ut < usedToolNames.length; ut++) {
+            if (
+              usedToolNames[ut].indexOf(toolName) !== -1 ||
+              toolName.indexOf(usedToolNames[ut]) !== -1
+            ) {
+              found = true;
+              break;
+            }
+          }
+          if (found) alreadyUsing.push(toolName);
+          else notUsing.push(toolName);
+        }
+
+        result.techStackAlignment.push({
+          language: langs[li],
+          bestTools: rec.bestTools,
+          reason: rec.reason,
+          alreadyUsing: alreadyUsing,
+          couldConsider: notUsing,
+          recommendation:
+            notUsing.length > 0
+              ? langs[li] +
+                " 開発には " +
+                notUsing.join(", ") +
+                " も有力候補。検討の価値あり。"
+              : langs[li] + " 開発に最適なツールを既に利用中。",
+        });
+      }
+    }
+  }
+
+  // ─── D. Plan optimization based on profile ───
+  // Use LLM to generate personalized plan advice
+  if (
+    subscriptions.length > 0 &&
+    (userProfile.techStack.devRole || userProfile.type !== "unknown")
+  ) {
+    try {
+      var profileSummary =
+        "ユーザープロファイル:\n" +
+        "  タイプ: " +
+        userProfile.type +
+        "\n" +
+        "  メイン言語: " +
+        (userProfile.techStack.primaryLanguages.join(", ") || "不明") +
+        "\n" +
+        "  開発ロール: " +
+        (userProfile.techStack.devRole || "不明") +
+        "\n" +
+        "  フレームワーク: " +
+        (userProfile.techStack.frameworks.join(", ") || "不明") +
+        "\n" +
+        "  GitHub: " +
+        (userProfile.githubUsername || "不明") +
+        " (" +
+        userProfile.github.publicRepos +
+        " repos, " +
+        userProfile.github.followers +
+        " followers)\n" +
+        "  所属: " +
+        (userProfile.detectedOrganization || "不明") +
+        "\n";
+
+      var subsSummary = "現在のサブスクリプション:\n";
+      for (var ps = 0; ps < subscriptions.length; ps++) {
+        var psub = subscriptions[ps];
+        subsSummary +=
+          "  - " +
+          psub.service +
+          " (" +
+          psub.plan +
+          "): " +
+          formatJpy(psub.monthly_jpy) +
+          "/月\n";
+      }
+
+      var sysP =
+        "あなたは AI コーディングツール専門のサブスクリプションアドバイザーです。" +
+        "ユーザーのプロファイル情報と現在のサブスクリプションを見て、その人に最適化されたアドバイスを3つ以内で提案してください。\n" +
+        "検出サービスは実際に検出されたもののみ。存在しないサービスを言及しないこと。\n" +
+        'JSON配列で返答: [{"advice": string, "reason": string, "potential_savings_jpy": number}]\n' +
+        "savings が不明なら 0。日本語で回答。";
+
+      var planRaw = llmChat(sysP, profileSummary + "\n" + subsSummary);
+      var planJson = extractJsonArray(planRaw);
+      var planParsed = safeJsonParse(planJson);
+      if (Array.isArray(planParsed)) {
+        result.planOptimization = sanitizePlanOptimizationRecommendations(
+          subscriptions,
+          planParsed,
+        );
+      }
+    } catch (e) {
+      debugLog("Plan optimization LLM failed: " + e);
+    }
+  }
+
+  // ─── E. Enterprise coverage check ───
+  if (allowEnterpriseCoverage && userProfile.detectedOrganization) {
+    var orgName = userProfile.detectedOrganization;
+    // Check if any GitHub orgs might provide Copilot Business
+    var hasCopilot = false;
+    for (var ec = 0; ec < subscriptions.length; ec++) {
+      if (
+        (subscriptions[ec].service || "").toLowerCase().indexOf("copilot") !==
+        -1
+      ) {
+        hasCopilot = true;
+        break;
+      }
+    }
+
+    if (userProfile.github.orgs.length > 0) {
+      result.enterpriseCoverage.push({
+        type: "org_licenses",
+        message:
+          "GitHub Organizations (" +
+          userProfile.github.orgs
+            .map(function (o) {
+              return o.name;
+            })
+            .join(", ") +
+          ") に所属しています。組織が GitHub Copilot Business を契約している場合、個人のサブスクリプションは不要かもしれません。",
+        action:
+          "組織の管理者に Copilot Business / Enterprise ライセンスの有無を確認してください。",
+        potential_savings_jpy: hasCopilot ? 5850 : 0,
+      });
+      if (hasCopilot) addPersonalizedServiceSaving("copilot", 5850);
+    }
+
+    if (userProfile.github.company) {
+      result.enterpriseCoverage.push({
+        type: "company_licenses",
+        message:
+          "所属: " +
+          userProfile.github.company +
+          " — 企業が JetBrains や GitHub の法人契約をしている可能性があります。",
+        action:
+          "IT部門やチームリーダーに開発ツールの法人ライセンスがあるか確認してください。",
+        potential_savings_jpy: 0,
+      });
+    }
+  }
+
+  // ─── Summary ───
+  var catCounts = [
+    result.studentDiscounts.filter(function (s) {
+      return s.savings_jpy > 0;
+    }).length,
+    result.ossLicenses.length,
+    result.techStackAlignment.length,
+    result.planOptimization.length,
+    result.enterpriseCoverage.length,
+  ];
+
+  var psKeys = Object.keys(personalizedSavingsByService);
+  var psTotal = 0;
+  for (var psk = 0; psk < psKeys.length; psk++) {
+    psTotal += personalizedSavingsByService[psKeys[psk]] || 0;
+  }
+  var monthlyCap = sumMonthly(subscriptions || []);
+  if (monthlyCap > 0 && psTotal > monthlyCap) psTotal = monthlyCap;
+  result.totalPersonalizedSavingsJpy = psTotal;
+
+  debugLog(
+    "[Step 5.5] Personalized recommendations: " +
+      "student=" +
+      catCounts[0] +
+      ", oss=" +
+      catCounts[1] +
+      ", tech=" +
+      catCounts[2] +
+      ", plan=" +
+      catCounts[3] +
+      ", enterprise=" +
+      catCounts[4] +
+      " | savings: " +
+      formatJpy(result.totalPersonalizedSavingsJpy) +
+      "/月",
+  );
+
+  return result;
+}
+
+/**
+ * Generate student/academic discount recommendations based on user profile.
+ */
+function generateStudentDiscountRecommendations(subscriptions, userProfile) {
+  if (!userProfile.studentDiscountEligible) return [];
+
+  var suggestions = [];
+  var discountDb = CONFIG.studentDiscounts;
+
+  for (var i = 0; i < subscriptions.length; i++) {
+    var sub = subscriptions[i];
+    var svcLower = (sub.service || "").toLowerCase();
+
+    var discount = discountDb[svcLower];
+    if (!discount) {
+      var dbKeys = Object.keys(discountDb);
+      for (var dk = 0; dk < dbKeys.length; dk++) {
+        if (
+          svcLower.indexOf(dbKeys[dk]) !== -1 ||
+          dbKeys[dk].indexOf(svcLower) !== -1
+        ) {
+          discount = discountDb[dbKeys[dk]];
+          break;
+        }
+      }
+    }
+
+    if (discount) {
+      if (discount.student_plan) {
+        var currentJpy = sub.monthly_jpy || 0;
+        var studentJpy = discount.student_price_jpy || 0;
+        var savings = currentJpy - studentJpy;
+        if (savings > 0) {
+          suggestions.push({
+            service: sub.service,
+            current_plan: sub.plan || "unknown",
+            current_monthly_jpy: currentJpy,
+            student_plan: discount.student_plan,
+            student_price: discount.student_price,
+            student_monthly_jpy: studentJpy,
+            savings_jpy: savings,
+            how_to_apply: discount.how_to_apply,
+            note: discount.note || "",
+          });
+        }
+      } else {
+        suggestions.push({
+          service: sub.service,
+          current_plan: sub.plan || "unknown",
+          current_monthly_jpy: sub.monthly_jpy || 0,
+          student_plan: null,
+          student_price: null,
+          student_monthly_jpy: null,
+          savings_jpy: 0,
+          how_to_apply: null,
+          note: discount.note || "学割なし",
+        });
+      }
+    }
+  }
+
+  suggestions.sort(function (a, b) {
+    return (b.savings_jpy || 0) - (a.savings_jpy || 0);
+  });
+  return suggestions;
 }
 
 // ============================================================================
@@ -3110,22 +5323,47 @@ function generateRecommendations(analysis) {
     });
   }
 
-  var totalPotentialSavings = 0;
-  for (var a = 0; a < recs.downgrades.length; a++)
-    totalPotentialSavings +=
-      recs.downgrades[a].estimated_monthly_savings_jpy || 0;
-  for (var b = 0; b < recs.duplicates.length; b++)
-    totalPotentialSavings += recs.duplicates[b].potential_savings_jpy || 0;
+  // Calculate total potential savings, avoiding double-counting the same service
+  // across downgrades, duplicates, and unused categories.
+  // For each service, take the MAX savings from any single category.
+  var savingsByService = {};
+  for (var a = 0; a < recs.downgrades.length; a++) {
+    var svcA = (recs.downgrades[a].service || "").toLowerCase();
+    var savA = recs.downgrades[a].estimated_monthly_savings_jpy || 0;
+    savingsByService[svcA] = Math.max(savingsByService[svcA] || 0, savA);
+  }
+  for (var b = 0; b < recs.duplicates.length; b++) {
+    // Duplicates list multiple services; attribute savings to the cheaper one
+    var svcB = (
+      recs.duplicates[b].recommend_keep ||
+      recs.duplicates[b].services_involved ||
+      ""
+    ).toLowerCase();
+    var savB = recs.duplicates[b].potential_savings_jpy || 0;
+    // Use category key if specific service is unclear
+    var dupKey = svcB || "dup_" + b;
+    savingsByService[dupKey] = Math.max(savingsByService[dupKey] || 0, savB);
+  }
   for (var c = 0; c < recs.unused.length; c++) {
-    // Only count unused subscriptions that actually cost money
     if (recs.unused[c].monthly_jpy > 0) {
-      totalPotentialSavings += recs.unused[c].monthly_jpy || 0;
+      var svcC = (recs.unused[c].service || "").toLowerCase();
+      var savC = recs.unused[c].monthly_jpy || 0;
+      savingsByService[svcC] = Math.max(savingsByService[svcC] || 0, savC);
     }
+  }
+  var totalPotentialSavings = 0;
+  var savKeys = Object.keys(savingsByService);
+  for (var sk = 0; sk < savKeys.length; sk++) {
+    totalPotentialSavings += savingsByService[savKeys[sk]];
+  }
+  // Cap at total monthly spend — savings can never exceed what you actually pay
+  if (totalPotentialSavings > analysis.totalMonthlyJpy) {
+    totalPotentialSavings = analysis.totalMonthlyJpy;
   }
 
   recs.total_potential_monthly_savings_jpy = totalPotentialSavings;
 
-  console.log(
+  debugLog(
     "[Step 5] Recommendations: " +
       recs.downgrades.length +
       " downgrades, " +
@@ -3271,31 +5509,241 @@ function generateReportSection(sectionTitle, systemPrompt, userPrompt) {
     return "(この節の生成に失敗しました。データは他の artifact ファイルを参照してください。)";
   }
   // Validate: check for known hallucinated service names
-  var hallucinatedNames = ["Tabnine", "Replit", "CodeWhisperer", "Codeium", "Ghostwriter", "Amazon Q"];
+  var hallucinatedNames = [
+    "Tabnine",
+    "Replit",
+    "CodeWhisperer",
+    "Codeium",
+    "Ghostwriter",
+    "Amazon Q",
+  ];
   var lower = text.toLowerCase();
   for (var hi = 0; hi < hallucinatedNames.length; hi++) {
     if (lower.indexOf(hallucinatedNames[hi].toLowerCase()) !== -1) {
-      debugLog("WARNING: Report section '" + sectionTitle + "' contains hallucinated service '" + hallucinatedNames[hi] + "' — retrying with stronger constraint");
+      debugLog(
+        "WARNING: Report section '" +
+          sectionTitle +
+          "' contains hallucinated service '" +
+          hallucinatedNames[hi] +
+          "' — retrying with stronger constraint",
+      );
       var retryText = llmChat(
-        systemPrompt + " 【警告】前回の出力に存在しないサービス名('" + hallucinatedNames[hi] + "')が含まれていました。提供されたデータにあるサービスのみ言及してください。",
-        userPrompt
+        systemPrompt +
+          " 【警告】前回の出力に存在しないサービス名('" +
+          hallucinatedNames[hi] +
+          "')が含まれていました。提供されたデータにあるサービスのみ言及してください。",
+        userPrompt,
       );
       if (retryText && retryText.length >= 30) {
-        return retryText;
+        text = retryText;
       }
       break;
     }
   }
+
+  var needsRetry = false;
+  var retryReason = "";
+  if (/[\u0E00-\u0E7F]/.test(text)) {
+    needsRetry = true;
+    retryReason = "日本語以外の不自然な文字列";
+  } else if (text.indexOf("季度") !== -1) {
+    needsRetry = true;
+    retryReason = "四半期の表記ゆれ";
+  } else if (/copilot\s*basic/i.test(text)) {
+    needsRetry = true;
+    retryReason = "存在しない Copilot プラン名";
+  }
+
+  if (needsRetry) {
+    var retryText2 = llmChat(
+      systemPrompt +
+        " 【警告】前回出力に " +
+        retryReason +
+        " が含まれていました。日本語のみで、価格・プラン名は入力データの表記を厳密に使って書き直してください。",
+      userPrompt,
+    );
+    if (retryText2 && retryText2.length >= 30) {
+      text = retryText2;
+    }
+  }
+
+  text = text
+    .replace(/季度/g, "四半期")
+    .replace(/[\u0E00-\u0E7F]/g, "")
+    .replace(/Copilot\s*Basic/gi, "Copilot Free");
+
   return text;
+}
+
+function sanitizePlanOptimizationRecommendations(subscriptions, rawItems) {
+  if (!Array.isArray(rawItems)) return [];
+  var cleaned = [];
+  var seen = {};
+  var totalMonthly = sumMonthly(subscriptions || []);
+  var allowedServices = [];
+  for (var si = 0; si < (subscriptions || []).length; si++) {
+    var svcName = String(subscriptions[si].service || "").trim();
+    if (svcName) allowedServices.push(svcName);
+  }
+
+  function detectMatchedService(adviceText, reasonText) {
+    var text = (String(adviceText || "") + " " + String(reasonText || "")).toLowerCase();
+    for (var mi = 0; mi < allowedServices.length; mi++) {
+      var sLower = allowedServices[mi].toLowerCase();
+      if (sLower && text.indexOf(sLower) !== -1) return allowedServices[mi];
+    }
+    return "";
+  }
+
+  for (var i = 0; i < rawItems.length; i++) {
+    var item = rawItems[i] || {};
+    var advice = String(item.advice || "").trim();
+    var reason = String(item.reason || "").trim();
+    if (!advice) continue;
+
+    advice = advice
+      .replace(/季度/g, "四半期")
+      .replace(/[\u0E00-\u0E7F]/g, "")
+      .replace(/Copilot\s*Basic/gi, "Copilot Free");
+    reason = reason
+      .replace(/季度/g, "四半期")
+      .replace(/[\u0E00-\u0E7F]/g, "")
+      .replace(/Copilot\s*Basic/gi, "Copilot Free");
+
+    var savings = Number(item.potential_savings_jpy || 0);
+    if (!isFinite(savings) || savings < 0) savings = 0;
+    if (totalMonthly > 0 && savings > totalMonthly) savings = totalMonthly;
+
+    var lowerAdvice = advice.toLowerCase();
+    var lowerReason = reason.toLowerCase();
+    if (
+      lowerAdvice.indexOf("github actions") !== -1 ||
+      lowerAdvice.indexOf("github packages") !== -1 ||
+      lowerReason.indexOf("github actions") !== -1 ||
+      lowerReason.indexOf("github packages") !== -1
+    ) {
+      continue;
+    }
+
+    var matchedService = detectMatchedService(advice, reason);
+    if (!matchedService) {
+      if (allowedServices.length === 1) matchedService = allowedServices[0];
+      else continue;
+    }
+
+    var combinedTextLower = (advice + " " + reason).toLowerCase();
+    if (
+      String(matchedService).toLowerCase().indexOf("copilot") !== -1 &&
+      /\bbasic\b/i.test(combinedTextLower)
+    ) {
+      // Guard against non-existent/unstable Copilot plan naming in LLM output.
+      continue;
+    }
+
+    var key = normalizeLooseText(advice + "|" + reason);
+    if (seen[key]) continue;
+    seen[key] = true;
+
+    cleaned.push({
+      service: matchedService,
+      advice: advice,
+      reason: reason,
+      potential_savings_jpy: Math.round(savings),
+    });
+  }
+
+  if (cleaned.length > 3) cleaned = cleaned.slice(0, 3);
+  return cleaned;
+}
+
+function buildDeterministicExecutiveSummary(analysis, recs, userProfile) {
+  var monthly = analysis.totalMonthlyJpy || 0;
+  var savings = recs.total_potential_monthly_savings_jpy || 0;
+  var subs = analysis.subscriptions || [];
+  var names = [];
+  for (var i = 0; i < subs.length; i++) {
+    names.push(subs[i].service + "（" + (subs[i].plan || "不明") + "）");
+  }
+
+  var lines = [];
+  lines.push("サブスクリプション最適化調査のエグゼクティブサマリー");
+  lines.push("");
+  lines.push(
+    "現在の月額総コストは" +
+      formatJpy(monthly) +
+      "です（対象: " +
+      (names.length ? names.join("、") : "検出なし") +
+      "）。",
+  );
+
+  if (recs.downgrades && recs.downgrades.length > 0) {
+    lines.push(
+      "主な最適化機会として、プラン見直し（ダウングレード候補）が " +
+        recs.downgrades.length +
+        " 件あります。",
+    );
+  }
+  if (recs.duplicates && recs.duplicates.length > 0) {
+    lines.push(
+      "機能重複の可能性は " +
+        recs.duplicates.length +
+        " 件で、同種機能の整理により支出削減余地があります。",
+    );
+  }
+  if (recs.unused && recs.unused.length > 0) {
+    lines.push(
+      "未使用の可能性は " +
+        recs.unused.length +
+        " 件で、継続利用の必要性確認が有効です。",
+    );
+  }
+
+  lines.push(
+    "通常シナリオでの推定節約額は最大 " +
+      formatJpy(savings) +
+      "/月です（この金額は月額総コストを上限に算出）。",
+  );
+
+  if (userProfile && userProfile.studentDiscountEligible) {
+    var stud = recs.student_discount_savings_jpy || 0;
+    if (stud > 0) {
+      lines.push(
+        "学割は通常シナリオの代替案であり、追加で " +
+          formatJpy(stud) +
+          "/月の削減可能性があります（通常節約額との単純合算はしません）。",
+      );
+    }
+  }
+
+  lines.push("");
+  lines.push("**推奨事項**");
+  if (recs.downgrades && recs.downgrades.length > 0)
+    lines.push("- まずはダウングレード候補の影響を確認し、必要機能を満たす最小プランを検討する。");
+  if (recs.duplicates && recs.duplicates.length > 0)
+    lines.push("- 重複カテゴリのサービスは、残す1件と停止候補を明確に分ける。");
+  if (recs.unused && recs.unused.length > 0)
+    lines.push("- 未使用疑いの契約は、直近利用実績を確認したうえで継続可否を判断する。");
+  if (
+    userProfile &&
+    userProfile.studentDiscountEligible &&
+    (recs.student_discount_savings_jpy || 0) > 0
+  ) {
+    lines.push("- 学割対象サービスは、通常プランの代替として適用可否を確認する。");
+  }
+
+  return lines.join("\n");
 }
 
 /**
  * Build a JSON-like summary string of subscriptions for LLM context.
  */
-function buildSubsSummaryForLlm(subs) {
+function buildSubsSummaryForLlm(subs, opts) {
+  var options = opts || {};
+  var onlyActive = !!options.onlyActive;
   var parts = [];
   for (var i = 0; i < subs.length; i++) {
     var s = subs[i];
+    if (onlyActive && s.status === "inactive") continue;
     parts.push(
       i +
         1 +
@@ -3311,6 +5759,9 @@ function buildSubsSummaryForLlm(subs) {
         (s.status || "?") +
         (s.notes ? ", notes: " + s.notes : ""),
     );
+  }
+  if (!parts.length && onlyActive) {
+    return buildSubsSummaryForLlm(subs, { onlyActive: false });
   }
   return parts.join("\n");
 }
@@ -3392,18 +5843,34 @@ function buildRecsSummaryForLlm(recs) {
  * Main report builder: generates a comprehensive Markdown report using LLM
  * for each section, following the DDG Deep Research report pattern.
  */
-function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
+function buildComprehensiveReport(
+  analysis,
+  recs,
+  localApps,
+  auditObj,
+  userProfile,
+) {
   var subs = analysis.subscriptions || [];
   var today = new Date().toISOString().split("T")[0];
+  // More robust profile detection: include if type is known OR if we have any profile signals
+  var hasProfile =
+    userProfile &&
+    (userProfile.type !== "unknown" ||
+      (userProfile.signals && userProfile.signals.length > 0) ||
+      (userProfile.githubUsername && userProfile.githubUsername.length > 0) ||
+      (userProfile.name && userProfile.name.length > 0) ||
+      (userProfile.email && userProfile.email.length > 0));
+  var isStudent = userProfile && userProfile.studentDiscountEligible;
 
   // Pre-build context strings for LLM
-  var subsSummary = buildSubsSummaryForLlm(subs);
+  var subsSummary = buildSubsSummaryForLlm(subs, { onlyActive: true });
   var appsSummary = buildAppsSummaryForLlm(localApps);
   var recsSummary = buildRecsSummaryForLlm(recs);
 
   // Build explicit service name list for validation
   var serviceNames = [];
-  for (var sni = 0; sni < subs.length; sni++) serviceNames.push(subs[sni].service);
+  for (var sni = 0; sni < subs.length; sni++)
+    serviceNames.push(subs[sni].service);
   var serviceNameListStr = serviceNames.join(", ");
 
   var sysBase =
@@ -3411,7 +5878,9 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     "マークダウン形式で出力してください。見出し(##, ###)は使わないでください（親セクションが管理します）。" +
     "【最重要ルール】以下のデータに記載されたサービス名・プラン名・価格のみを使用してください。" +
     "データに無いサービス名（例: Tabnine, Replit, Amazon CodeWhisperer, Codeium 等）は絶対に言及しないでください。" +
-    "検出されたサービスは: " + serviceNameListStr + " のみです。" +
+    "検出されたサービスは: " +
+    serviceNameListStr +
+    " のみです。" +
     "為替レートは $1 = ¥150 とし、ドル建て価格には括弧で円換算を付けてください。" +
     "データにない情報を推測・補完・捏造しないでください。";
 
@@ -3435,6 +5904,12 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     "> - 潜在的月間節約額: " +
     formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
     "\n>\n";
+  if (isStudent && recs.student_discount_savings_jpy > 0) {
+    report +=
+      "> - 🎓 学割適用時の追加節約額: " +
+      formatJpy(recs.student_discount_savings_jpy) +
+      "\n>\n";
+  }
   report +=
     "> - 重複カテゴリ: " +
     (analysis.overlaps ? analysis.overlaps.length : 0) +
@@ -3454,40 +5929,42 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "## 目次\n\n";
   report += "1. [エグゼクティブサマリー](#1-エグゼクティブサマリー)\n";
   report += "2. [調査方法](#2-調査方法)\n";
-  report += "3. [サブスクリプション詳細分析](#3-サブスクリプション詳細分析)\n";
-  report += "4. [ローカルアプリ相関分析](#4-ローカルアプリ相関分析)\n";
-  report += "5. [コスト最適化戦略](#5-コスト最適化戦略)\n";
-  report += "6. [ツール比較・競合分析](#6-ツール比較競合分析)\n";
-  report += "7. [推奨アクションプラン](#7-推奨アクションプラン)\n";
-  report += "8. [結論](#8-結論)\n";
-  report += "9. [データ付録](#9-データ付録)\n\n";
+  if (hasProfile) {
+    report +=
+      "3. [ユーザープロファイル・パーソナライズ分析](#3-ユーザープロファイルパーソナライズ分析)\n";
+    report +=
+      "4. [サブスクリプション詳細分析](#4-サブスクリプション詳細分析)\n";
+    report += "5. [ローカルアプリ相関分析](#5-ローカルアプリ相関分析)\n";
+    report += "6. [コスト最適化戦略](#6-コスト最適化戦略)\n";
+    report += "7. [ツール比較・競合分析](#7-ツール比較競合分析)\n";
+    report += "8. [推奨アクションプラン](#8-推奨アクションプラン)\n";
+    report += "9. [結論](#9-結論)\n";
+    report += "10. [データ付録](#10-データ付録)\n\n";
+  } else {
+    report +=
+      "3. [サブスクリプション詳細分析](#3-サブスクリプション詳細分析)\n";
+    report += "4. [ローカルアプリ相関分析](#4-ローカルアプリ相関分析)\n";
+    report += "5. [コスト最適化戦略](#5-コスト最適化戦略)\n";
+    report += "6. [ツール比較・競合分析](#6-ツール比較競合分析)\n";
+    report += "7. [推奨アクションプラン](#7-推奨アクションプラン)\n";
+    report += "8. [結論](#8-結論)\n";
+    report += "9. [データ付録](#9-データ付録)\n\n";
+  }
   report += "---\n\n";
 
-  // ─── 1. Executive Summary (LLM) ───
-  console.log("  → エグゼクティブサマリー...");
-  var execSummary = generateReportSection(
-    "Executive Summary",
-    sysBase,
-    "以下のデータに基づき、AIコーディングツールのサブスクリプション最適化調査のエグゼクティブサマリーを200〜400語で作成してください。" +
-      "現在の月額総コスト、検出した主要サブスクリプション、主要な最適化機会、推定節約額を含めてください。\n\n" +
-      "■ サブスクリプション一覧:\n" +
-      subsSummary +
-      "\n\n" +
-      "■ 月額合計: " +
-      formatJpy(analysis.totalMonthlyJpy) +
-      "\n" +
-      "■ 推定節約可能額: " +
-      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
-      "/月\n\n" +
-      "■ 推奨事項概要:\n" +
-      recsSummary,
+  // ─── 1. Executive Summary (Deterministic) ───
+  debugLog("  → エグゼクティブサマリー...");
+  var execSummary = buildDeterministicExecutiveSummary(
+    analysis,
+    recs,
+    userProfile,
   );
   report += "## 1. エグゼクティブサマリー\n\n";
   report += execSummary + "\n\n";
   report += "---\n\n";
 
   // ─── 2. Methodology ───
-  console.log("  → 調査方法...");
+  debugLog("  → 調査方法...");
   report += "## 2. 調査方法\n\n";
   report += "### 2.1 データ収集プロセス\n\n";
   report += "本調査では、以下の多層的アプローチでデータを収集しました：\n\n";
@@ -3531,9 +6008,321 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     " |\n\n";
   report += "---\n\n";
 
-  // ─── 3. Per-Subscription Analysis (LLM) ───
-  console.log("  → サブスクリプション詳細分析...");
-  report += "## 3. サブスクリプション詳細分析\n\n";
+  // ─── Section numbering offset based on profile ───
+  var sOff = hasProfile ? 1 : 0; // section offset for numbering
+
+  // ─── 3 (if profile): User Profile & Personalized Analysis ───
+  if (hasProfile) {
+    debugLog("  → ユーザープロファイル・パーソナライズ分析...");
+    report += "## 3. ユーザープロファイル・パーソナライズ分析\n\n";
+
+    // Profile summary table
+    report += "### 3.1 ユーザープロファイル\n\n";
+    report += "| 項目 | 値 |\n|---|---|\n";
+    var profileTypeJa =
+      userProfile.type === "student"
+        ? "学生"
+        : userProfile.type === "likely_student"
+          ? "学生（推定）"
+          : userProfile.type === "oss_contributor"
+            ? "OSSコントリビューター"
+            : userProfile.type === "professional"
+              ? "プロフェッショナル"
+              : userProfile.type === "hobbyist"
+                ? "ホビー開発者"
+                : "一般ユーザー";
+    report += "| プロファイルタイプ | **" + profileTypeJa + "** |\n";
+    report +=
+      "| 信頼度 | " + (userProfile.confidence * 100).toFixed(0) + "% |\n";
+    if (userProfile.name) {
+      report += "| 名前 | " + userProfile.name + " |\n";
+    }
+    if (userProfile.email) {
+      var emailParts = userProfile.email.split("@");
+      var maskedEmail =
+        emailParts[0].substring(0, 2) + "***@" + (emailParts[1] || "");
+      report += "| メールドメイン | " + maskedEmail + " |\n";
+    }
+    if (userProfile.githubUsername) {
+      report +=
+        "| GitHub | [@" +
+        userProfile.githubUsername +
+        "](https://github.com/" +
+        userProfile.githubUsername +
+        ") |\n";
+      report += "| 公開リポジトリ | " + userProfile.github.publicRepos + " |\n";
+      report += "| フォロワー | " + userProfile.github.followers + " |\n";
+      if (userProfile.github.plan !== "free") {
+        report += "| GitHub プラン | " + userProfile.github.plan + " |\n";
+      }
+      if (userProfile.github.isEducation) {
+        report += "| GitHub Education | ✅ 認証済み |\n";
+      }
+    }
+    if (userProfile.detectedOrganization) {
+      var orgClean = String(userProfile.detectedOrganization)
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\|/g, "／")
+        .trim();
+      report += "| 所属組織 | " + safeMd(orgClean) + " |\n";
+    }
+    if (userProfile.github.orgs.length > 0) {
+      report +=
+        "| GitHub Orgs | " +
+        userProfile.github.orgs
+          .map(function (o) {
+            return o.name;
+          })
+          .join(", ") +
+        " |\n";
+    }
+    if (userProfile.github.bio) {
+      // Strip \r, newlines, and replace pipe chars that break markdown tables
+      var bioClean = String(userProfile.github.bio)
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\|/g, "／")
+        .trim();
+      report += "| GitHub Bio | " + safeMd(bioClean) + " |\n";
+    }
+    if (userProfile.github.location) {
+      report += "| 所在地 | " + safeMd(userProfile.github.location) + " |\n";
+    }
+    report += "\n";
+
+    // Tech Stack section
+    if (userProfile.techStack.primaryLanguages.length > 0) {
+      report += "### 3.2 技術スタック分析\n\n";
+      var roleJa = {
+        fullstack: "フルスタック",
+        frontend: "フロントエンド",
+        backend: "バックエンド",
+        data_science: "データサイエンス",
+        mobile: "モバイル",
+        general: "汎用",
+      };
+      report += "| 項目 | 情報 |\n|---|---|\n";
+      report +=
+        "| 主要言語 | " +
+        userProfile.techStack.primaryLanguages.join(", ") +
+        " |\n";
+      report +=
+        "| 開発ロール | " +
+        (roleJa[userProfile.techStack.devRole] ||
+          userProfile.techStack.devRole) +
+        " |\n";
+      if (userProfile.techStack.frameworks.length > 0) {
+        report +=
+          "| フレームワーク | " +
+          userProfile.techStack.frameworks.join(", ") +
+          " |\n";
+      }
+      report +=
+        "| ローカルプロジェクト数 | " +
+        userProfile.techStack.totalProjects +
+        " |\n\n";
+
+      // GitHub pinned repos
+      if (userProfile.github.pinnedRepos.length > 0) {
+        report += "**GitHub ピン留めリポジトリ:**\n\n";
+        report += "| リポジトリ | 言語 | Stars | 説明 |\n|---|---|---:|---|\n";
+        for (var pri = 0; pri < userProfile.github.pinnedRepos.length; pri++) {
+          var pr = userProfile.github.pinnedRepos[pri];
+          report +=
+            "| " +
+            safeMd(pr.name) +
+            " | " +
+            safeMd(pr.language || "-") +
+            " | " +
+            (pr.stars || 0) +
+            " | " +
+            safeMd(pr.description || "") +
+            " |\n";
+        }
+        report += "\n";
+      }
+    }
+
+    // Detection signals
+    if (userProfile.signals.length > 0) {
+      report += "### 3.3 検出シグナル\n\n";
+      for (var psi = 0; psi < userProfile.signals.length; psi++) {
+        report += "- " + userProfile.signals[psi] + "\n";
+      }
+      report += "\n";
+    }
+
+    // ─── 3.4 Student discounts ───
+    var studentDiscounts = recs.studentDiscounts || [];
+    var discountsWithSavings = [];
+    var discountsNoDiscount = [];
+    for (var sdi = 0; sdi < studentDiscounts.length; sdi++) {
+      if (studentDiscounts[sdi].savings_jpy > 0) {
+        discountsWithSavings.push(studentDiscounts[sdi]);
+      } else {
+        discountsNoDiscount.push(studentDiscounts[sdi]);
+      }
+    }
+
+    if (discountsWithSavings.length > 0) {
+      report += "### 3.4 🎓 学割適用可能なサービス\n\n";
+      report +=
+        "| サービス | 現在のプラン | 現在の月額 | 学割プラン | 学割月額 | 月間節約額 |\n";
+      report += "|---|---|---:|---|---:|---:|\n";
+      var totalStudentSavings = 0;
+      for (var dwi = 0; dwi < discountsWithSavings.length; dwi++) {
+        var dw = discountsWithSavings[dwi];
+        totalStudentSavings += dw.savings_jpy;
+        report +=
+          "| " +
+          safeMd(dw.service) +
+          " | " +
+          safeMd(dw.current_plan) +
+          " | " +
+          formatJpy(dw.current_monthly_jpy) +
+          " | " +
+          safeMd(dw.student_plan) +
+          " | " +
+          (dw.student_price || "¥0") +
+          " | **" +
+          formatJpy(dw.savings_jpy) +
+          "** |\n";
+      }
+      report +=
+        "| | | | | **合計節約額** | **" +
+        formatJpy(totalStudentSavings) +
+        "/月** |\n\n";
+
+      report += "**学割申請方法:**\n\n";
+      for (var hai = 0; hai < discountsWithSavings.length; hai++) {
+        var ha = discountsWithSavings[hai];
+        report += "**" + ha.service + ":**\n";
+        if (ha.how_to_apply) report += "- 申請方法: " + ha.how_to_apply + "\n";
+        if (ha.note) report += "- 備考: " + ha.note + "\n";
+        report += "\n";
+      }
+    }
+
+    if (discountsNoDiscount.length > 0) {
+      report += "### 学割なしのサービス\n\n";
+      for (var ndi = 0; ndi < discountsNoDiscount.length; ndi++) {
+        var nd = discountsNoDiscount[ndi];
+        report +=
+          "- **" + nd.service + "**: " + (nd.note || "学割情報なし") + "\n";
+      }
+      report += "\n";
+    }
+
+    // ─── 3.5 OSS License opportunities ───
+    var ossLicenses = recs.ossLicenses || [];
+    if (ossLicenses.length > 0) {
+      report += "### 3.5 🔓 OSSコントリビューター特典\n\n";
+      report +=
+        "| サービス | 現在の月額 | OSSライセンス | OSSプラン | 月間節約額 |\n";
+      report += "|---|---:|---|---|---:|\n";
+      for (var oli = 0; oli < ossLicenses.length; oli++) {
+        var ol = ossLicenses[oli];
+        report +=
+          "| " +
+          safeMd(ol.service) +
+          " | " +
+          formatJpy(ol.current_monthly_jpy) +
+          " | " +
+          safeMd(ol.oss_plan) +
+          " | " +
+          formatJpy(ol.oss_price_jpy) +
+          " | **" +
+          formatJpy(ol.savings_jpy) +
+          "** |\n";
+      }
+      report += "\n";
+      for (var oai = 0; oai < ossLicenses.length; oai++) {
+        var oa = ossLicenses[oai];
+        report += "**" + oa.service + " (OSS):**\n";
+        report += "- 条件: " + oa.requirement + "\n";
+        report += "- 申請方法: " + oa.how_to_apply + "\n";
+        if (oa.note) report += "- 備考: " + oa.note + "\n";
+        report += "\n";
+      }
+    }
+
+    // ─── 3.6 Tech stack alignment ───
+    var techAlign = recs.techStackAlignment || [];
+    if (techAlign.length > 0) {
+      report += "### 3.6 🛠 技術スタック最適化\n\n";
+      report +=
+        "あなたの技術スタックに基づく、各言語に最適な AI コーディングツールの分析です。\n\n";
+      for (var tai = 0; tai < techAlign.length; tai++) {
+        var ta = techAlign[tai];
+        report += "**" + ta.language + ":**\n";
+        report += "- 推奨ツール: " + ta.bestTools.join(", ") + "\n";
+        report += "- 理由: " + ta.reason + "\n";
+        if (ta.alreadyUsing.length > 0) {
+          report += "- ✅ 既に利用中: " + ta.alreadyUsing.join(", ") + "\n";
+        }
+        if (ta.couldConsider.length > 0) {
+          report += "- 💡 検討候補: " + ta.couldConsider.join(", ") + "\n";
+        }
+        report += "- → " + ta.recommendation + "\n\n";
+      }
+    }
+
+    // ─── 3.7 LLM-based plan optimization ───
+    var planOpt = recs.planOptimization || [];
+    if (planOpt.length > 0) {
+      report += "### 3.7 💡 パーソナライズド最適化アドバイス\n\n";
+      report +=
+        "あなたのプロファイル・技術スタック・利用パターンに基づいた提案です。\n\n";
+      for (var poi = 0; poi < planOpt.length; poi++) {
+        var po = planOpt[poi];
+        report += poi + 1 + ". **" + safeMd(po.advice || "") + "**\n";
+        report += "   - 理由: " + safeMd(po.reason || "") + "\n";
+        if (po.potential_savings_jpy > 0) {
+          report +=
+            "   - 節約見込み: " + formatJpy(po.potential_savings_jpy) + "/月\n";
+        }
+        report += "\n";
+      }
+    }
+
+    // ─── 3.8 Enterprise coverage ───
+    var entCov = recs.enterpriseCoverage || [];
+    if (entCov.length > 0) {
+      report += "### 3.8 🏢 組織ライセンス確認\n\n";
+      for (var eci = 0; eci < entCov.length; eci++) {
+        var ec = entCov[eci];
+        report +=
+          "**" +
+          (ec.type === "org_licenses"
+            ? "GitHub Organization"
+            : "企業ライセンス") +
+          ":**\n";
+        report += "- " + ec.message + "\n";
+        report += "- 📋 アクション: " + ec.action + "\n";
+        if (ec.potential_savings_jpy > 0) {
+          report +=
+            "- 節約可能額: " + formatJpy(ec.potential_savings_jpy) + "/月\n";
+        }
+        report += "\n";
+      }
+    }
+
+    // ─── Total personalized savings ───
+    if (recs.personalized_savings_jpy > 0) {
+      report += "### パーソナライズド分析による合計節約見込み\n\n";
+      report +=
+        "> **" +
+        formatJpy(recs.personalized_savings_jpy) +
+        "/月** （代替シナリオ別の上限値）\n\n";
+      report +=
+        "> 注: 学割・OSS・法人ライセンスは互いに代替関係となる場合があり、単純合算しません。\n\n";
+    }
+
+    report += "---\n\n";
+  }
+
+  // ─── Per-Subscription Analysis (LLM) ───
+  debugLog("  → サブスクリプション詳細分析...");
+  report += "## " + (3 + sOff) + ". サブスクリプション詳細分析\n\n";
 
   if (subs.length === 0) {
     report += "検出されたサブスクリプションはありません。\n\n";
@@ -3545,7 +6334,12 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       var jpyStr = formatJpy(sf.monthly_jpy);
       subsFactsheet += "### **" + sf.service + "**\n";
       subsFactsheet += "- プラン: " + (sf.plan || "不明") + "\n";
-      subsFactsheet += "- 価格: " + (sf.raw_price || jpyStr + "/月") + " (月額換算: " + jpyStr + ")\n";
+      subsFactsheet +=
+        "- 価格: " +
+        (sf.raw_price || jpyStr + "/月") +
+        " (月額換算: " +
+        jpyStr +
+        ")\n";
       subsFactsheet += "- 請求周期: " + (sf.billing_period || "不明") + "\n";
       subsFactsheet += "- ステータス: " + (sf.status || "不明") + "\n";
       subsFactsheet += "- ソース: " + (sf.source_type || "不明") + "\n";
@@ -3570,8 +6364,8 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "---\n\n";
 
   // ─── 4. Local App Correlation (LLM) ───
-  console.log("  → ローカルアプリ相関分析...");
-  report += "## 4. ローカルアプリ相関分析\n\n";
+  debugLog("  → ローカルアプリ相関分析...");
+  report += "## " + (4 + sOff) + ". ローカルアプリ相関分析\n\n";
 
   var correlationText = generateReportSection(
     "App Correlation",
@@ -3607,12 +6401,19 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
   report += "---\n\n";
 
   // ─── 5. Cost Optimization Strategy (LLM) ───
-  console.log("  → コスト最適化戦略...");
+  debugLog("  → コスト最適化戦略...");
   // Build explicit cost breakdown so LLM doesn't make up numbers
   var costBreakdown = "";
   for (var cbi = 0; cbi < subs.length; cbi++) {
     var cbs = subs[cbi];
-    costBreakdown += "- " + cbs.service + " (" + (cbs.plan || "?") + "): " + formatJpy(cbs.monthly_jpy) + "/月\n";
+    costBreakdown +=
+      "- " +
+      cbs.service +
+      " (" +
+      (cbs.plan || "?") +
+      "): " +
+      formatJpy(cbs.monthly_jpy) +
+      "/月\n";
   }
   var costStrategy = generateReportSection(
     "Cost Strategy",
@@ -3633,12 +6434,12 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       "■ 推奨事項:\n" +
       recsSummary,
   );
-  report += "## 5. コスト最適化戦略\n\n";
+  report += "## " + (5 + sOff) + ". コスト最適化戦略\n\n";
   report += costStrategy + "\n\n";
   report += "---\n\n";
 
   // ─── 6. Competitive Comparison (LLM) ───
-  console.log("  → ツール比較・競合分析...");
+  debugLog("  → ツール比較・競合分析...");
   var compAnalysis = generateReportSection(
     "Competitive Analysis",
     sysBase +
@@ -3651,12 +6452,12 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       "■ ローカルインストール済み:\n" +
       appsSummary,
   );
-  report += "## 6. ツール比較・競合分析\n\n";
+  report += "## " + (6 + sOff) + ". ツール比較・競合分析\n\n";
   report += compAnalysis + "\n\n";
   report += "---\n\n";
 
   // ─── 7. Action Plan (LLM) ───
-  console.log("  → 推奨アクションプラン...");
+  debugLog("  → 推奨アクションプラン...");
   var actionPlan = generateReportSection(
     "Action Plan",
     sysBase +
@@ -3673,18 +6474,21 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
       "/月",
   );
-  report += "## 7. 推奨アクションプラン\n\n";
+  report += "## " + (7 + sOff) + ". 推奨アクションプラン\n\n";
   report += actionPlan + "\n\n";
   report += "---\n\n";
 
   // ─── 8. Conclusions (LLM) ───
-  console.log("  → 結論...");
+  debugLog("  → 結論...");
   var conclusions = generateReportSection(
     "Conclusions",
-    sysBase + " 結論では提供されたサービス名のみ言及してください。存在しないサービス名を絶対に使わないでください。",
+    sysBase +
+      " 結論では提供されたサービス名のみ言及してください。存在しないサービス名を絶対に使わないでください。",
     "以下のデータに基づき、AIコーディングツールのサブスクリプション最適化調査の結論を200〜300語でまとめてください。" +
       "主要な発見、推奨アクションの要約、今後のレビュー計画を含めてください。\n\n" +
-      "■ 検出サービス一覧 (これ以外のサービス名は使用禁止): " + serviceNameListStr + "\n" +
+      "■ 検出サービス一覧 (これ以外のサービス名は使用禁止): " +
+      serviceNameListStr +
+      "\n" +
       "■ サブスクリプション数: " +
       subs.length +
       "\n" +
@@ -3697,21 +6501,24 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
       "■ 推定節約可能額: " +
       formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
       "/月\n" +
-      "■ 各サービスの月額:\n" + costBreakdown + "\n" +
+      "■ 各サービスの月額:\n" +
+      costBreakdown +
+      "\n" +
       "■ 推奨事項数: ダウングレード " +
       (recs.downgrades ? recs.downgrades.length : 0) +
       ", 重複 " +
       (recs.duplicates ? recs.duplicates.length : 0) +
       ", 未使用 " +
       (recs.unused ? recs.unused.length : 0) +
-      "\n■ 推奨事項概要:\n" + recsSummary,
+      "\n■ 推奨事項概要:\n" +
+      recsSummary,
   );
-  report += "## 8. 結論\n\n";
+  report += "## " + (8 + sOff) + ". 結論\n\n";
   report += conclusions + "\n\n";
   report += "---\n\n";
 
   // ─── 9. Data Appendix (static) ───
-  report += "## 9. データ付録\n\n";
+  report += "## " + (9 + sOff) + ". データ付録\n\n";
   report += "### 9.1 サブスクリプション一覧\n\n";
   report +=
     "| # | サービス | プラン | 価格 | 月額(¥) | 請求周期 | ステータス | ソース |\n";
@@ -3765,7 +6572,7 @@ function buildComprehensiveReport(analysis, recs, localApps, auditObj) {
     "*サブスクリプションの変更は一切行っていません。すべての推奨事項は手動での確認・実行が必要です。*\n";
   report += "*Generated: " + new Date().toISOString() + "*\n";
 
-  return report;
+  return { report: report, execSummary: execSummary };
 }
 
 // ============================================================================
@@ -3813,14 +6620,14 @@ function writeArtifacts(
   // 7e. analysis_report.md (LLM-generated comprehensive report)
   if (comprehensiveReport) {
     writeFile(outputDir + "/analysis_report.md", comprehensiveReport);
-    console.log(
+    debugLog(
       "  Report size: " +
         (comprehensiveReport.length / 1000).toFixed(1) +
         " KB",
     );
   }
 
-  console.log("[Step 7] Artifacts written to " + outputDir);
+  debugLog("[Step 7] Artifacts written to " + outputDir);
 }
 
 function buildInventoryMarkdown(analysis) {
@@ -4015,6 +6822,150 @@ function buildOptimizationPlanMarkdown(analysis, recs) {
     }
   }
 
+  // D. Student Discount Opportunities
+  if (recs.studentDiscounts && recs.studentDiscounts.length > 0) {
+    lines.push("## D. Student Discount Opportunities");
+    lines.push("");
+    lines.push(
+      "> ユーザープロファイル分析により、学割の適用可能性が検出されました。",
+    );
+    lines.push("");
+    lines.push(
+      "| サービス | 現在のプラン | 現在の月額 | 学割プラン | 学割月額 | 節約額/月 | 申請方法 |",
+    );
+    lines.push("|---|---|---:|---|---:|---:|---|");
+    for (var sd = 0; sd < recs.studentDiscounts.length; sd++) {
+      var disc = recs.studentDiscounts[sd];
+      lines.push(
+        "| " +
+          safeMd(disc.service) +
+          " | " +
+          safeMd(disc.current_plan) +
+          " | " +
+          formatJpy(disc.current_monthly_jpy || 0) +
+          " | " +
+          safeMd(disc.student_plan) +
+          " | " +
+          formatJpy(disc.student_monthly_jpy || 0) +
+          " | " +
+          formatJpy(disc.savings_jpy || 0) +
+          " | " +
+          safeMd(disc.how_to_apply) +
+          " |",
+      );
+    }
+    lines.push("");
+    lines.push(
+      "**学割による追加節約見込み:** " +
+        formatJpy(recs.student_discount_savings_jpy || 0) +
+        "/月",
+    );
+    lines.push("");
+    lines.push(
+      "> **注意:** 学割適用には学生証明（.eduメール、在学証明書等）が必要です。",
+    );
+    lines.push("> 各サービスの公式ページで最新の学割条件を確認してください。");
+    lines.push("");
+  }
+
+  // E. OSS License Opportunities
+  if (recs.ossLicenses && recs.ossLicenses.length > 0) {
+    lines.push("## E. OSS Contributor License Opportunities");
+    lines.push("");
+    lines.push(
+      "> OSSコントリビューターとして無料/割引ライセンスを申請できるサービスが見つかりました。",
+    );
+    lines.push("");
+    lines.push(
+      "| サービス | 現在の月額 | OSSプラン | OSS月額 | 節約額/月 | 条件 |",
+    );
+    lines.push("|---|---:|---|---:|---:|---|");
+    for (var oe = 0; oe < recs.ossLicenses.length; oe++) {
+      var osl = recs.ossLicenses[oe];
+      lines.push(
+        "| " +
+          safeMd(osl.service) +
+          " | " +
+          formatJpy(osl.current_monthly_jpy || 0) +
+          " | " +
+          safeMd(osl.oss_plan) +
+          " | " +
+          formatJpy(osl.oss_price_jpy || 0) +
+          " | " +
+          formatJpy(osl.savings_jpy || 0) +
+          " | " +
+          safeMd(osl.requirement) +
+          " |",
+      );
+    }
+    lines.push("");
+    for (var oed = 0; oed < recs.ossLicenses.length; oed++) {
+      var osld = recs.ossLicenses[oed];
+      lines.push("**" + osld.service + ":** " + safeMd(osld.how_to_apply));
+      if (osld.note) lines.push("  - " + safeMd(osld.note));
+      lines.push("");
+    }
+  }
+
+  // F. Tech Stack Alignment
+  if (recs.techStackAlignment && recs.techStackAlignment.length > 0) {
+    lines.push("## F. Tech Stack Tool Alignment");
+    lines.push("");
+    lines.push("> あなたの技術スタックに基づく最適なツール選択のガイドです。");
+    lines.push("");
+    for (var tf = 0; tf < recs.techStackAlignment.length; tf++) {
+      var tsa = recs.techStackAlignment[tf];
+      lines.push("### " + tsa.language);
+      lines.push("");
+      lines.push("- **推奨ツール:** " + tsa.bestTools.join(", "));
+      lines.push("- **理由:** " + safeMd(tsa.reason));
+      if (tsa.alreadyUsing.length > 0)
+        lines.push("- **✅ 利用中:** " + tsa.alreadyUsing.join(", "));
+      if (tsa.couldConsider.length > 0)
+        lines.push("- **💡 検討候補:** " + tsa.couldConsider.join(", "));
+      lines.push("- **→ " + safeMd(tsa.recommendation) + "**");
+      lines.push("");
+    }
+  }
+
+  // G. Enterprise Coverage
+  if (recs.enterpriseCoverage && recs.enterpriseCoverage.length > 0) {
+    lines.push("## G. Organization & Enterprise License Check");
+    lines.push("");
+    lines.push("> 所属組織や企業のライセンスカバレッジの確認です。");
+    lines.push("");
+    for (var eg = 0; eg < recs.enterpriseCoverage.length; eg++) {
+      var ecv = recs.enterpriseCoverage[eg];
+      lines.push("- **" + safeMd(ecv.message) + "**");
+      lines.push("  - アクション: " + safeMd(ecv.action));
+      if (ecv.potential_savings_jpy > 0) {
+        lines.push(
+          "  - 節約可能額: " + formatJpy(ecv.potential_savings_jpy) + "/月",
+        );
+      }
+      lines.push("");
+    }
+  }
+
+  // H. Personalized Plan Optimization (LLM advice)
+  if (recs.planOptimization && recs.planOptimization.length > 0) {
+    lines.push("## H. Personalized Optimization Advice");
+    lines.push("");
+    lines.push("> AI分析によるパーソナライズド最適化アドバイスです。");
+    lines.push("");
+    for (var ph = 0; ph < recs.planOptimization.length; ph++) {
+      var pov = recs.planOptimization[ph];
+      lines.push(ph + 1 + ". **" + safeMd(pov.advice || "") + "**");
+      lines.push("   - 理由: " + safeMd(pov.reason || ""));
+      if (pov.potential_savings_jpy > 0) {
+        lines.push(
+          "   - 節約見込み: " + formatJpy(pov.potential_savings_jpy) + "/月",
+        );
+      }
+      lines.push("");
+    }
+  }
+
   lines.push("---");
   lines.push("");
   lines.push("## Review Checklist");
@@ -4025,6 +6976,22 @@ function buildOptimizationPlanMarkdown(analysis, recs) {
     "- [ ] Review overlap categories — some services may complement each other",
   );
   lines.push("- [ ] Confirm savings estimates with official pricing pages");
+  if (recs.studentDiscounts && recs.studentDiscounts.length > 0) {
+    lines.push(
+      "- [ ] Verify student discount eligibility with .edu email or enrollment proof",
+    );
+    lines.push("- [ ] Apply for student plans listed in Section D");
+  }
+  if (recs.ossLicenses && recs.ossLicenses.length > 0) {
+    lines.push(
+      "- [ ] Check OSS license eligibility for active open-source projects (Section E)",
+    );
+  }
+  if (recs.enterpriseCoverage && recs.enterpriseCoverage.length > 0) {
+    lines.push(
+      "- [ ] Contact organization admin to check existing enterprise licenses (Section G)",
+    );
+  }
   lines.push("- [ ] Set a follow-up review date (30 days recommended)");
 
   return lines.join("\n");
@@ -4042,42 +7009,47 @@ function workflow() {
   resolveConfig();
 
   // --- Step 0: Pre-Execution Audit ---
-  console.log("[Step 0] Building pre-execution audit...");
+  debugLog("[Step 0] Building pre-execution audit...");
   var auditObj = buildPreExecutionAudit();
   auditLog("pre_execution_audit", "Generated");
 
-  console.log("\n========================================");
-  console.log("  PRE-EXECUTION AUDIT");
-  console.log("========================================");
-  console.log(JSON.stringify(auditObj, null, 2));
-  console.log("========================================\n");
+  debugLog("\n========================================");
+  debugLog("  PRE-EXECUTION AUDIT");
+  debugLog("========================================");
+  debugLog(JSON.stringify(auditObj, null, 2));
+  debugLog("========================================\n");
 
   if (auditObj.detected_billing_tabs.length === 0) {
-    console.log("[WARN] No billing tabs detected in browser.");
     console.log(
+      "[INFO] No pre-opened billing tabs detected. Proceeding with auto-opened billing sources.",
+    );
+    debugLog(
       "  Open billing/subscription pages in Floorp, then re-run this workflow.",
     );
-    console.log("  Proceeding with local-only analysis...\n");
+    debugLog("  Proceeding with local-only analysis...\n");
   }
 
   if (AUDIT_ONLY) {
-    console.log(
+    debugLog(
       "[AUDIT_ONLY] Stopping after audit. Set AUDIT_ONLY=false to proceed.\n",
     );
     return { ok: true, audit_only: true, audit: auditObj };
   }
 
+  // --- Step 0.5: User Profile Detection ---
+  var userProfile = detectUserProfile();
+
   // --- Step 1: Local App Inventory ---
-  console.log("\n[Step 1] Building local app inventory...");
+  debugLog("\n[Step 1] Building local app inventory...");
   var localApps = buildLocalAppInventory();
 
   // --- Step 1.5: Filter local apps to AI coding tools only ---
-  console.log(
+  debugLog(
     "\n[Step 1.5] Filtering local apps — keeping AI coding tools only...",
   );
   var preFilterCount = localApps.length;
   localApps = filterLocalAppsToAiTools(localApps);
-  console.log(
+  debugLog(
     "[Step 1.5] " +
       preFilterCount +
       " apps → " +
@@ -4092,18 +7064,18 @@ function workflow() {
   );
 
   // --- Currency setup ---
-  console.log("\n[Currency] Fetching exchange rates...");
+  debugLog("\n[Currency] Fetching exchange rates...");
   fetchExchangeRates();
 
   // --- Step 2: Subscription Inventory ---
-  console.log("\n[Step 2] Building subscription inventory from browser...");
+  debugLog("\n[Step 2] Building subscription inventory from browser...");
   var rawSubscriptions = buildSubscriptionInventory();
 
   // --- Step 3: Normalise & deduplicate ---
-  console.log("\n[Step 3] Normalising and deduplicating...");
+  debugLog("\n[Step 3] Normalising and deduplicating...");
   var normalised = normaliseSubscriptions(rawSubscriptions);
   var deduped = deduplicateSubscriptions(normalised);
-  console.log(
+  debugLog(
     "[Step 3] " +
       deduped.length +
       " unique subscriptions after dedup (from " +
@@ -4116,12 +7088,12 @@ function workflow() {
   );
 
   // --- Step 3.2: Filter subscriptions to AI coding tools only ---
-  console.log(
+  debugLog(
     "\n[Step 3.2] Filtering subscriptions — keeping AI coding tools only...",
   );
   var preSubFilterCount = deduped.length;
   deduped = filterSubscriptionsToAiTools(deduped);
-  console.log(
+  debugLog(
     "[Step 3.2] " +
       preSubFilterCount +
       " subscriptions → " +
@@ -4136,30 +7108,28 @@ function workflow() {
   );
 
   // --- Step 3.5: Web Exploration (DuckDuckGo search for pricing & plan verification) ---
-  console.log(
-    "\n[Step 3.5] Web exploration for pricing & plan verification...",
-  );
+  debugLog("\n[Step 3.5] Web exploration for pricing & plan verification...");
   var webResult = webExploreAndVerify(deduped, localApps);
   deduped = webResult.subscriptions;
 
   // If web exploration found new subscription candidates, normalise and add them
   if (webResult.newCandidates.length > 0) {
-    console.log(
+    debugLog(
       "[Step 3.5] Adding " +
         webResult.newCandidates.length +
         " newly discovered subscription candidate(s)...",
     );
     var newNorm = normaliseSubscriptions(webResult.newCandidates);
     deduped = deduplicateSubscriptions(deduped.concat(newNorm));
-    console.log(
+    debugLog(
       "[Step 3.5] Total after merge: " + deduped.length + " subscriptions",
     );
   }
 
   // --- Step 4: Join & Analyse ---
-  console.log("\n[Step 4] Joining apps with subscriptions...");
+  debugLog("\n[Step 4] Joining apps with subscriptions...");
   var analysis = joinAndAnalyse(localApps, deduped);
-  console.log(
+  debugLog(
     "[Step 4] Total monthly: " +
       formatJpy(analysis.totalMonthlyJpy) +
       " | Overlaps: " +
@@ -4169,23 +7139,62 @@ function workflow() {
   );
 
   // --- Step 5: Recommendations ---
-  console.log("\n[Step 5] Generating recommendations...");
+  debugLog("\n[Step 5] Generating recommendations...");
   var recs = generateRecommendations(analysis);
 
+  // --- Step 5.5: Personalized Profile-Based Recommendations ---
+  var personalizedRecs = generatePersonalizedRecommendations(
+    analysis.subscriptions,
+    userProfile,
+  );
+  // Merge personalized recs into main recs object
+  recs.studentDiscounts = personalizedRecs.studentDiscounts || [];
+  recs.ossLicenses = personalizedRecs.ossLicenses || [];
+  recs.techStackAlignment = personalizedRecs.techStackAlignment || [];
+  recs.planOptimization = personalizedRecs.planOptimization || [];
+  recs.enterpriseCoverage = personalizedRecs.enterpriseCoverage || [];
+  recs.student_discount_savings_jpy = 0;
+  recs.personalized_savings_jpy =
+    personalizedRecs.totalPersonalizedSavingsJpy || 0;
+  if (recs.personalized_savings_jpy > analysis.totalMonthlyJpy) {
+    recs.personalized_savings_jpy = analysis.totalMonthlyJpy;
+  }
+  // Calculate student-only savings for backward compat
+  for (var sdi = 0; sdi < recs.studentDiscounts.length; sdi++) {
+    recs.student_discount_savings_jpy +=
+      recs.studentDiscounts[sdi].savings_jpy || 0;
+  }
+  auditLog(
+    "personalized_recs",
+    JSON.stringify({
+      student: recs.studentDiscounts.filter(function (s) {
+        return s.savings_jpy > 0;
+      }).length,
+      oss: recs.ossLicenses.length,
+      techStack: recs.techStackAlignment.length,
+      planOpt: recs.planOptimization.length,
+      enterprise: recs.enterpriseCoverage.length,
+      totalSavings: recs.personalized_savings_jpy,
+    }),
+  );
+
   // --- Step 6: Actions Queue ---
-  console.log("\n[Step 6] Building actions queue...");
+  debugLog("\n[Step 6] Building actions queue...");
   var actionsQueue = buildActionsQueue(analysis, recs);
   auditLog("build_actions_queue", actionsQueue.length + " actions");
 
   // --- Step 6.5: Comprehensive Report Generation (LLM) ---
-  console.log("\n[Step 6.5] Generating comprehensive analysis report...");
-  var comprehensiveReport = buildComprehensiveReport(
+  debugLog("\n[Step 6.5] Generating comprehensive analysis report...");
+  var reportResult = buildComprehensiveReport(
     analysis,
     recs,
     localApps,
     auditObj,
+    userProfile,
   );
-  console.log(
+  var comprehensiveReport = reportResult.report;
+  var execSummary = reportResult.execSummary;
+  debugLog(
     "[Step 6.5] Report generated: " +
       (comprehensiveReport.length / 1000).toFixed(1) +
       " KB",
@@ -4193,7 +7202,7 @@ function workflow() {
   auditLog("generate_report", comprehensiveReport.length + " chars");
 
   // --- Step 7: Write Artifacts ---
-  console.log("\n[Step 7] Writing artifacts...");
+  debugLog("\n[Step 7] Writing artifacts...");
   writeArtifacts(
     CONFIG.outputBaseDir,
     analysis,
@@ -4203,17 +7212,34 @@ function workflow() {
     comprehensiveReport,
   );
 
-  // --- Done ---
+  // --- Executive Summary & Done ---
   console.log("\n========================================");
+  console.log("  RESULTS SUMMARY");
+  console.log("========================================");
+  console.log(
+    "Apps: " +
+      localApps.length +
+      " | Subs: " +
+      deduped.length +
+      " | Monthly: " +
+      formatJpy(analysis.totalMonthlyJpy) +
+      " | Savings: " +
+      formatJpy(recs.total_potential_monthly_savings_jpy || 0) +
+      "/mo",
+  );
+  if (userProfile.studentDiscountEligible) {
+    console.log("Profile: Student — additional discounts available");
+  }
+  console.log("----------------------------------------");
+  // Output exec summary line-by-line to avoid console truncation
+  var summaryLines = execSummary.split("\n");
+  for (var sl = 0; sl < summaryLines.length; sl++) {
+    console.log(summaryLines[sl]);
+  }
+  console.log("========================================");
   console.log("  COMPLETE — NO CHANGES WERE MADE");
   console.log("========================================");
   console.log("Output: " + CONFIG.outputBaseDir);
-  console.log("Files:");
-  console.log("  1. subscriptions_inventory.md");
-  console.log("  2. optimization_plan.md");
-  console.log("  3. actions_queue.json");
-  console.log("  4. audit_log.json");
-  console.log("  5. analysis_report.md  ← NEW: LLM comprehensive report");
   console.log("========================================\n");
 
   auditLog("workflow_complete", "All artifacts written successfully");
@@ -4230,5 +7256,15 @@ function workflow() {
       unused: recs.unused.length,
     },
     totalPotentialSavingsJpy: recs.total_potential_monthly_savings_jpy || 0,
+    personalizedSavingsJpy: recs.personalized_savings_jpy || 0,
+    studentDiscountSavingsJpy: recs.student_discount_savings_jpy || 0,
+    userProfile: {
+      type: userProfile.type,
+      githubUsername: userProfile.githubUsername,
+      primaryLanguages: userProfile.techStack.primaryLanguages,
+      devRole: userProfile.techStack.devRole,
+      ossEligible: userProfile.ossLicenseEligible,
+      studentEligible: userProfile.studentDiscountEligible,
+    },
   };
 }
