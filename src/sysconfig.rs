@@ -12,6 +12,9 @@ use crate::dummy_plugin::dummy_plugin_package;
 use exec::{core_exec_plugin_package, exec_plugin_package};
 use fetch::{core_fetch_plugin_package, fetch_plugin_package};
 use filesystem::{core_filesystem_plugin_package, filesystem_plugin_package};
+use floorp::{core_floorp_plugin_package, floorp_plugin_package};
+use ocr::{core_ocr_plugin_package, ocr_plugin_package};
+use llm_chat::{core_llm_chat_plugin_package, llm_chat_plugin_package};
 use search::{core_search_plugin_package, search_plugin_package};
 use window::{core_window_plugin_package, window_plugin_package};
 
@@ -35,6 +38,9 @@ pub fn sysconfig() -> SysConfig {
         core_plugin_package: vec![
             Arc::new(core_fetch_plugin_package()),
             Arc::new(core_filesystem_plugin_package()),
+            Arc::new(core_floorp_plugin_package()),
+            Arc::new(core_ocr_plugin_package()),
+            Arc::new(core_llm_chat_plugin_package()),
             Arc::new(core_search_plugin_package()),
             Arc::new(core_window_plugin_package()),
             Arc::new(core_exec_plugin_package()),
@@ -42,6 +48,9 @@ pub fn sysconfig() -> SysConfig {
         initial_plugins: vec![
             fetch_plugin_package(),
             filesystem_plugin_package(),
+            floorp_plugin_package(),
+            ocr_plugin_package(),
+            llm_chat_plugin_package(),
             search_plugin_package(),
             window_plugin_package(),
             exec_plugin_package(),
