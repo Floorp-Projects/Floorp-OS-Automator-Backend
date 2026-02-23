@@ -201,10 +201,13 @@ pub fn llm_call(user_query: &str) -> Result<String, Box<dyn Error>> {
 ///
 /// Returns the response text produced by the model, or an error when environment variables or the API call fail.
 pub async fn _llm_call_async(user_query: &str) -> Result<String, Box<dyn Error>> {
-    // OpenRouter のエンドポイント
-    let api_base = &env::var("OPENAI_API_BASE")?;
-    let api_key = &env::var("OPENAI_API_KEY")?;
-    let model = &env::var("OPENAI_MODEL")?;
+    // Ollama の OpenAI互換エンドポイント
+    let api_base = env::var("OPENAI_API_BASE")
+        .unwrap_or_else(|_| "http://127.0.0.1:11434/v1".to_string());
+    let api_key = env::var("OPENAI_API_KEY")
+        .unwrap_or_else(|_| "ollama".to_string());
+    let model = env::var("OPENAI_MODEL")
+        .unwrap_or_else(|_| "gemma3n:e4b".to_string());
 
     let client = Client::with_config(
         OpenAIConfig::new()

@@ -15,7 +15,7 @@ use sapphillon_core::runtime::OpStateWorkflowData;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
-const DEFAULT_OLLAMA_MODEL: &str = "gemma3:4b";
+const DEFAULT_OLLAMA_MODEL: &str = "gemma3n:e4b";
 const DEFAULT_OLLAMA_BASE_URL: &str = "http://127.0.0.1:11434";
 
 // ============================================================================
@@ -36,7 +36,7 @@ pub fn llm_chat_chat_plugin_function() -> PluginFunction {
 pub fn llm_chat_plugin_package() -> PluginPackage {
     PluginPackage {
         package_id: "app.sapphillon.core.llm_chat".to_string(),
-        package_name: "LLM | Ollama".to_string(),
+        package_name: "LLM | Gemma3n Ollama".to_string(),
         provider_id: "".to_string(),
         description: "A plugin to interact with a local Ollama LLM instance.".to_string(),
         functions: vec![llm_chat_chat_plugin_function()],
