@@ -9,7 +9,7 @@ Sapphillon は、汎用的なワークフロー自動化プラットフォーム
 ### Sapphillon の役割
 
 - **gRPC サーバー**: Floorp ブラウザおよびフロントエンドアプリケーションとの通信を担当
-- **ワークフローエンジン**: [Sapphillon-Core](https://github.com/Sapphillon/Sapphillon-Core) をベースに、ワークフローの実行・管理を提供
+- **ワークフローエンジン**: [Sapphillon](https://github.com/Sapphillon/Sapphillon) をベースに、ワークフローの実行・管理を提供
 - **プラグインシステム**: ファイルシステム操作、Web リクエスト、ウィンドウ管理、OCR など、OS レベルの自動化プラグインを搭載
 - **データ永続化**: SQLite（Sea-ORM）によるワークフローおよびプラグインデータの管理
 
