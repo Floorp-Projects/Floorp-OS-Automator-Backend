@@ -34,7 +34,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
- "tonic 0.14.2",
+ "tonic 0.14.6",
  "tonic-build",
  "tonic-reflection",
  "tonic-web",
@@ -7939,7 +7939,7 @@ dependencies = [
  "prost 0.14.1",
  "prost-types",
  "serde",
- "tonic 0.14.2",
+ "tonic 0.14.6",
  "tonic-prost",
 ]
 
@@ -8876,7 +8876,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "tokio",
- "tonic 0.14.2",
+ "tonic 0.14.6",
  "unescaper",
  "url",
  "windows-sys 0.61.2",
@@ -10882,9 +10882,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.14.2"
+version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb7613188ce9f7df5bfe185db26c5814347d110db17920415cf2fbcad85e7203"
+checksum = "ac2a5518c70fa84342385732db33fb3f44bc4cc748936eb5833d2df34d6445ef"
 dependencies = [
  "async-trait",
  "axum 0.8.8",
@@ -10923,26 +10923,26 @@ dependencies = [
 
 [[package]]
 name = "tonic-prost"
-version = "0.14.2"
+version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66bd50ad6ce1252d87ef024b3d64fe4c3cf54a86fb9ef4c631fdd0ded7aeaa67"
+checksum = "50849f68853be452acf590cde0b146665b8d507b3b8af17261df47e02c209ea0"
 dependencies = [
  "bytes",
  "prost 0.14.1",
- "tonic 0.14.2",
+ "tonic 0.14.6",
 ]
 
 [[package]]
 name = "tonic-reflection"
-version = "0.14.2"
+version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34da53e8387581d66db16ff01f98a70b426b091fdf76856e289d5c1bd386ed7b"
+checksum = "acccd136a4bf19810a1fde9c74edc6129b42a66b44d0c1c8aaa67aeb49a146a7"
 dependencies = [
  "prost 0.14.1",
  "prost-types",
  "tokio",
  "tokio-stream",
- "tonic 0.14.2",
+ "tonic 0.14.6",
  "tonic-prost",
 ]
 
@@ -10958,7 +10958,7 @@ dependencies = [
  "http-body 1.0.1",
  "pin-project",
  "tokio-stream",
- "tonic 0.14.2",
+ "tonic 0.14.6",
  "tower-layer",
  "tower-service",
  "tracing",
