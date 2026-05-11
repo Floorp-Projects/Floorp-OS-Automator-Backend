@@ -26,7 +26,7 @@ deno_error = "0.7.0"
 x-win = "5.3.3"
 
 tonic = { version = "0.14.1", default-features = false, features = ["codegen", "transport", "router"] }
-prost = { version = "0.14.1", default-features = false, features = ["std"] }
+prost = { version = "0.14.3", default-features = false, features = ["std"] }
 prost-types = { version = "0.14.1", default-features = false }
 sapphillon_core = { git = "ssh://git@github.com/Sapphillon/Sapphillon-Core.git", tag = "v0.17.0" }
 tonic-build = "0.14.1"
